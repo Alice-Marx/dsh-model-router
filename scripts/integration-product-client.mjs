@@ -28,6 +28,7 @@ export async function bundleProductClient({root=ROOT}={}) {
   if (galInputs.length) throw new Error(`Product bundle contains GAL dependencies: ${galInputs.join(', ')}`)
   const code = [
     '// Generated from apps/integration-client. Includes Apache-2.0 DS Bot sources; see modules/bot-runtime/SOURCE.json and vendor/ds-bot/UPSTREAM_NOTICE.',
+    '// Includes jsQR 1.4.0 (Apache-2.0): https://github.com/cozmo/jsQR; license: apps/integration-client/licenses/jsqr-1.4.0-LICENSE.txt.',
     'window.__ModuleLoader__.load({', `  id: ${JSON.stringify(pkg.name)},`, '  factory: (require) => {',
     '    var module = { exports: {} };', '    var exports = module.exports;', result.outputFiles[0].text.trimEnd(),
     '    return module.exports;', '  },', '});', '',

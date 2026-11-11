@@ -2,6 +2,46 @@ param([ValidateSet('server','client','supervise','probe','protect')][string]$Mod
 $ErrorActionPreference = 'Stop'
 [Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false, $true)
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$compilerPhase = $true
+try {
+  # Host-allocated compilation storage is separate from the CLI's private
+  # profile/TEMP. The root hint is not a peer credential or an execution grant.
+  $compilerRoot = $env:DSH_NATIVE_COMPILER_ROOT
+  $compilerScratch = $env:DSH_NATIVE_COMPILER_SCRATCH
+  if ([string]::IsNullOrEmpty($compilerRoot) -or [string]::IsNullOrEmpty($compilerScratch) -or
+      $compilerRoot.Length -gt 140 -or $compilerScratch.Length -gt 160 -or
+      -not [System.IO.Path]::IsPathRooted($compilerRoot) -or -not [System.IO.Path]::IsPathRooted($compilerScratch) -or
+      [System.IO.Path]::GetFileName($compilerRoot) -notmatch '^dshc-[a-f0-9]{16}$' -or
+      [System.IO.Path]::GetFileName($compilerScratch) -notmatch '^c-[A-Za-z0-9]{6}$' -or
+      -not [string]::Equals([System.IO.Path]::GetDirectoryName($compilerScratch), $compilerRoot, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'COMPILER_STORAGE_INVALID' }
+  $ownerSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+  foreach ($compilerPath in @($compilerRoot, $compilerScratch)) {
+    $directory = [System.IO.DirectoryInfo]::new($compilerPath)
+    if (-not $directory.Exists -or ($directory.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'COMPILER_STORAGE_INVALID' }
+    $security = [System.Security.AccessControl.DirectorySecurity]::new()
+    $security.SetAccessRuleProtection($true, $false)
+    $security.SetOwner($ownerSid)
+    $security.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($ownerSid, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
+    $directory.SetAccessControl($security)
+    $actual = $directory.GetAccessControl()
+    $rules = @($actual.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
+    if (-not $actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or $rules[0].IdentityReference.Value -ne $ownerSid.Value -or
+        $rules[0].AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow -or
+        $rules[0].FileSystemRights -ne [System.Security.AccessControl.FileSystemRights]::FullControl) { throw 'COMPILER_ACL_UNCONFIRMED' }
+  }
+  if ([System.IO.File]::ReadAllText([System.IO.Path]::Combine($compilerRoot, '.dsh-root')) -ne ('dsh-native-compiler-v1:' + [System.IO.Path]::GetFileName($compilerRoot) + "`n") -or
+      [System.IO.File]::ReadAllText([System.IO.Path]::Combine($compilerScratch, '.dsh-owner')) -notmatch '^[a-f0-9]{32}$') { throw 'COMPILER_STORAGE_INVALID' }
+  $compilerParameters = [System.CodeDom.Compiler.CompilerParameters]::new()
+  $compilerParameters.GenerateInMemory = $true
+  $compilerParameters.GenerateExecutable = $false
+  $compilerParameters.TempFiles = [System.CodeDom.Compiler.TempFileCollection]::new($compilerScratch, $false)
+  [void]$compilerParameters.ReferencedAssemblies.Add('System.dll')
+  [void]$compilerParameters.ReferencedAssemblies.Add('System.Core.dll')
+  $privateTemps = @{ TEMP = $env:TEMP; TMP = $env:TMP; TMPDIR = $env:TMPDIR }
+  try {
+    # csc's Win32 resource generator also uses the process TEMP; change it only
+    # for compilation, then restore it before admitting any CLI process.
+    $env:TEMP = $compilerScratch; $env:TMP = $compilerScratch; $env:TMPDIR = $compilerScratch
 # Only packaged source is compiled. No supplied command or script is evaluated.
 Add-Type -TypeDefinition @'
 using System;
@@ -286,8 +326,12 @@ public static class DshNativePeer {
     return result;
   }
 }
-'@
-try {
+'@ -CompilerParameters $compilerParameters
+  } finally {
+    foreach ($key in @('TEMP','TMP','TMPDIR')) { [System.Environment]::SetEnvironmentVariable($key, $privateTemps[$key], 'Process') }
+    [System.Environment]::SetEnvironmentVariable('DSH_NATIVE_COMPILER_SCRATCH', $null, 'Process')
+  }
+  $compilerPhase = $false
   if ($Mode -eq 'probe') {
     $result = [DshNativePeer]::ProbeJob()
     $response = @{ peer = 'windows-kernel-pid'; supervisor = 'windows-job'; available = ($result -eq 'OK') }
@@ -308,4 +352,8 @@ try {
   elseif ($Mode -eq 'server') { [DshNativePeer]::Server($spec.endpoint,[int]$spec.rootPid,[string]$spec.rootStart,[int]$spec.ttlMs) }
   elseif ($Mode -eq 'client') { [DshNativePeer]::Client($spec.endpoint,[int]$spec.serverPid,[string]$spec.serverStart,[int]$spec.ttlMs) }
   else { [DshNativePeer]::Supervise($spec.executable,[string[]]$spec.args,$spec.cwd,[int]$spec.ttlMs) }
-} catch { [Console]::Error.WriteLine('NATIVE_PEER_REFUSED: ' + $_.Exception.GetBaseException().Message); exit 2 }
+} catch {
+  $code = if ($compilerPhase) { 'NATIVE_COMPILER_FAILED' } else { $_.Exception.GetBaseException().Message }
+  if ($code -notmatch '^[A-Z][A-Z0-9_]{0,79}$') { $code = 'NATIVE_PEER_FAILED' }
+  [Console]::Error.WriteLine('NATIVE_PEER_REFUSED: ' + $code); exit 2
+}

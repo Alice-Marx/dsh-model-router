@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
+execFileSync(process.execPath,[resolve(root,'scripts/build-openmaus-protocol.mjs')],{cwd:root,stdio:'inherit',windowsHide:true})
 execFileSync(process.execPath, [resolve(root, 'remote-computer-agent/build.mjs')], {
   cwd: root, stdio: 'inherit', windowsHide: true,
 })

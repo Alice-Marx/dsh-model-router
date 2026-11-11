@@ -1,0 +1,68 @@
+--- a/src/host/store.js
++++ b/src/host/store.js
+@@ -430,6 +430,8 @@
+   const roomOwners = new Map()
+   /** @type {Map<string, {botId?:string, roomId?:string}>} */
+   const pastOwners = new Map()
++  /** @type {Map<string, string>} */
++  const threadOwners = new Map()
+   const chatOf = botId => botOf(botId)?.sessionId ?? botId
+   const sessionOfRoom = room => (room === undefined ? undefined : room.sessionId ?? room.id)
+   const indexSessions = () => {
+@@ -437,9 +439,23 @@
+     groupOwners.clear()
+     roomOwners.clear()
+     pastOwners.clear()
++    threadOwners.clear()
+     for (const bot of Object.values(state.bots)) {
+       for (const segment of bot.segments ?? []) pastOwners.set(segment.sessionId, { botId: bot.id })
+       chatOwners.set(chatOf(bot.id), bot.id)
++      // A live thread Session is another own chat of the same Bot: it speaks
++      // with the Bot's identity, prompt, tools and money, so it sits in
++      // chatOwners beside the Bot's default chat. chatOf() stays the default
++      // chat, which is a different thing from any one thread. An archived
++      // thread keeps its history readable and gains no authority.
++      for (const thread of bot.threads ?? []) {
++        if (thread?.sessionId === undefined) continue
++        if (thread.archivedAt === undefined || thread.archivedAt === null) {
++          if (chatOwners.has(thread.sessionId)) { warn('ds-bot: thread Session %s is owned already; it keeps its first owner', thread.sessionId); continue }
++          chatOwners.set(thread.sessionId, bot.id)
++          threadOwners.set(thread.sessionId, bot.id)
++        } else pastOwners.set(thread.sessionId, { botId: bot.id, threadId: thread.threadId })
++      }
+     }
+     for (const room of Object.values(state.rooms)) {
+       const sessionId = sessionOfRoom(room)
+@@ -461,6 +477,22 @@
+   const selfOf = id => chatOwners.get(id) ?? groupOwners.get(id)?.botId ?? pastOwners.get(id)?.botId
+   // A Session where the Bot speaks now, as opposed to an archived segment.
+   const isBotSession = id => chatOwners.has(id) || groupOwners.has(id)
++  // Threads: several independent own chats under one Bot. threadsOf() is the
++  // read-only record list, threadOf() the live owner of one Session, and
++  // sessionsOfBot() every Session that speaks for a Bot.
++  const threadsOf = botId => (botOf(botId)?.threads ?? []).map(thread => ({ ...thread }))
++  const threadOf = sessionId => {
++    if (typeof sessionId !== 'string') return undefined
++    for (const bot of Object.values(state.bots)) {
++      for (const thread of bot.threads ?? []) {
++        if (thread.sessionId !== sessionId) continue
++        return thread.archivedAt === undefined || thread.archivedAt === null ? { botId: bot.id, threadId: thread.threadId } : undefined
++      }
++    }
++    return undefined
++  }
++  const threadSessionOf = (botId, threadId) => threadsOf(botId).find(thread => thread.threadId === threadId)?.sessionId
++  const sessionsOfBot = botId => [...new Set([botId, chatOf(botId), ...(botOf(botId)?.segments ?? []).map(segment => segment.sessionId), ...threadsOf(botId).map(thread => thread.sessionId), ...groupSessionsOf(botId)])]
+   const groupSessionsOf = botId => Object.values(state.rooms).map(room => room.sessions?.[botId]).filter(Boolean)
+   const dropGroupSession = (room, botId) => {
+     if (room.memberDirs !== undefined) delete room.memberDirs[botId]
+@@ -506,7 +538,8 @@
+   Object.assign(rt, {
+     state, load, save, refresh, readOnly, own,
+     botOf, roomOf, isMain, chatOf, sessionOfRoom, selfOf, isBotSession,
+-    chatOwners, groupOwners, roomOwners, pastOwners,
++    chatOwners, groupOwners, roomOwners, pastOwners, threadOwners,
++    threadsOf, threadOf, threadSessionOf, sessionsOfBot,
+     groupSessionsOf, dropGroupSession, retireGroupSession, findBot, findRooms, isAdminOf,
+   })
+ }

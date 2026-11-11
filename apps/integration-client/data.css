@@ -1,0 +1,69 @@
+/* Data panel surfaces. Colours come from the shared --bp-* tokens so the panel
+ * follows the workspace light/dark theme automatically; the parent concatenates
+ * this sheet with the others (see data-wiring.patch). Nothing here executes. */
+
+.bp-data .bp-data-load-form,
+.bp-data .bp-data-query {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 12px;
+  align-items: end;
+  margin: 10px 0 4px;
+}
+.bp-data .bp-data-query { grid-template-columns: 1fr; }
+.bp-data .bp-data-load-form label,
+.bp-data label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--bp-muted); }
+.bp-data input,
+.bp-data select,
+.bp-data textarea {
+  font: inherit; font-size: 13px; color: var(--bp-ink); background: var(--bp-surface);
+  border: 1px solid var(--bp-border); border-radius: 8px; padding: 7px 9px; min-height: 24px; width: 100%;
+}
+.bp-data textarea { resize: vertical; font-family: var(--bp-font); }
+.bp-data input:focus-visible,
+.bp-data select:focus-visible,
+.bp-data textarea:focus-visible { outline: 2px solid var(--bp-focus); outline-offset: 1px; }
+.bp-data h3 { margin: 20px 0 6px; }
+.bp-data section { margin-top: 4px; }
+
+.bp-data-tables, .bp-data-card-list { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bp-data-tables li, .bp-data-card-list li {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 10px; border: 1px solid var(--bp-border); border-radius: 10px; background: var(--bp-surface);
+}
+.bp-data-tables li > .bp-muted { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.bp-data-card-list li { justify-content: space-between; }
+.bp-data .bp-row-actions { display: inline-flex; gap: 6px; margin-left: auto; }
+
+.bp-data-table-wrap { overflow: auto; border: 1px solid var(--bp-border); border-radius: 10px; margin: 12px 0; max-width: 100%; }
+.bp-data-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.bp-data-table caption { text-align: left; padding: 8px 10px; color: var(--bp-muted); font-size: 12px; }
+.bp-data-table th, .bp-data-table td { padding: 7px 10px; border-bottom: 1px solid var(--bp-border); text-align: left; white-space: nowrap; }
+.bp-data-table th { position: sticky; top: 0; background: var(--bp-subtle); font-weight: 600; z-index: 1; }
+.bp-data-table td { font-variant-numeric: tabular-nums; }
+.bp-data-table tbody tr:last-child td { border-bottom: 0; }
+.bp-data-type { display: block; font-weight: 400; font-size: 10px; color: var(--bp-quiet); text-transform: uppercase; letter-spacing: .03em; }
+
+.bp-data-chart { margin: 12px 0; }
+.bp-data-chart svg { width: 100%; height: auto; max-width: 720px; background: var(--bp-surface); border: 1px solid var(--bp-border); border-radius: 10px; }
+.bp-data-grid { stroke: var(--bp-border); stroke-width: 1; }
+.bp-data-axis { fill: var(--bp-muted); font-size: 11px; }
+.bp-data-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--bp-muted); }
+.bp-data-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.bp-data-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+.bp-data-result p, .bp-data-card .bp-card-title { margin: 4px 0; }
+
+.bp-data .bp-data-chart-editor .bp-data-load-form { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.bp-data .bp-actions { display: flex; gap: 8px; align-items: center; margin: 8px 0 4px; }
+.bp-data .bp-actions button { font: inherit; font-size: 13px; padding: 7px 12px; border: 1px solid var(--bp-border); border-radius: 8px; background: var(--bp-surface); color: var(--bp-ink); cursor: pointer; }
+.bp-data .bp-actions .bp-button-primary { color: var(--bp-on-solid); background: var(--bp-solid); border-color: var(--bp-solid); }
+.bp-data button:disabled { opacity: .55; cursor: not-allowed; }
+.bp-data-chart-editor p.bp-muted { margin: 6px 0 0; }
+
+@container (max-width: 600px) {
+  .bp-data .bp-data-load-form { grid-template-columns: 1fr; }
+  .bp-data-tables li { flex-direction: column; align-items: stretch; }
+  .bp-data .bp-row-actions { margin-left: 0; }
+  .bp-data-table th, .bp-data-table td { padding: 6px 8px; }
+}

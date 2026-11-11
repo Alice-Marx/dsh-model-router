@@ -72,6 +72,11 @@ export function HeaderPill({ sessionId, useRoster, useSessions, useSessionStatus
   const doing = useActivity(map => map[owner])
   const bot = roster.byId[sessionId]
   const room = roster.roomsById[sessionId]
+  // A thread is another own chat of this Bot: the header keeps naming the Bot,
+  // because that is who is speaking, and adds the thread so the owner can tell
+  // two contexts of the same Bot apart at a glance.
+  const thread = roster.threadsById?.[sessionId]
+  const threadName = typeof thread?.name === 'string' ? thread.name.trim() : ''
   const goal = room?.goal
   const goalCompose = useUi(state => state.goalCompose === sessionId)
   const goalOpen = useUi(state => state.goalOpen === sessionId)
@@ -116,7 +121,7 @@ export function HeaderPill({ sessionId, useRoster, useSessions, useSessionStatus
   }, [showGoal])
   const pill = h('button', {
     type: 'button', className: 'bt-pill', 'aria-expanded': away ? undefined : detailsOpen, 'data-memory': memoryNotice ? 'updated' : undefined,
-    'aria-label': away ? t('Back to chat') : memoryNotice ? t('Memory updated. Open {name}\'s memory', { name: roster.byId[changed]?.name ?? name }) : t('View conversation details'),
+    'aria-label': away ? t('Back to chat') : memoryNotice ? t('Memory updated. Open {name}\'s memory', { name: roster.byId[changed]?.name ?? name }) : threadName ? `${t('View conversation details')} · ${threadName}` : t('View conversation details'),
     title: away ? name : undefined,
     onClick: () => (away ? selectView('chat') : memoryNotice ? actions.openMemory(changed) : actions.toggleDetails(sessionId)),
   },
@@ -127,6 +132,7 @@ export function HeaderPill({ sessionId, useRoster, useSessions, useSessionStatus
         h('span', { className: 'bt-pill-goal' }, h('span', { className: 'bt-pill-ico', 'aria-hidden': true }, h(GoalIcon)), h('span', { className: 'bt-pill-title' }, view.title)),
         h('span', { className: 'bt-pill-name' }, name))
       : h('span', { className: 'bt-pill-name' }, away ? t('Back to chat') : bot?.name ?? room?.name ?? (title || t('New chat'))),
+    threadName ? h('span', { className: 'bt-swap' }, threadName) : null,
     goalShown && view?.number !== undefined ? h('span', { className: 'bt-pill-count' }, `${view.number}/${view.count}`) : null,
     h(MemoryNotice, { shown: memoryNotice }),
     h('span', { className: 'bt-pill-go', 'aria-hidden': true }, h(GoArrow)))
@@ -134,7 +140,8 @@ export function HeaderPill({ sessionId, useRoster, useSessions, useSessionStatus
     showGoal ? h(GoalIsland, { room, goal, view, open: goalOpen, composing: goalCompose, roomWork, roster, actions, pill }) : pill,
     h('span', { className: 'bt-sr', role: 'status' }, memoryNotice ? t('Memory updated') : ''),
     h(NewMessagePills, { key: sessionId, sessionId, useSessions, useUi, useTurnClock }),
-    h(ActivityIndicator, { key: `activity:${sessionId}`, sessionId, useRoster, useSessionStatus, useSession, useLive, useWork, actions }))
+    h(ActivityIndicator, { key: `activity:${sessionId}`, sessionId, useRoster, useSessionStatus, useSession, useLive, useWork, actions }),
+    typeof actions.conversationAddon === 'function' ? h(actions.conversationAddon, { sessionId, bot, room, roster, actions, running }) : null)
 }
 
 // New-message pills. "N new messages ↓" takes Back to bottom's place when

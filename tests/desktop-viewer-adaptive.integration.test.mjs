@@ -67,5 +67,34 @@ test('a reduced JPEG maps a real canvas pointer to physical monitor pixels', asy
       assert.deepEqual(input.event, { type: 'key', action: type === 'keydown' ? 'down' : 'up', code: 'Enter', key: 'Enter' })
       await act(async () => message({ type: 'input', id: input.id, ok: true }))
     }
+    await act(async()=>canvas.dispatchEvent(new dom.window.MouseEvent('pointerdown',{bubbles:true,clientX:580,clientY:320,button:0})))
+    const held=socket.sent.filter(item=>item.type==='input').at(-1);await act(async()=>message({type:'input',id:held.id,ok:true}))
+    await act(async()=>canvas.dispatchEvent(new dom.window.MouseEvent('pointerup',{bubbles:true,clientX:50,clientY:0,button:0})))
+    assert.equal(socket.sent.at(-1).type,'release-input','a captured release outside the visible frame must not leave a remote drag held')
+    await act(async()=>message({type:'release-input',id:socket.sent.at(-1).id,ok:true}))
   } finally { await act(async () => root.unmount()); for (const key of globals) globalThis[key] = previous[key]; dom.window.close() }
+})
+
+test('duplicate connect clicks share one attempt, and reconnect cannot discard an unconfirmed original desktop stop',async()=>{
+  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'}),keys=['window','document','Element','HTMLElement','WebSocket','IS_REACT_ACT_ENVIRONMENT']
+  const previous=Object.fromEntries(keys.map(key=>[key,globalThis[key]]));let socket,opens=0,confirmed=false;const closes=[],gate=Promise.withResolvers()
+  class Socket{readyState=1;constructor(){socket=this}send(){}close(){this.readyState=3}}
+  for(const key of keys)globalThis[key]=key==='IS_REACT_ACT_ENVIRONMENT'?true:dom.window[key]
+  globalThis.WebSocket=Socket
+  const container=document.getElementById('root'),root=createRoot(container),button=label=>[...container.querySelectorAll('button')].find(value=>value.textContent===label)
+  try{
+    await act(()=>root.render(React.createElement(DesktopViewer,{botId:'bot-a',machines:[{id:'machine-a'}],openSession:async()=>{opens++;if(opens===1)await gate.promise;return {sessionId:`desktop-${opens}`,token:'a'.repeat(43),websocketUrl:'ws://localhost/',expiresAt:Date.now()+60000}},
+      renewSession:async()=>({}),closeSession:async(botId,sessionId)=>{closes.push({botId,sessionId});return {stopConfirmed:confirmed}}})))
+    await act(async()=>{button('连接桌面').click();button('连接桌面').click();await new Promise(setImmediate)})
+    assert.equal(opens,1)
+    await act(async()=>{gate.resolve();await new Promise(setImmediate);socket.onopen();socket.onmessage({data:JSON.stringify({type:'ready',mode:'watch'})})})
+    await act(async()=>{button('重新连接').click();await new Promise(setImmediate)})
+    assert.equal(opens,1);assert.match(container.textContent,/上一桌面尚未确认释放输入/)
+    assert.equal(button('断开').disabled,false)
+    confirmed=true
+    await act(async()=>{button('断开').click();await new Promise(setImmediate)})
+    assert.deepEqual(closes,[{botId:'bot-a',sessionId:'desktop-1'},{botId:'bot-a',sessionId:'desktop-1'}])
+    await act(async()=>{button('连接桌面').click();await new Promise(setImmediate)})
+    assert.equal(opens,2)
+  }finally{await act(()=>root.unmount());dom.window.close();for(const key of keys)globalThis[key]=previous[key]}
 })

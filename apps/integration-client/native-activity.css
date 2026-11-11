@@ -1,0 +1,141 @@
+/* Native tool activity surface.
+ *
+ * One calm, compact surface for what a native engine actually did. It shares the
+ * chat tokens (--bp-chat-*) and the body[data-bot-product-ui] scope, so light,
+ * dark and 375px come from the same palette and rules as the rest of the chat.
+ *
+ * Scope. Every rule hangs off body[data-bot-product-ui], so the Harness
+ * workbench, other Sessions and the plain Agent view keep their own styling.
+ * Nothing here overrides layout, the composer or any native control: this is an
+ * observation, not a second toolbar.
+ *
+ * Colour lives in the chat tokens. The browser verifier checks state-label
+ * contrast on the rendered surface. The four states use shape and word as well
+ * as colour, so a colour-blind owner still reads 进行中 / 已返回 / 返回错误 /
+ * 待核对, and a late CLI return never borrows the success colour.
+ */
+
+html body[data-bot-product-ui] .bp-na-chip,
+html body[data-bot-product-ui] .bp-na-card-toggle {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 26px; max-width: 100%;
+  padding: 3px 9px 3px 7px; border: 1px solid var(--bp-chat-line); border-radius: 999px;
+  background: var(--bp-chat-surface); color: var(--bp-chat-muted); font-size: 11px; line-height: 1.4;
+  text-align: left; white-space: nowrap; cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-na-chip:hover,
+html body[data-bot-product-ui] .bp-na-card-toggle:hover { color: var(--bp-chat-ink); background: var(--bp-chat-hover); }
+html body[data-bot-product-ui] .bp-na-chip > svg,
+html body[data-bot-product-ui] .bp-na-card-toggle > svg { flex: none; }
+html body[data-bot-product-ui] .bp-na-chip-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+html body[data-bot-product-ui] .bp-na-chip-count {
+  flex: none; padding: 0 5px; border-radius: 999px; background: var(--bp-chat-inset);
+  color: var(--bp-chat-muted); font-size: 10px; font-variant-numeric: tabular-nums;
+}
+/* A state is carried by its word first and its colour second, so the four states
+   stay apart without depending on hue alone. */
+html body[data-bot-product-ui] .bp-na-chip[data-state=running],
+html body[data-bot-product-ui] .bp-na-card[data-state=running] { color: var(--bp-chat-accent); border-color: var(--bp-chat-accent); }
+html body[data-bot-product-ui] .bp-na-chip[data-state=running] > svg:first-child { animation: bp-na-pulse 1.6s ease-in-out infinite; }
+@keyframes bp-na-pulse { 50% { opacity: .4; } }
+html body[data-bot-product-ui] .bp-na-chip[data-state=cli-error],
+html body[data-bot-product-ui] .bp-na-card[data-state=cli-error] { color: var(--bp-chat-danger); border-color: var(--bp-chat-danger); }
+html body[data-bot-product-ui] .bp-na-chip[data-state=turn-unconfirmed],
+html body[data-bot-product-ui] .bp-na-card[data-state=turn-unconfirmed] { color: var(--bp-chat-warning); border-color: var(--bp-chat-warning); }
+
+html body[data-bot-product-ui] .bp-na-dialog {
+  position: fixed; z-index: 60; width: min(360px, calc(100vw - 24px)); max-height: min(420px, calc(100vh - 32px));
+  display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--bp-chat-line-strong);
+  border-radius: 14px; background: var(--bp-chat-surface); color: var(--bp-chat-ink); box-shadow: var(--bp-chat-shadow-float);
+}
+html body[data-bot-product-ui] .bp-na-dialog > header {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none;
+  padding: 9px 10px 9px 13px; border-bottom: 1px solid var(--bp-chat-line); font-size: 12px;
+}
+html body[data-bot-product-ui] .bp-na-dialog > header button {
+  display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--bp-chat-muted); cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-na-dialog > header button:hover { color: var(--bp-chat-ink); background: var(--bp-chat-inset); }
+html body[data-bot-product-ui] .bp-na-dialog-body { min-height: 0; overflow: auto; padding: 8px 10px 11px; }
+html body[data-bot-product-ui] .bp-na-scope {
+  margin: 0 3px 8px; color: var(--bp-chat-muted); font-size: 10px; line-height: 1.5;
+}
+html body[data-bot-product-ui] .bp-na-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+html body[data-bot-product-ui] .bp-na-row {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; grid-auto-rows: auto;
+  align-items: start; gap: 3px 8px; padding: 7px 3px; border-radius: 9px;
+}
+html body[data-bot-product-ui] .bp-na-row:hover { background: var(--bp-chat-inset); }
+html body[data-bot-product-ui] .bp-na-row-icon {
+  display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px;
+  background: var(--bp-chat-inset); color: var(--bp-chat-muted);
+}
+html body[data-bot-product-ui] .bp-na-row[data-state=running] .bp-na-row-icon { color: var(--bp-chat-accent); }
+html body[data-bot-product-ui] .bp-na-row[data-state=cli-error] .bp-na-row-icon { color: var(--bp-chat-danger); }
+html body[data-bot-product-ui] .bp-na-row[data-state=turn-unconfirmed] .bp-na-row-icon { color: var(--bp-chat-warning); }
+html body[data-bot-product-ui] .bp-na-row[data-state=cli-ok] .bp-na-row-icon { color: var(--bp-chat-accent); }
+html body[data-bot-product-ui] .bp-na-row-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+html body[data-bot-product-ui] .bp-na-row-title { font-size: 12px; color: var(--bp-chat-ink); overflow-wrap: anywhere; }
+html body[data-bot-product-ui] .bp-na-row-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 10px; color: var(--bp-chat-muted); }
+html body[data-bot-product-ui] .bp-na-state {
+  display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; border-radius: 999px;
+  border: 1px solid var(--bp-chat-line); background: var(--bp-chat-canvas); font-size: 10px; color: var(--bp-chat-muted);
+}
+html body[data-bot-product-ui] .bp-na-state[data-state=running] { color: var(--bp-chat-accent); border-color: var(--bp-chat-accent); }
+html body[data-bot-product-ui] .bp-na-state[data-state=cli-error] { color: var(--bp-chat-danger); border-color: var(--bp-chat-danger); }
+html body[data-bot-product-ui] .bp-na-state[data-state=turn-unconfirmed] { color: var(--bp-chat-warning); border-color: var(--bp-chat-warning); }
+html body[data-bot-product-ui] .bp-na-row-note { font-size: 10px; color: var(--bp-chat-warning); }
+html body[data-bot-product-ui] .bp-na-row-more {
+  align-self: center; min-height: 24px; padding: 2px 7px; border: 1px solid var(--bp-chat-line); border-radius: 8px;
+  background: var(--bp-chat-canvas); color: var(--bp-chat-muted); font-size: 10px; cursor: pointer; white-space: nowrap;
+}
+html body[data-bot-product-ui] .bp-na-row-more:hover { color: var(--bp-chat-ink); background: var(--bp-chat-hover); }
+html body[data-bot-product-ui] .bp-na-detail {
+  grid-column: 2 / -1; margin: 3px 0 2px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px;
+  padding: 8px 10px; border-radius: 9px; background: var(--bp-chat-canvas); font-size: 10px; color: var(--bp-chat-muted);
+}
+html body[data-bot-product-ui] .bp-na-detail dt { color: var(--bp-chat-muted); }
+html body[data-bot-product-ui] .bp-na-detail dd { margin: 0; color: var(--bp-chat-ink); overflow-wrap: anywhere; }
+html body[data-bot-product-ui] .bp-na-detail-limit { grid-column: 1 / -1; margin: 5px 0 0; color: var(--bp-chat-muted); }
+html body[data-bot-product-ui] .bp-na-note {
+  display: block; margin: 6px 3px 0; padding: 7px 9px; border-radius: 9px; font-size: 10px; line-height: 1.5;
+  color: var(--bp-chat-warning); background: var(--bp-chat-warning-bg); overflow-wrap: anywhere;
+}
+/* In the header the note stays a quiet pill beside the chip: it never wraps the toolbar. */
+html body[data-bot-product-ui] .bp-na-header { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
+html body[data-bot-product-ui] .bp-na-header > .bp-na-note { margin: 0; max-width: 216px; padding: 3px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body[data-bot-product-ui] .bp-na-note[data-kind=failed] { color: var(--bp-chat-danger); background: var(--bp-chat-danger-bg); }
+html body[data-bot-product-ui] .bp-na-actions { margin: 8px 3px 0; }
+html body[data-bot-product-ui] .bp-na-actions button {
+  min-height: 28px; padding: 4px 10px; border: 1px solid var(--bp-chat-line-strong); border-radius: 9px;
+  background: var(--bp-chat-surface); color: var(--bp-chat-ink); font-size: 11px; cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-na-actions button:disabled { opacity: .55; cursor: default; }
+html body[data-bot-product-ui] .bp-na-sr-only { position: absolute; display: block; margin: 0; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+/* Every control keeps a visible ring on keyboard focus, at the chat's own focus token. */
+html body[data-bot-product-ui] .bp-na-chip:focus-visible,
+html body[data-bot-product-ui] .bp-na-card-toggle:focus-visible,
+html body[data-bot-product-ui] .bp-na-row-more:focus-visible,
+html body[data-bot-product-ui] .bp-na-actions button:focus-visible,
+html body[data-bot-product-ui] .bp-na-dialog > header button:focus-visible,
+html body[data-bot-product-ui] .bp-na-dialog:focus-visible { outline: 2px solid var(--bp-chat-focus); outline-offset: 2px; }
+
+/* The transcript card: the same records, quieter, inside the independent chat. */
+html body[data-bot-product-ui] .bp-na-card {
+  align-self: stretch; min-width: 0; border: 1px solid var(--bp-chat-line); border-radius: 13px;
+  background: var(--bp-chat-surface); padding: 3px 9px; margin: 2px 0;
+}
+html body[data-bot-product-ui] .bp-na-card-toggle { border: 0; background: transparent; width: 100%; padding: 6px 2px; }
+html body[data-bot-product-ui] .bp-na-card-toggle:hover { background: var(--bp-chat-inset); }
+html body[data-bot-product-ui] .bp-na-card-count { margin-left: auto; flex: none; font-size: 10px; color: var(--bp-chat-muted); }
+html body[data-bot-product-ui] .bp-na-card-body { padding: 0 0 7px; }
+html body[data-bot-product-ui] .bp-na-card .bp-na-row { grid-template-columns: 20px minmax(0, 1fr) auto; }
+
+/* 375px: the chip keeps its word and its dot, the dialog takes the width it can. */
+@media (max-width: 480px) {
+  html body[data-bot-product-ui] .bp-na-chip { max-width: 168px; }
+  html body[data-bot-product-ui] .bp-na-dialog { width: calc(100vw - 16px); max-height: calc(100vh - 24px); }
+  html body[data-bot-product-ui] .bp-na-row { grid-template-columns: 20px minmax(0, 1fr) auto; }
+  html body[data-bot-product-ui] .bp-na-row-more { grid-column: 3; justify-self: end; margin-top: 0; min-height: 32px; }
+  html body[data-bot-product-ui] .bp-na-detail { grid-column: 1 / -1; }
+}

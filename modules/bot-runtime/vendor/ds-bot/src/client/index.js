@@ -199,7 +199,7 @@ export function apply(ctx) {
     for (const id of pendingAdopt.keys()) {
       if (roster.getSnapshot().agentOf[id] !== undefined || listed[id] === undefined) pendingAdopt.delete(id)
     }
-    for (const id of [...value.bots.map(currentPart), ...value.rooms.map(room => room.sessionId ?? room.id)]) {
+    for (const id of [...value.bots.map(currentPart), ...value.rooms.map(room => room.sessionId ?? room.id), ...(value.bots ?? []).flatMap(bot => (bot.threads ?? []).map(thread => thread.sessionId))]) {
       if (refreshed.has(id)) continue
       refreshed.add(id)
       void Promise.resolve(ctx.sessions.refreshProjections?.(id)).catch(quietly('refresh projections'))
@@ -407,6 +407,13 @@ export function apply(ctx) {
   // A Bot id or a group chat id, or any part of either's chat, opens the current part.
   const partFor = (id) => {
     const snapshot = roster.getSnapshot()
+    // A thread Session, or a thread id, opens its own Session: it is not the
+    // Bot's default chat, and opening it is never redirected there. The thread
+    // is resolved before the Bot, because a thread Session also resolves to its
+    // Bot in `byId` — every other Bot surface needs that, and this one line
+    // keeps the two from being confused.
+    const thread = snapshot.threadsById?.[id]
+    if (thread !== undefined) return thread.sessionId ?? id
     const bot = snapshot.byId[id]
     if (bot !== undefined) return currentPart(bot)
     const room = snapshot.roomsById[id]
@@ -437,7 +444,7 @@ export function apply(ctx) {
     const snapshot = roster.getSnapshot()
     if (!snapshot.ready || !snapshot.mainBotId) return
     const main = mainView()
-    if (main !== undefined && snapshot.byId[main] === undefined && snapshot.roomsById[main] === undefined) {
+    if (main !== undefined && snapshot.byId[main] === undefined && snapshot.roomsById[main] === undefined && snapshot.threadsById?.[main] === undefined) {
       actions.openSession(snapshot.mainBotId)
     }
   }

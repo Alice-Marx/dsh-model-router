@@ -5,6 +5,8 @@ import { PolicyError } from '../../capability-broker/src/authority.mjs'
 const id = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value)
 const table = value => value && typeof value === 'object' && !Array.isArray(value)
 const fail = code => { throw new PolicyError(code) }
+// The same ceiling the vendor roster enforces when it records a thread.
+export const MAX_THREADS_PER_BOT = 64
 
 function normalizeGrant(grant) {
   if (!table(grant) || !Array.isArray(grant.tools) || !Array.isArray(grant.modelRoutes)) fail('INVALID_GRANT')
@@ -19,6 +21,8 @@ function normalizeGrant(grant) {
 /** Compile only active own/group Sessions; archived parts never gain authority. */
 export function compileDsOwnership(saved, grantFor) {
   if (!table(saved) || saved.version !== 1 || !Number.isSafeInteger(saved.revision) || saved.revision < 0 || !table(saved.bots) || !table(saved.rooms)) fail('INVALID_DS_STATE')
+  const mainBotIds = saved.mainBotIds ?? []
+  if (!Array.isArray(mainBotIds)) fail('INVALID_DS_MAIN_BOT')
   const bots = new Map(), sessions = new Map(),botRecords=new Map()
   const add = (sessionId, botId) => {
     if (!id(sessionId) || sessions.has(sessionId)) fail('AMBIGUOUS_SESSION_OWNER')
@@ -26,9 +30,29 @@ export function compileDsOwnership(saved, grantFor) {
   }
   for (const [botId,bot] of Object.entries(saved.bots)) {
     if (!id(botId) || !table(bot) || bot.id !== botId) fail('INVALID_DS_BOT')
-    bots.set(botId,normalizeGrant(grantFor(structuredClone(bot))))
+    bots.set(botId,normalizeGrant(grantFor(structuredClone(bot), { main: mainBotIds.includes(botId) })))
     botRecords.set(botId,structuredClone(bot))
     add(bot.sessionId ?? botId,botId)
+    // A Bot's threads are further own chats of the same Bot, so a thread Session
+    // is authority-bearing exactly like the Bot's own chat is — same grant, same
+    // money, same tools. Only committed state can say so: nothing here reads a
+    // model argument, a request body or a client-supplied id. `add` already
+    // refuses a Session two Bots claim, and `commit` refuses one that moves
+    // between Bots, so a restored thread can only ever be its own Bot's again.
+    // An archived thread keeps its record and its readable history and gains no
+    // authority at all.
+    if (bot.threads !== undefined) {
+      if (!Array.isArray(bot.threads) || bot.threads.length > MAX_THREADS_PER_BOT) fail('INVALID_DS_BOT_THREADS')
+      const seenThreads = new Set(), seenSessions = new Set()
+      for (const thread of bot.threads) {
+        if (!table(thread) || !id(thread.threadId) || !id(thread.sessionId)) fail('INVALID_DS_BOT_THREAD')
+        if (seenThreads.has(thread.threadId) || seenSessions.has(thread.sessionId)) fail('AMBIGUOUS_THREAD_IDENTITY')
+        if (thread.archivedAt !== undefined && thread.archivedAt !== null && !Number.isSafeInteger(thread.archivedAt)) fail('INVALID_DS_BOT_THREAD')
+        seenThreads.add(thread.threadId)
+        seenSessions.add(thread.sessionId)
+        if (thread.archivedAt === undefined || thread.archivedAt === null) add(thread.sessionId,botId)
+      }
+    }
   }
   for (const room of Object.values(saved.rooms)) {
     if (!table(room) || !Array.isArray(room.members) || !table(room.sessions ?? {})) fail('INVALID_DS_ROOM')
@@ -38,8 +62,7 @@ export function compileDsOwnership(saved, grantFor) {
     }
   }
   if (bots.size > 4096 || sessions.size > 16384) fail('DS_STATE_LIMIT')
-  const mainBotIds=saved.mainBotIds??[]
-  if(!Array.isArray(mainBotIds)||mainBotIds.some(botId=>!bots.has(botId)))fail('INVALID_DS_MAIN_BOT')
+  if(mainBotIds.some(botId=>!bots.has(botId)))fail('INVALID_DS_MAIN_BOT')
   return { revision:saved.revision,bots,sessions,botRecords,mainBotIds:[...mainBotIds],sourceStamp:createHash('sha256').update(JSON.stringify(saved)).digest('hex') }
 }
 
@@ -175,9 +198,13 @@ export function attachDsLifecycle({ runtime, directory, grantFor, readSaved = ()
   return Object.freeze({
     observeAgent,
     committedBot(botId) { return healthy&&!closed&&committedBots.has(botId)?structuredClone(committedBots.get(botId)):null },
+    committedGrant(botId) { return healthy&&!closed&&records.has(botId)?structuredClone(records.get(botId).grant):null },
     committedBots() { return healthy&&!closed?[...committedBots.values()].map(bot=>structuredClone(bot)):[] },
     committedMainBotIds() { return healthy&&!closed?[...committedMainBotIds]:[] },
-    async refreshGrants() { adoptDisk(await readSaved()) },
+    async refreshGrants() {
+      try { adoptDisk(await readSaved()) }
+      catch (cause) { suspend(); throw cause }
+    },
     status:()=>({healthy,closed,revision,bots:records.size,activeSessions:ownership.size,boundAgents:bindings.size}),
     close() {
       if (closed) return

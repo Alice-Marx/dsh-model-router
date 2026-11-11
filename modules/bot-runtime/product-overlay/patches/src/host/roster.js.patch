@@ -1,0 +1,145 @@
+--- a/src/host/roster.js
++++ b/src/host/roster.js
+@@ -2,7 +2,7 @@
+ // the first Main Bot of a new team.
+ import { mkdir } from 'node:fs/promises'
+ import { MAX_AVATAR_IMAGE, ROOM_MAX_MEMBERS, ROOM_MODES, ROOM_NAME_MAX, ROOM_NOTICE_MAX } from './constants.js'
+-import { currentColor, isColor, normalize, unquote } from './text.js'
++import { currentColor, isColor, normalize, splitRef, unquote } from './text.js'
+ import { nameProblem } from '../shared/mentions.js'
+ 
+ const BROWSER_GRANT_KINDS = new Set(['post', 'upload', 'download', 'delete', '*'])
+@@ -420,6 +420,114 @@
+     return bot
+   }
+ 
++  // Trusted product-only profile edit. No notice is delivered, no model is selected,
++  // and no kickoff is released. The owner service supplies the final synchronous
++  // committed-state check; the live base is compared at the same mutation boundary.
++  async function updateBotProfile(id, patch, { base, check } = {}) {
++    const fail = (code, message) => { throw Object.assign(new Error(message), { code }) }
++    const fields = { name: 40, role: 24, instructions: 4000 }
++    const plain = value => value && typeof value === 'object' && !Array.isArray(value)
++    if (!plain(patch) || !Object.keys(patch).length || Object.keys(patch).some(key => !Object.hasOwn(fields, key))
++      || !plain(base) || typeof check !== 'function') fail('BOT_PROFILE_INVALID', 'Invalid profile mutation')
++    const bot = rt.botOf(id)
++    if (!bot || state.bots[id] !== bot) fail('BOT_PROFILE_UNKNOWN_BOT', 'Unknown Bot')
++    if (rt.readOnly() !== undefined) fail('PRODUCT_READ_ONLY', rt.readOnly())
++    const next = {}
++    for (const field of Object.keys(patch)) {
++      if (typeof patch[field] !== 'string' || patch[field].trim().length > fields[field]) fail('BOT_PROFILE_INVALID', 'Invalid profile field')
++      if (typeof base[field] !== 'string' || (bot[field] ?? '') !== base[field]) fail('BOT_PROFILE_CONFLICT', 'Bot profile changed before commit')
++      next[field] = patch[field].trim()
++    }
++    if (next.name !== undefined) {
++      const clash = rt.findBot(next.name)
++      const pending = isHeld('bot', next.name) && normalize(next.name) !== normalize(bot.name)
++      const problem = next.name === bot.name ? undefined : nameProblem(next.name)
++      if (!next.name || (clash && clash.id !== id) || pending || problem !== undefined) fail('BOT_PROFILE_NAME_INVALID', 'Bot name is not available')
++    }
++    const checked = check(bot)
++    if (checked && typeof checked.then === 'function') fail('BOT_PROFILE_INVALID', 'Profile commit check must be synchronous')
++    // No await between the check and all three field assignments.
++    const renamed = next.name !== undefined && next.name !== bot.name
++    Object.assign(bot, next)
++    const rooms = renamed ? Object.values(state.rooms).filter(room => !room.named && room.members.includes(id)) : []
++    for (const room of rooms) room.name = autoRoomName(room.members)
++    await rt.save()
++    // Session titles are presentation. A failure cannot undo an already persisted
++    // profile or turn the successful save into a request the UI might retry.
++    if (renamed) {
++      try {
++        const agent = await rt.resolveAgent(rt.chatOf(id))
++        const current = rt.botOf(id)
++        if (current) await ctx.sessionTitle.rename(agent.session, current.name)
++      } catch (error) { rt.warn('ds-bot: profile session title not updated: %s', error?.message ?? error) }
++      for (const room of rooms) await retitleRoom(room)
++    }
++    return bot
++  }
++
++  // Trusted product-only thread records. A thread Session is made by the caller
++  // through rt.createSession — the same factory every own chat uses — and
++  // recorded here in one save, so the committed state the Host lifecycle
++  // compiles and the directory the product keeps can never disagree about who
++  // owns a Session. Nothing here delivers a notice, picks a model beyond the
++  // Bot's own, or starts a turn.
++  const THREAD_LIMIT = 64
++  const THREAD_ID = /^[A-Za-z0-9_-]{1,128}$/
++  const threadFail = (code, message) => { throw Object.assign(new Error(message), { code }) }
++  async function addThreadSession(botId, threadId, sessionId, { name } = {}) {
++    const readOnly = rt.readOnly()
++    if (readOnly !== undefined) threadFail('PRODUCT_READ_ONLY', readOnly)
++    const bot = rt.botOf(botId)
++    if (!bot || state.bots[botId] !== bot) threadFail('BOT_THREAD_UNKNOWN_BOT', 'Unknown Bot')
++    if (!THREAD_ID.test(threadId ?? '') || !THREAD_ID.test(sessionId ?? '')) threadFail('BOT_THREAD_INVALID', 'Invalid thread identity')
++    const threads = bot.threads ?? []
++    if (threads.length >= THREAD_LIMIT) threadFail('BOT_THREAD_LIMIT', 'Too many threads on one Bot')
++    if (threads.some(thread => thread.threadId === threadId)) threadFail('BOT_THREAD_KNOWN', 'That thread already has a Session')
++    for (const other of Object.values(state.bots)) {
++      for (const thread of other.threads ?? []) if (thread.sessionId === sessionId) threadFail('BOT_THREAD_SESSION_TAKEN', 'That Session already belongs to a thread')
++    }
++    const record = { threadId, sessionId, createdAt: Date.now(), ...(typeof name === 'string' && name.trim() ? { name: name.trim().slice(0, 80) } : {}) }
++    ;(bot.threads ??= []).push(record)
++    await rt.save()
++    // A thread runs on its Bot's model and permission preset, as a fresh part does.
++    const ref = await rt.desiredModel(bot)
++    if (ref !== undefined) {
++      const effort = await rt.desiredEffort(bot, ref)
++      await rt.selectSessionModel(sessionId, { ...splitRef(ref), ...(effort === undefined ? {} : { reasoningEffort: effort }) })
++        .catch(error => rt.warn('ds-bot: model for a thread of %s not applied: %s', bot.name, error))
++    }
++    await rt.applyPermission(bot, sessionId)
++      .catch(error => rt.warn('ds-bot: permission for a thread of %s not applied: %s', bot.name, error))
++    return { ...record }
++  }
++
++  async function renameThread(botId, threadId, name) {
++    const readOnly = rt.readOnly()
++    if (readOnly !== undefined) threadFail('PRODUCT_READ_ONLY', readOnly)
++    const bot = rt.botOf(botId)
++    const thread = bot?.threads?.find(entry => entry.threadId === threadId)
++    if (!bot || !thread) threadFail('BOT_THREAD_UNKNOWN', 'Unknown thread')
++    if (typeof name !== 'string' || name.trim().length > 80) threadFail('BOT_THREAD_INVALID', 'Invalid thread name')
++    thread.name = name.trim()
++    await rt.save()
++    return { ...thread }
++  }
++
++  // Archive hides a thread and drops its authority in the same save: the
++  // Session and its history stay, and only an explicit restore brings it back.
++  async function setThreadArchived(botId, threadId, archivedAt) {
++    const readOnly = rt.readOnly()
++    if (readOnly !== undefined) threadFail('PRODUCT_READ_ONLY', readOnly)
++    const bot = rt.botOf(botId)
++    const thread = bot?.threads?.find(entry => entry.threadId === threadId)
++    if (!bot || !thread) threadFail('BOT_THREAD_UNKNOWN', 'Unknown thread')
++    if (archivedAt === undefined || archivedAt === null) delete thread.archivedAt
++    else if (Number.isFinite(archivedAt) && archivedAt >= 0) thread.archivedAt = archivedAt
++    else threadFail('BOT_THREAD_INVALID', 'Invalid archive stamp')
++    await rt.save()
++    return { ...thread }
++  }
++
+   async function setFlags(id, { pinned, hidden }) {
+     const entry = rt.botOf(id) ?? rt.roomOf(id) ?? rt.own(state.agents, id)
+     if (entry === undefined) throw new Error('Unknown conversation')
+@@ -694,7 +802,7 @@
+     const archived = rt.archiveBotMemory(id)
+     const current = rt.chatOf(id)
+     // Questions and exchange turns are kept per Session, so every part of the chat is cleared.
+-    const parts = new Set([id, current, ...(bot.segments ?? []).map(segment => segment.sessionId)])
++    const parts = new Set([id, current, ...(bot.segments ?? []).map(segment => segment.sessionId), ...(bot.threads ?? []).map(thread => thread.sessionId)])
+     // `archiving` stands until the archive's path is known: the memory may already be
+     // there, and no region of its own closes it yet.
+     const closedArchive = bot.private === true ? {
+@@ -769,7 +877,8 @@
+   }
+ 
+   Object.assign(rt, {
+-    ensureWorkspace, keepTeamFolder, createSession, createBot, duplicateBot, updateBot, setFlags,
++    ensureWorkspace, keepTeamFolder, createSession, createBot, duplicateBot, updateBot, updateBotProfile,
++    addThreadSession, renameThread, setThreadArchived, setFlags,
+     roomBusy, autoRoomName, retitleRoom, createRoom, updateRoom, deleteRoom,
+     setMain, deleteBot, bootstrap, releaseKickoff, greetingOut, holdKickoffAgain, userWrote, userAnswered,
+   })

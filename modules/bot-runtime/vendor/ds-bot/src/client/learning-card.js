@@ -1,7 +1,7 @@
 import { createElement as h, useId, useMemo, useRef, useState } from 'react'
 import { useTurnFacts } from './btw.js'
 import { editLines, lineDiff, proposalPlacement } from './learning-card-model.js'
-import { currentPart } from './text.js'
+import { isOwnChatOf } from './sources.js'
 import { t } from './i18n.js'
 import { CheckIcon, MemoryIcon, PencilIcon } from './icons.js'
 import { spring, SPRING_TAP } from './motion.js'
@@ -106,7 +106,7 @@ function LearningProposals({ turn, dock, sessionId, useRoster, actions }) {
   const facts = useTurnFacts(sessionId, actions)
   const [failed, setFailed] = useState({})
   const bot = roster.byId?.[sessionId]
-  if (!bot || currentPart(bot) !== sessionId) return null
+  if (!bot || !isOwnChatOf(bot, sessionId)) return null
   const proposals = roster.learning?.[bot.id] ?? []
   const visible = [...proposals]
   for (const entry of Object.values(failed)) {

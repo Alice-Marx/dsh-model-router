@@ -21,7 +21,7 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $stamp = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,6)
 $stage = Join-Path $OutputDirectory "DSH-RemoteAgent-windows-x64-$stamp"
 New-Item -ItemType Directory -Path $stage | Out-Null
-foreach ($name in @('dist','package.json','package-lock.json','start.cmd','setup.ps1','launch-agent.ps1','README.md')) {
+foreach ($name in @('dist','package.json','package-lock.json','start.cmd','setup.ps1','launch-agent.ps1','pair-device.ps1','README.md')) {
   Copy-Item -LiteralPath (Join-Path $agent $name) -Destination (Join-Path $stage $name) -Recurse
 }
 Copy-Item -LiteralPath $NodePath -Destination (Join-Path $stage 'node.exe')
@@ -50,17 +50,21 @@ DSH Remote Computer Agent (Windows x64)
 
 1. Extract the entire folder on your own Windows computer or cloud PC.
 2. Sign into the Windows desktop, then double-click start.cmd.
-3. Choose a shared workspace and a private VPN address (or loopback for an SSH tunnel).
-4. Import the generated private/pairing.private.json from the installed directory
-   into the Host app's Computers > Add computer panel.
+3. Choose a shared workspace and one reachable local address.
+4. Open the generated private/pairing.html, then scan or copy its short invitation
+   into the Host app's Computers > Secure pairing panel and check the six-digit code.
 
 The installer shows the exact installation and pairing-file paths. Windows must
 stay signed into an interactive desktop for video and mouse/keyboard control.
-Keep pairing.private.json private: it contains the Host pairing credential.
+Run pair-device.cmd to refresh an unredeemed invitation after two minutes.
+Keep pairing pages/files private. Legacy mode still exports pairing.private.json.
 Rerunning setup preserves existing configuration and credentials.
 Full instructions and limitations: README.md.
 '@ | Set-Content -LiteralPath (Join-Path $stage 'START-HERE.txt') -Encoding UTF8
 $zip = "$stage.zip"
 Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
-$checksum = Get-FileHash -LiteralPath $zip -Algorithm SHA256
-[pscustomobject]@{package=$zip;sha256=$checksum.Hash;bytes=(Get-Item -LiteralPath $zip).Length;stagingDirectory=$stage;node=(& $NodePath --version)} | ConvertTo-Json -Compress
+$hashAlgorithm = [Security.Cryptography.SHA256]::Create()
+$zipStream = [IO.File]::OpenRead($zip)
+try { $checksum = [BitConverter]::ToString($hashAlgorithm.ComputeHash($zipStream)).Replace('-', '') }
+finally { $zipStream.Dispose(); $hashAlgorithm.Dispose() }
+[pscustomobject]@{package=$zip;sha256=$checksum;bytes=(Get-Item -LiteralPath $zip).Length;stagingDirectory=$stage;node=(& $NodePath --version)} | ConvertTo-Json -Compress

@@ -19,6 +19,8 @@ async function fixture(t) {
   await mkdir(output, { recursive: true })
   await mkdir(join(root, 'node_modules/esbuild'), { recursive: true })
   await mkdir(join(root, 'packages/cli-runtime/src'), { recursive: true })
+  await mkdir(join(root, 'modules/openmaus-protocol/vendor'), { recursive: true })
+  for (const [source,name] of [['vendor/LICENSE','OPENMAUSBOT_LICENSE'],['NOTICE','OPENMAUSBOT_NOTICE'],['SOURCE.json','OPENMAUSBOT_SOURCE.json']]) await writeFile(join(root,'modules/openmaus-protocol',source),`notice:${name}`)
   await copyFile(new URL('../remote-computer-agent/build.mjs', import.meta.url), join(agent, 'build.mjs'))
   await writeFile(join(root, 'node_modules/esbuild/package.json'), JSON.stringify({ name: 'esbuild', type: 'module', exports: './index.mjs' }))
   // Hold compilation at an observable boundary; the assertions exercise the build's filesystem
@@ -66,11 +68,11 @@ test('Agent build: concurrent compilation preserves published entry points until
   for (const name of ['index.mjs', 'cli.mjs']) assert.equal(await readFile(join(f.output, name), 'utf8'), `old:${name}`)
   await f.release()
   for (const worker of workers) { const result = await worker.done; assert.equal(result.code, 0, result.stderr) }
-  const expected = ['index.mjs', 'index.mjs.map', 'cli.mjs', 'cli.mjs.map', 'cli-stdio-bridge.mjs', 'cli-stdio-bridge.mjs.map', 'native-peer.ps1', 'native-peer.py']
+  const expected = ['index.mjs', 'index.mjs.map', 'cli.mjs', 'cli.mjs.map', 'cli-stdio-bridge.mjs', 'cli-stdio-bridge.mjs.map', 'native-peer.ps1', 'native-peer.py', 'OPENMAUSBOT_LICENSE','OPENMAUSBOT_NOTICE','OPENMAUSBOT_SOURCE.json']
   assert.deepEqual((await readdir(f.output)).sort(), expected.sort())
   for (const name of expected) {
     const prefix = name === 'cli.mjs' ? '#!/usr/bin/env node\n' : ''
-    assert.equal(await readFile(join(f.output, name), 'utf8'), `${prefix}${name.startsWith('native-peer.') ? 'helper' : 'built'}:${name}`)
+    assert.equal(await readFile(join(f.output, name), 'utf8'), `${prefix}${name.startsWith('native-peer.') ? 'helper' : name.startsWith('OPENMAUSBOT_') ? 'notice' : 'built'}:${name}`)
   }
   if (process.platform !== 'win32') assert.ok((await stat(join(f.output, 'cli.mjs'))).mode & 0o100, 'the CLI retains owner execute permission')
   assert.deepEqual((await readdir(f.agent)).sort(), ['build.mjs', 'dist'], 'temporary publications are cleaned up')

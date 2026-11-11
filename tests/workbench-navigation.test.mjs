@@ -13,11 +13,11 @@ test('templates and remounts keep the draft without starting work; attention ope
   const previous = Object.fromEntries(Object.keys(replacements).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
   for (const [key, value] of Object.entries(replacements)) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value })
   const { createRoot } = await import('react-dom/client')
-  const bundle = await build({ entryPoints: [fileURLToPath(new URL('../.dsh-plugin/client/router-main.jsx', import.meta.url))],
+  const bundle = await build({ stdin: { contents: "export * from './.dsh-plugin/client/router-main.jsx'; export * from './.dsh-plugin/client/workbench-state.mjs'", resolveDir: process.cwd(), loader: 'jsx' },
     bundle: true, platform: 'node', format: 'cjs', external: ['react'], loader: { '.css': 'text' }, write: false, logLevel: 'silent' })
   const module = { exports: {} }
   new Function('require', 'module', 'exports', bundle.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports)
-  const { RouterMainPage } = module.exports
+  const { RouterMainPage, requestWorkbenchView } = module.exports
   const ok = value => ({ ok: true, value })
   const value = { budgetUsd: 0, routingPreset: 'balanced' }
   const ledger = { runs: [{ id: 'first', task: 'first fixture', status: 'failed', packages: [], reviews: [], createdAt: 1 },
@@ -43,7 +43,13 @@ test('templates and remounts keep the draft without starting work; attention ope
       if (previous[key]) Object.defineProperty(globalThis, key, previous[key]); else delete globalThis[key]
     }
   })
+  requestWorkbenchView('tools')
   await mount()
+  assert.equal(host.querySelector('#mr-tab-tools').getAttribute('aria-selected'), 'true', 'a Bot settings request opens the actual official-tool module on first mount')
+  await act(async () => { requestWorkbenchView('models'); await new Promise(setImmediate) })
+  assert.equal(host.querySelector('#mr-tab-models').getAttribute('aria-selected'), 'true', 'an already-mounted workbench follows the display address')
+  assert.equal(previews, 0); assert.equal(starts, 0)
+  await act(async () => { host.querySelector('#mr-tab-plan').click(); await new Promise(setImmediate) })
   await click('项目检查')
   const original = host.querySelector('#mr-task').value
   assert.match(original, /只读检查/)

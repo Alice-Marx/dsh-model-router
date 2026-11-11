@@ -12,7 +12,7 @@
     {
       "path": "src/client/details-drawer.js",
       "kind": "patched",
-      "summary": "Adds the 电脑操作 (desktop) tab to a 1:1 Bot's drawer and renders DesktopPane in it.",
+      "summary": "Adds the 电脑操作 (desktop) tab to a 1:1 Bot's drawer and renders DesktopPane in it; a thread Session keeps its own transcript, stats, questions and usage, and its name is shown instead of offering to rename the Bot.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "f4917de604dc7c3daf3b4a5267a04c326c9b20aea94bb5e27bfcb6e106396172"
@@ -30,7 +30,7 @@
     {
       "path": "src/client/index.js",
       "kind": "patched",
-      "summary": "Accepts a wrapped TeamSidebar in the sidebar.workspaces slot probe, so the product's own wrapper still counts as the DS Bot team surface.",
+      "summary": "Opens a thread Session as itself in partFor — resolved before the Bot, because a thread Session also resolves to its Bot — keeps homeToMainBot from bouncing an open thread to Main, and refreshes thread projections.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "4fd22b26d817ca3ae5454e5a8042c1c4b806ff4ae78c9e38f90ee5ee3c996b9a"
@@ -52,6 +52,132 @@
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "3818fea953dc7a766d7dcb738661a448a922f84ac42b8d434ac7fb83e09b9c65"
+      }
+    },
+    {
+      "path": "src/client/header.js",
+      "kind": "patched",
+      "summary": "Renders the product conversationAddon after the native header identity, preserving goals, activity and slot component identity, and names the open thread beside its Bot so two contexts of one Bot are never confused.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "2e16b329fcc5e0994066db13fe54558ac70fdd7b4131155c89b7aa04d0c59bab"
+      }
+    },
+    {
+      "path": "src/host/roster.js",
+      "kind": "patched",
+      "summary": "Adds the trusted thread records addThreadSession/renameThread/setThreadArchived (one save each, the Bot model and permission preset applied, no notice or turn), keeps updateBotProfile untouched, and archives thread Sessions on Bot delete.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "0a06730a0ce2ecf6b67d82319ef9b7fc127b3b2c2170b6e50d3d77ce4c866e32"
+      }
+    },
+    {
+      "path": "src/host/store.js",
+      "kind": "patched",
+      "summary": "Indexes a Bot thread Session as another own chat of the same Bot: live threads sit in chatOwners/threadOwners, archived ones in pastOwners with no authority, and threadsOf/threadOf/threadSessionOf/sessionsOfBot are exposed for the product.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "aae02595f97b2337e485f16a84091c9d91d40f6dbdc211350fe3fe0cddf52b19"
+      }
+    },
+    {
+      "path": "src/host/parts.js",
+      "kind": "patched",
+      "summary": "Keeps the part steward off thread Sessions: a thread is not a part chain, so nothing condenses it or hands its input on to the Bot default chat.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "f7a2e272f0296414075d2318d45cf58871fff3a22c1d3035707a75bec77ef619"
+      }
+    },
+    {
+      "path": "src/host/models.js",
+      "kind": "patched",
+      "summary": "Applies a Bot model change to its live thread Sessions as it already does for group Sessions.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "db1424879e28d6252818eccbb4bc763bc87ff355be503abe3f95399aaed869a9"
+      }
+    },
+    {
+      "path": "src/host/usage.js",
+      "kind": "patched",
+      "summary": "Attributes a thread Session usage to its Bot through the shared sessionsOfBot list.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "3d4ff2168d7dfb726c2d5454f36eef58dec1c768b79c2c0c17f4192a34b2bbd7"
+      }
+    },
+    {
+      "path": "src/host/privacy.js",
+      "kind": "patched",
+      "summary": "Covers thread Sessions when a private Bot files are purged.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "370b5adf762714a8b794f2079a8bbfd8f9c63811bf599ecadad80a63a9f12c5a"
+      }
+    },
+    {
+      "path": "src/host/memory.js",
+      "kind": "patched",
+      "summary": "Renews memory for thread Sessions when a Bot memory is archived.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "5e145d02c6c9d8d217b1725ae8bd88483c6a847300d50f107da70575696b7503"
+      }
+    },
+    {
+      "path": "src/host/channel.js",
+      "kind": "patched",
+      "summary": "Projects a Bot threads to the client and refuses input aimed at an archived thread instead of redirecting it to the default chat.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "0e05d9a424b188fe338f7102404a9fb295069d0ece241d63cc4f87be18947d03"
+      }
+    },
+    {
+      "path": "src/client/sources.js",
+      "kind": "patched",
+      "summary": "Indexes thread Sessions in a read-only threadsById map by Session id and thread id, resolves a thread Session to its Bot in byId (never taking a Bot's own chat identity), and exports isOwnChatOf so Bot-scoped surfaces recognise a thread as another own chat of the same Bot.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "1cc04070d1869dcc382efc31fafcff8fda9c3271342896c98355c37299458e1c"
+      }
+    },
+    {
+      "path": "src/client/model-menu.js",
+      "kind": "patched",
+      "summary": "The Bot's model-choice dock belongs to a thread too: it recognises a thread Session as another own chat of the same Bot instead of only the default chat.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "78c28d9459e78ce4ffa9b3edc64d7d2218b02112eaf3b0ae204cf2700321b7a5"
+      }
+    },
+    {
+      "path": "src/client/learning-card.js",
+      "kind": "patched",
+      "summary": "Memory learning proposals are shown for a thread Session, which is another own chat of the same Bot, not only for the default chat.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "29e0ddffc08814b3e9676fb40474ba5ae0702edb1b53267d52e51b4b31be733f"
+      }
+    },
+    {
+      "path": "src/client/secret-card.js",
+      "kind": "patched",
+      "summary": "The secret-request dock waits for a thread Session's own cards, so a tool asking for a secret inside a thread is answered there.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "2ac7d7546918b7104d7af8b71d08a6fc07bdc2aeb4168d3ad26bddf2f9fd4ff5"
+      }
+    },
+    {
+      "path": "src/client/turn-error.js",
+      "kind": "patched",
+      "summary": "A turn failure inside a thread keeps its sign-in and model-move affordances, exactly as the Bot's default chat does.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "4ed1e99fb3fe66be3a55176389e1ab08e282070e23e9e06089a20f6dbec3b59b"
       }
     }
   ]

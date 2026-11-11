@@ -23,3 +23,19 @@ Thumbs.db
 
 # Leftover from an interrupted vendor sync.
 /modules/bot-runtime/vendor/ds-bot.next/
+
+# Reproducible JavaScript is the installed protocol entry (Node cannot strip
+# TypeScript inside node_modules).
+!/modules/openmaus-protocol/dist/
+!/modules/openmaus-protocol/dist/protocol.mjs
+
+# Local verification artifacts stay outside publication.
+output/
+host-parity-audit/
+nul
+
+# Hash-verified upstream package-manager policy contains no credentials.
+!/modules/bot-runtime/vendor/ds-bot/.npmrc
+
+# Keep redistributable Agent output and its upstream license/source notices.
+!/remote-computer-agent/dist/

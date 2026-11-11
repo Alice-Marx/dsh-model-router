@@ -1635,12 +1635,18 @@ function createSource(initial) {
     }
   };
 }
-var EMPTY_ROSTER = { revision: -1, mainBotId: null, mainBotIds: [], bots: [], rooms: [], agents: [], exchangeTurns: {}, questions: {}, btwCards: {}, sideChats: {}, learning: {}, secrets: [], capabilities: [], capabilityStatuses: {}, secretRequests: {}, models: [], defaultModel: null, modelsKey: null, prefs: {}, byId: {}, roomsById: {}, agentsById: {}, agentOf: {}, ready: false };
+var EMPTY_ROSTER = { revision: -1, mainBotId: null, mainBotIds: [], bots: [], rooms: [], agents: [], exchangeTurns: {}, questions: {}, btwCards: {}, sideChats: {}, learning: {}, secrets: [], capabilities: [], capabilityStatuses: {}, secretRequests: {}, models: [], defaultModel: null, modelsKey: null, prefs: {}, byId: {}, roomsById: {}, agentsById: {}, agentOf: {}, threadsById: {}, ready: false };
 var isMainOf = (roster, id) => id !== void 0 && (roster.mainBotIds ?? []).includes(id);
 function indexRoster(value) {
   const byId = {};
   for (const bot of value.bots) {
     for (const id of [...bot.parts ?? [], bot.sessionId ?? bot.id, bot.id]) byId[id] = bot;
+  }
+  const threadsById = {};
+  for (const bot of value.bots) for (const thread of bot.threads ?? []) {
+    if (thread.sessionId !== void 0) threadsById[thread.sessionId] = { botId: bot.id, ...thread };
+    if (thread.threadId !== void 0) threadsById[thread.threadId] = { botId: bot.id, ...thread };
+    if (thread.sessionId !== void 0 && byId[thread.sessionId] === void 0) byId[thread.sessionId] = bot;
   }
   const roomsById = {};
   for (const room2 of value.rooms) {
@@ -1652,8 +1658,9 @@ function indexRoster(value) {
     agentsById[agent.id] = agent;
     for (const sessionId of agent.sessions ?? []) agentOf[sessionId] = agent.id;
   }
-  return { ...value, agents: value.agents ?? [], byId, roomsById, agentsById, agentOf, ready: true };
+  return { ...value, agents: value.agents ?? [], byId, roomsById, agentsById, agentOf, threadsById, ready: true };
 }
+var isOwnChatOf = (bot, sessionId) => bot !== void 0 && bot !== null && typeof sessionId === "string" && ((bot.sessionId ?? bot.id) === sessionId || (bot.threads ?? []).some((thread) => thread.sessionId === sessionId));
 function isAgentSession(roster, cache, sessionId) {
   if (sessionId === void 0 || sessionId === null || sessionId === "") return false;
   if (roster.ready) return roster.agentOf[sessionId] !== void 0;
@@ -7723,7 +7730,7 @@ function SecretDock({ sessionId, useRoster, useCards, useHeldCards, actions }) {
   const shown = useCards?.((state) => state[sessionId]) ?? NONE;
   const held = useHeldCards?.((state) => state[sessionId]) ?? NONE;
   const bot = roster.byId[sessionId];
-  if (!bot || currentPart(bot) !== sessionId) return null;
+  if (!bot || !isOwnChatOf(bot, sessionId)) return null;
   const drawn = (entry) => entry.callId && entry.sessionId === sessionId && shown[entry.callId] > 0 && !(held[heldCardKey("secret", entry.id)] > 0);
   const waiting = (roster.secretRequests?.[bot.id] ?? []).filter((entry) => entry.status === "pending" && !drawn(entry));
   if (waiting.length === 0) return null;
@@ -11245,6 +11252,8 @@ function HeaderPill({ sessionId, useRoster, useSessions, useSessionStatus, useSe
   const doing = useActivity((map) => map[owner]);
   const bot = roster.byId[sessionId];
   const room2 = roster.roomsById[sessionId];
+  const thread = roster.threadsById?.[sessionId];
+  const threadName = typeof thread?.name === "string" ? thread.name.trim() : "";
   const goal = room2?.goal;
   const goalCompose = useUi((state) => state.goalCompose === sessionId);
   const goalOpen = useUi((state) => state.goalOpen === sessionId);
@@ -11291,7 +11300,7 @@ function HeaderPill({ sessionId, useRoster, useSessions, useSessionStatus, useSe
       className: "bt-pill",
       "aria-expanded": away ? void 0 : detailsOpen,
       "data-memory": memoryNotice ? "updated" : void 0,
-      "aria-label": away ? t("Back to chat") : memoryNotice ? t("Memory updated. Open {name}'s memory", { name: roster.byId[changed]?.name ?? name }) : t("View conversation details"),
+      "aria-label": away ? t("Back to chat") : memoryNotice ? t("Memory updated. Open {name}'s memory", { name: roster.byId[changed]?.name ?? name }) : threadName ? `${t("View conversation details")} · ${threadName}` : t("View conversation details"),
       title: away ? name : void 0,
       onClick: () => away ? selectView("chat") : memoryNotice ? actions.openMemory(changed) : actions.toggleDetails(sessionId)
     },
@@ -11302,6 +11311,7 @@ function HeaderPill({ sessionId, useRoster, useSessions, useSessionStatus, useSe
       (0, import_react22.createElement)("span", { className: "bt-pill-goal" }, (0, import_react22.createElement)("span", { className: "bt-pill-ico", "aria-hidden": true }, (0, import_react22.createElement)(GoalIcon)), (0, import_react22.createElement)("span", { className: "bt-pill-title" }, view.title)),
       (0, import_react22.createElement)("span", { className: "bt-pill-name" }, name)
     ) : (0, import_react22.createElement)("span", { className: "bt-pill-name" }, away ? t("Back to chat") : bot?.name ?? room2?.name ?? (title || t("New chat"))),
+    threadName ? (0, import_react22.createElement)("span", { className: "bt-swap" }, threadName) : null,
     goalShown && view?.number !== void 0 ? (0, import_react22.createElement)("span", { className: "bt-pill-count" }, `${view.number}/${view.count}`) : null,
     (0, import_react22.createElement)(MemoryNotice, { shown: memoryNotice }),
     (0, import_react22.createElement)("span", { className: "bt-pill-go", "aria-hidden": true }, (0, import_react22.createElement)(GoArrow))
@@ -11312,7 +11322,8 @@ function HeaderPill({ sessionId, useRoster, useSessions, useSessionStatus, useSe
     showGoal ? (0, import_react22.createElement)(GoalIsland, { room: room2, goal, view, open: goalOpen, composing: goalCompose, roomWork, roster, actions, pill }) : pill,
     (0, import_react22.createElement)("span", { className: "bt-sr", role: "status" }, memoryNotice ? t("Memory updated") : ""),
     (0, import_react22.createElement)(NewMessagePills, { key: sessionId, sessionId, useSessions, useUi, useTurnClock }),
-    (0, import_react22.createElement)(ActivityIndicator, { key: `activity:${sessionId}`, sessionId, useRoster, useSessionStatus, useSession, useLive, useWork, actions })
+    (0, import_react22.createElement)(ActivityIndicator, { key: `activity:${sessionId}`, sessionId, useRoster, useSessionStatus, useSession, useLive, useWork, actions }),
+    typeof actions.conversationAddon === "function" ? (0, import_react22.createElement)(actions.conversationAddon, { sessionId, bot, room: room2, roster, actions, running }) : null
   );
 }
 function useTranscriptView() {
@@ -12590,11 +12601,11 @@ function ModelChoiceDock({ sessionId, useRoster, actions }) {
   const bot = roster.byId[sessionId];
   const [busy, setBusy] = (0, import_react25.useState)("");
   const [error, setError] = (0, import_react25.useState)("");
-  const shown = Boolean(bot) && currentPart(bot) === sessionId && roster.ready;
+  const shown = Boolean(bot) && isOwnChatOf(bot, sessionId) && roster.ready;
   (0, import_react25.useEffect)(() => {
     if (shown) void actions.refreshModels?.();
   }, [shown, sessionId]);
-  if (!bot || currentPart(bot) !== sessionId || !roster.ready) return null;
+  if (!bot || !isOwnChatOf(bot, sessionId) || !roster.ready) return null;
   const models = roster.models ?? [];
   const usable = models.filter((model) => !model.needsKey);
   const lost = bot.model ? !models.some((model) => model.ref === bot.model) : false;
@@ -12899,7 +12910,7 @@ function FailureCell({ node, sessionId, useRoster, useTurnClock, actions }) {
   const provider = blocked?.provider ?? providerOf(bot, roster);
   const text = failureText2(data.code, { name: bot?.name ?? t("This Bot"), provider: providerName(roster, provider), status: blocked?.status });
   const facts = failureFacts(data, blocked);
-  const current = bot !== void 0 && currentPart(bot) === sessionId && !later;
+  const current = bot !== void 0 && isOwnChatOf(bot, sessionId) && !later;
   const moveToAccount = () => {
     const model = accountModel(roster);
     if (model === void 0) {
@@ -19294,12 +19305,14 @@ function GroupOverview({ room: room2, roster, actions, usage, useWork, openSetti
 }
 function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, roster, actions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages }) {
   const owner = roster.byId[sessionId];
-  const part = owner ? currentPart(owner) : sessionId;
+  const thread = roster.threadsById?.[sessionId];
+  const threadName = typeof thread?.name === "string" ? thread.name.trim() : "";
+  const part = thread ? thread.sessionId ?? sessionId : owner ? currentPart(owner) : sessionId;
   const isMainBot = isMainOf(roster, owner?.id);
   const [tab, setTab] = (0, import_react51.useState)("details");
   const room2 = roster.roomsById[sessionId];
   const [view, setView] = (0, import_react51.useState)(startTab === "settings" && (owner || room2) ? "settings" : "overview");
-  const [editing, setEditing] = (0, import_react51.useState)(Boolean(startRenaming && (roster.byId[sessionId] || roster.roomsById[sessionId])));
+  const [editing, setEditing] = (0, import_react51.useState)(Boolean(startRenaming && thread === void 0 && (roster.byId[sessionId] || roster.roomsById[sessionId])));
   const [draftName, setDraftName] = (0, import_react51.useState)(roster.byId[sessionId]?.name ?? (roster.roomsById[sessionId]?.named ? roster.roomsById[sessionId].name : ""));
   const [copied, setCopied] = (0, import_react51.useState)(false);
   const [error, setError] = (0, import_react51.useState)("");
@@ -19315,7 +19328,7 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, roster, a
   const running = useSessionStatus((map) => map.get(part)?.running === true);
   const doing = useActivity((map) => map[bot?.id ?? sessionId]);
   const transcript = useSessions((list) => transcriptOf(list, part, bot?.name ?? room2?.name ?? t("Bot"), roster.exchangeTurns[part]));
-  const usage = useSessions((list) => usageOf(list, [part, ...bot?.parts ?? room2?.parts ?? []]));
+  const usage = useSessions((list) => usageOf(list, [part, ...thread === void 0 ? bot?.parts ?? room2?.parts ?? [] : []]));
   const run2 = (promise) => Promise.resolve(promise).then(() => {
     setError("");
     return true;
@@ -19399,11 +19412,12 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, roster, a
             setEditing(false);
           }
         }
-      }) : (0, import_react51.createElement)("button", { type: "button", className: "bt-drawer-name", "aria-label": t("Rename {name}", { name: current }), title: t("Rename"), onClick: () => {
+      }) : thread !== void 0 ? (0, import_react51.createElement)("span", { className: "bt-drawer-name", "data-thread": "" }, current) : (0, import_react51.createElement)("button", { type: "button", className: "bt-drawer-name", "aria-label": t("Rename {name}", { name: current }), title: t("Rename"), onClick: () => {
         setDraftName(room2 && !room2.named ? "" : current);
         setEditing(true);
       } }, current),
-      subtitle ? (0, import_react51.createElement)("span", { className: "bt-drawer-role" }, subtitle) : null
+      subtitle ? (0, import_react51.createElement)("span", { className: "bt-drawer-role" }, subtitle) : null,
+      threadName ? (0, import_react51.createElement)("span", { className: "bt-drawer-role", "data-thread": threadName }, threadName) : null
     ),
     tabs.length > 1 ? (0, import_react51.createElement)(
       "div",
@@ -21718,7 +21732,7 @@ function LearningProposals({ turn, dock, sessionId, useRoster, actions }) {
   const facts = useTurnFacts(sessionId, actions);
   const [failed, setFailed] = (0, import_react54.useState)({});
   const bot = roster.byId?.[sessionId];
-  if (!bot || currentPart(bot) !== sessionId) return null;
+  if (!bot || !isOwnChatOf(bot, sessionId)) return null;
   const proposals = roster.learning?.[bot.id] ?? [];
   const visible = [...proposals];
   for (const entry of Object.values(failed)) {
@@ -22168,7 +22182,7 @@ function apply(ctx) {
     for (const id of pendingAdopt.keys()) {
       if (roster.getSnapshot().agentOf[id] !== void 0 || listed[id] === void 0) pendingAdopt.delete(id);
     }
-    for (const id of [...value.bots.map(currentPart), ...value.rooms.map((room2) => room2.sessionId ?? room2.id)]) {
+    for (const id of [...value.bots.map(currentPart), ...value.rooms.map((room2) => room2.sessionId ?? room2.id), ...(value.bots ?? []).flatMap((bot) => (bot.threads ?? []).map((thread) => thread.sessionId))]) {
       if (refreshed.has(id)) continue;
       refreshed.add(id);
       void Promise.resolve(ctx.sessions.refreshProjections?.(id)).catch(quietly("refresh projections"));
@@ -22396,6 +22410,8 @@ function apply(ctx) {
   });
   const partFor = (id) => {
     const snapshot = roster.getSnapshot();
+    const thread = snapshot.threadsById?.[id];
+    if (thread !== void 0) return thread.sessionId ?? id;
     const bot = snapshot.byId[id];
     if (bot !== void 0) return currentPart(bot);
     const room2 = snapshot.roomsById[id];
@@ -22422,7 +22438,7 @@ function apply(ctx) {
     const snapshot = roster.getSnapshot();
     if (!snapshot.ready || !snapshot.mainBotId) return;
     const main = mainView();
-    if (main !== void 0 && snapshot.byId[main] === void 0 && snapshot.roomsById[main] === void 0) {
+    if (main !== void 0 && snapshot.byId[main] === void 0 && snapshot.roomsById[main] === void 0 && snapshot.threadsById?.[main] === void 0) {
       actions.openSession(snapshot.mainBotId);
     }
   };

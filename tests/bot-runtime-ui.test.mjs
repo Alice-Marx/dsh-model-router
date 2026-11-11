@@ -1,3 +1,4 @@
+import './helpers/ui-dom-bootstrap.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
@@ -14,7 +15,7 @@ const { JSDOM } = fixtureRequire('jsdom')
 const parent = join(ROOT, 'tmp/integration/product-ui'); await mkdir(parent, { recursive: true })
 const dir = await mkdtemp(join(parent, 'components-'))
 const bundle = await build({ absWorkingDir: ROOT, entryPoints: ['apps/integration-client/panels.jsx'], bundle: true, format: 'esm', platform: 'node',
-  external: ['react', 'react-dom', 'react-dom/*'], write: false })
+  external: ['react', 'react-dom', 'react-dom/*'], write: false , loader: { '.css': 'text' } })
 const file = join(dir, 'panels.mjs'); await writeFile(file, bundle.outputFiles[0].text)
 const { ProductPage, BotBindings, Usage, Machines } = await import(pathToFileURL(file))
 

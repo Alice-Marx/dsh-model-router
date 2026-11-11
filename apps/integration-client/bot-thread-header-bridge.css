@@ -1,0 +1,20 @@
+/* The directory palette is scoped to .bp-threads. The header lives in the
+   existing chat toolbar and inherits that conversation's appearance instead. */
+html body[data-bot-product-ui] .bp-threads-head-wrap {
+  --bp-thread-surface: var(--bp-chat-surface);
+  --bp-thread-inset: var(--bp-chat-inset);
+  --bp-thread-hover: var(--bp-chat-hover);
+  --bp-thread-line: var(--bp-chat-line);
+  --bp-thread-ink: var(--bp-chat-ink);
+  --bp-thread-muted: var(--bp-chat-muted);
+  --bp-thread-accent: var(--bp-chat-accent);
+  --bp-thread-accent-ink: var(--bp-chat-accent-ink);
+  --bp-thread-focus: var(--bp-chat-focus);
+  --bp-thread-wait: var(--bp-chat-warning);
+}
+html body[data-bot-product-ui] .bp-threads-head-wrap :is(button, input):focus-visible { outline: 2px solid var(--bp-chat-focus); outline-offset: 2px; }
+@media (max-width: 640px) {
+  html body[data-bot-product-ui] .bp-threads-head-wrap { position: static; }
+  html body[data-bot-product-ui] .bp-threads-head-wrap .bp-threads-head { max-width: 76px; padding: 0 6px; }
+  html body[data-bot-product-ui] .bp-threads-head-wrap .bp-threads-head-name { max-width: 38px; }
+}

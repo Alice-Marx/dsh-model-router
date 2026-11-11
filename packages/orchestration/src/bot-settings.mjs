@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { OFFICIAL_TOOLS } from '../../../.dsh-plugin/shared/official-tool-registry.mjs'
+import { fundingForMainRoute, materializeMainRouteDefault, normalizeMainModelRoutes, preserveMainModelRoutes } from './main-model-routes.mjs'
 
 export const BOT_SETTINGS_SCHEMA = 1
 export const BOT_EXECUTION_MODES = Object.freeze(['read-only', 'workspace-write', 'cli-native'])
@@ -36,7 +37,7 @@ export function defaultBotSettings() {
 
 /** Closed stored schema. No executable paths, installer URLs, credentials or arbitrary roots. */
 export function normalizeBotSettings(input) {
-  keys(input, ['schemaVersion', 'enabled', 'model', 'officialTools', 'machineGrants', 'capabilities', 'workspaceRef', 'funding', 'maxConcurrentTasks', 'routing'], 'settings')
+  keys(input, ['schemaVersion', 'enabled', 'model', 'officialTools', 'machineGrants', 'capabilities', 'workspaceRef', 'funding', 'maxConcurrentTasks', 'routing', 'mainRoutes'], 'settings')
   const value = { ...defaultBotSettings(), ...input }
   if (value.schemaVersion !== 1) fail('BOT_SETTINGS_VERSION_UNSUPPORTED', 'Bot 绑定版本不受支持，请升级宿主。')
   if (typeof value.enabled !== 'boolean') fail('BOT_SETTINGS_INVALID', 'enabled 必须是布尔值。', { field: 'enabled' })
@@ -82,8 +83,16 @@ export function normalizeBotSettings(input) {
     if (!['local', 'remote'].includes(value.workspaceRef.kind) || !ref(value.workspaceRef.machineId) || !ref(value.workspaceRef.rootId)) fail('BOT_SETTINGS_INVALID', '工作区必须引用已登记机器和根目录。', { field: 'workspaceRef' })
     value.workspaceRef = { kind: value.workspaceRef.kind, machineId: value.workspaceRef.machineId, rootId: value.workspaceRef.rootId }
   }
-  keys(value.funding, ['mode', 'scopeId', 'pricing', 'request', 'dailyBudgetUsd', 'monthlyBudgetUsd', 'subscription'], 'funding')
-  const funding = { ...defaultBotSettings().funding, ...value.funding }
+  value.funding = normalizeFunding(value.funding)
+  if (Object.hasOwn(input, 'mainRoutes')) value.mainRoutes = normalizeMainModelRoutes(input.mainRoutes, { normalizeFunding })
+  if (!Number.isSafeInteger(value.maxConcurrentTasks) || value.maxConcurrentTasks < 1 || value.maxConcurrentTasks > 32) fail('BOT_SETTINGS_INVALID', '最大并发任务数必须为 1 至 32。', { field: 'maxConcurrentTasks' })
+  json(value)
+  return clone(value)
+}
+
+function normalizeFunding(input) {
+  keys(input, ['mode', 'scopeId', 'pricing', 'request', 'dailyBudgetUsd', 'monthlyBudgetUsd', 'subscription'], 'funding')
+  const funding = { ...defaultBotSettings().funding, ...input }
   if (!['api', 'subscription'].includes(funding.mode) || (funding.scopeId !== null && !ref(funding.scopeId))) fail('BOT_SETTINGS_INVALID', '请选择目录中的 API 或订阅资金范围。', { field: 'funding' })
   if (funding.pricing !== null) {
     keys(funding.pricing, ['input', 'output', 'cacheRead', 'cacheWrite'], 'funding.pricing')
@@ -101,17 +110,18 @@ export function normalizeBotSettings(input) {
     funding.subscription = { dailyCalls: count(funding.subscription.dailyCalls, 'funding.subscription.dailyCalls'), monthlyCalls: count(funding.subscription.monthlyCalls, 'funding.subscription.monthlyCalls') }
   }
   if (funding.mode === 'api' && funding.subscription !== null) fail('BOT_SETTINGS_INVALID', 'API 资金不能携带订阅次数；不会隐式切换执行渠道。', { field: 'funding.subscription' })
-  value.funding = funding
-  if (!Number.isSafeInteger(value.maxConcurrentTasks) || value.maxConcurrentTasks < 1 || value.maxConcurrentTasks > 32) fail('BOT_SETTINGS_INVALID', '最大并发任务数必须为 1 至 32。', { field: 'maxConcurrentTasks' })
-  json(value)
-  return clone(value)
+  return funding
 }
 
 function catalogOf(input) {
   if (!plain(input)) fail('BOT_SETTINGS_CATALOG_UNAVAILABLE', '宿主尚未提供可信模型、机器和资金目录。')
   const models = list(input.models ?? [], 4096, 'catalog.models').map(item => {
     if (!token(item.provider) || !token(item.model)) fail('BOT_SETTINGS_CATALOG_INVALID', '宿主模型目录无效。')
+    if (item.fundingModes !== undefined && (!Array.isArray(item.fundingModes) || !item.fundingModes.length || item.fundingModes.length > 2
+      || item.fundingModes.some(mode => !['api', 'subscription'].includes(mode)) || new Set(item.fundingModes).size !== item.fundingModes.length)) fail('BOT_SETTINGS_CATALOG_INVALID', '宿主模型资金渠道目录无效。')
     return { provider: item.provider, model: item.model, label: String(item.label ?? item.model).slice(0, 256),
+      ...(item.fundingModes === undefined ? {} : { fundingModes: [...item.fundingModes] }),
+      ...(item.pricing === undefined ? {} : { pricing: normalizeFunding({ pricing: item.pricing }).pricing }),
       cliModels: (item.cliModels ?? []).filter(mapping => registry.has(mapping.toolId) && token(mapping.model)).map(mapping => ({ toolId: mapping.toolId, model: mapping.model })) }
   })
   unique(models.map(routeRef), 'catalog.models')
@@ -152,6 +162,7 @@ export function validateBotSettings(input, catalogInput) {
   const denied = (message, field) => fail('BOT_SETTINGS_SCOPE_DENIED', message, { field })
   const model = settings.model && catalog.models.find(item => routeRef(item) === routeRef(settings.model))
   if (settings.model && !model) denied('此准确模型已不在宿主目录，请刷新后重新选择。', 'model')
+  if (model?.fundingModes && !model.fundingModes.includes(settings.funding.mode)) denied('此模型不支持所选资金渠道，请选择宿主列出的渠道。', 'funding.mode')
   for (const tool of settings.officialTools) {
     const entry = catalog.tools.find(item => item.toolId === tool.toolId)
     if (!entry?.modes.includes(tool.mode)) denied(`${tool.toolId} 尚未获准使用该执行模式。`, 'officialTools')
@@ -187,10 +198,20 @@ function compiledGrant(settings, catalog) {
   return { tools: [...new Set(tools)].sort(), modelRoutes: [{ ...settings.model }] }
 }
 
+export function checkMainRouteFunding(route, funding, catalog) {
+  const model = catalog.models.find(item => item.provider === route.provider && item.model === route.model)
+  const scope = catalog.fundingScopes.find(item => item.id === funding?.scopeId)
+  if (!funding || !model || (model.fundingModes && !model.fundingModes.includes(funding.mode))
+    || !scope?.modes.includes(funding.mode) || (scope.models && !scope.models.some(item => item.provider === route.provider && item.model === route.model))) {
+    fail('MAIN_ROUTE_FUNDING_UNAVAILABLE', '此路线缺少可用模型、资金范围、渠道或完整限额。', { field: 'mainRoutes', route: routeRef(route) })
+  }
+  return funding
+}
+
 /** Isolated component tables, safe to colocate with other SQLite components. */
-export function openBotSettings({ Database, file, catalogFor = () => ({}), botExists = () => false, onCommitted = () => {}, onSuspended = () => {}, now = Date.now }) {
+export function openBotSettings({ Database, file, catalogFor = () => ({}), botExists = () => false, isMainBot = () => false, onCommitted = () => {}, onSuspended = () => {}, now = Date.now }) {
   if (typeof Database !== 'function' || typeof file !== 'string' || !file) throw new TypeError('Database constructor and explicit file are required')
-  for (const [name, callback] of Object.entries({ catalogFor, botExists, onCommitted, onSuspended })) if (typeof callback !== 'function') throw new TypeError(`${name} must be a function`)
+  for (const [name, callback] of Object.entries({ catalogFor, botExists, isMainBot, onCommitted, onSuspended })) if (typeof callback !== 'function') throw new TypeError(`${name} must be a function`)
   if (file !== ':memory:') { file = resolve(file); mkdirSync(dirname(file), { recursive: true }) }
   const db = new Database(file)
   try {
@@ -288,8 +309,26 @@ export function openBotSettings({ Database, file, catalogFor = () => ({}), botEx
       const botId = botIdOf(request.botId)
       if (!Number.isSafeInteger(request.expectedRevision) || request.expectedRevision < 0) fail('BOT_SETTINGS_INVALID', 'expectedRevision 必须是当前绑定修订号。')
       if (!sync(botExists(botId), 'botExists')) fail('BOT_SETTINGS_UNKNOWN_BOT', '此 Bot 不在已提交的宿主目录。')
-      const normalized=normalizeBotSettings(request.settings)
-      const settings=normalized.enabled?validateBotSettings(normalized,sync(catalogFor(botId),'catalogFor')).settings:normalized
+      const previous = load(botId).settings
+      const incoming = normalizeBotSettings(request.settings)
+      const main = sync(isMainBot(botId), 'isMainBot') === true
+      if (!main && Object.hasOwn(incoming, 'mainRoutes') && json(incoming.mainRoutes) !== json(previous.mainRoutes ?? null)) {
+        fail('MAIN_ROUTES_ROLE_REQUIRED', '只有已提交的 Main Bot 可以修改多路线配置。')
+      }
+      let normalized = main ? preserveMainModelRoutes(incoming, previous) : incoming
+      if (!main && Object.hasOwn(previous, 'mainRoutes')) normalized.mainRoutes = previous.mainRoutes
+      const needsCatalog = normalized.enabled || (main && normalized.mainRoutes)
+      const hostCatalog = needsCatalog ? sync(catalogFor(botId), 'catalogFor') : null
+      if (main && normalized.mainRoutes) {
+        const catalog = catalogOf(hostCatalog)
+        for (const route of normalized.mainRoutes.routes) {
+          const known = catalog.models.find(item => item.provider === route.provider && item.model === route.model)
+          if (route.funding.mode === 'api' && route.funding.pricing === null && known?.pricing) route.funding.pricing = clone(known.pricing)
+          if (route.enabled) checkMainRouteFunding(route, fundingForMainRoute(normalized.mainRoutes, route), catalog)
+        }
+        normalized = materializeMainRouteDefault(normalized, { normalizeFunding })
+      }
+      const settings = normalized.enabled ? validateBotSettings(normalized, hostCatalog).settings : normalized
       return commit(botId, request.expectedRevision, settings)
     },
     refresh() {

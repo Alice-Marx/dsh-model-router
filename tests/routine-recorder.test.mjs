@@ -92,3 +92,24 @@ test('more than 200 non-coalescible acknowledged actions still invalidate the wh
   assert.equal(recorder.snapshot.status, 'invalid'); assert.equal(recorder.snapshot.error, 'ROUTINE_TOO_LONG')
   assert.throws(() => recorder.finish({ name: 'cannot truncate text' }), code('ROUTINE_TOO_LONG'))
 })
+
+test('an acknowledged release between held modifiers and text is recorded in order, including out-of-order callbacks',()=>{
+  const recorder=make(),held={type:'key',action:'down',code:'ControlLeft',key:'Control'}
+  const release={id:2,sessionId:'desktop-a',sentAt:30},next={id:3,sessionId:'desktop-a',sentAt:50}
+  recorder.inputSent(held,meta);recorder.releaseSent(release);recorder.inputSent(event,next)
+  recorder.releaseAcknowledged({...release,ok:true});recorder.inputAcknowledged(event,next)
+  assert.equal(recorder.snapshot.length,0)
+  recorder.inputAcknowledged(held,meta)
+  assert.equal(recorder.snapshot.inputReleased,false);assert.deepEqual(recorder.snapshot.pending,0)
+  assert.throws(()=>recorder.finish({name:'not released'}),code('ROUTINE_RELEASE_REQUIRED'))
+  recorder.released({sessionId:'desktop-a',ok:true})
+  const saved=recorder.finish({name:'release recorded'})
+  assert.deepEqual(saved.steps,[{action:'input',event:held,delayMs:0},{action:'release-input',delayMs:10},{action:'input',event,delayMs:20}])
+  assert.equal(saved.recording.acknowledgedInputs,2)
+})
+
+test('a lost release acknowledgement invalidates a demonstration instead of saving a held-key replay',()=>{
+  const recorder=make();recorder.releaseSent({...meta,id:1});recorder.releaseFailed({...meta,failure:{possiblyApplied:true}})
+  assert.equal(recorder.snapshot.error,'ROUTINE_RELEASE_UNCONFIRMED')
+  assert.throws(()=>recorder.finish({name:'uncertain'}),code('ROUTINE_RELEASE_UNCONFIRMED'))
+})

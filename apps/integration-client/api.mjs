@@ -1,11 +1,15 @@
-export const PRODUCT_PANELS = Object.freeze({ bindings: 'bot-product-bindings', tasks: 'bot-product-tasks', machines: 'bot-product-machines', library: 'bot-product-library', routine: 'bot-product-routine', usage: 'bot-product-usage' })
+export { PRODUCT_PANELS } from './workspace-navigation.mjs'
 
 export function createProductApi(fetcher = globalThis.fetch, clientLocation = globalThis.location) {
+  const listeners = new Set()
   const call = async (action, payload, signal) => {
     // Desktop's protocol bridge removes Origin before forwarding to the HTTP
     // Host. Preserve only the known native viewer origin as a transport hint;
     // owner admission and Bot/machine authority still belong to the Host.
-    const nativeDesktop = ['machine.desktop.open', 'machine.desktop.renew'].includes(action)
+    // The desktop bridge strips Origin, so the native viewer supplies its own. A web panel probe
+    // needs the same hint: it evaluates frame-ancestors against the origin the page is really
+    // framed from, and an HTTP Host origin must never stand in for dsh-app://app.
+    const nativeDesktop = ['machine.desktop.open', 'machine.desktop.renew', 'machine.desktop.poll', 'machine.desktop.send', 'webPanels.probe'].includes(action)
       && clientLocation?.protocol === 'dsh-app:' && clientLocation?.host === 'app'
     const response = await fetcher('api/bot-product', { method: 'POST', credentials: 'same-origin',
       headers: { 'content-type': 'application/json', ...(nativeDesktop ? { 'x-dsh-desktop-origin': 'dsh-app://app' } : {}) },
@@ -15,7 +19,14 @@ export function createProductApi(fetcher = globalThis.fetch, clientLocation = gl
     if (!response.ok || body.ok !== true) throw Object.assign(new Error(body.error?.message ?? `宿主请求失败（HTTP ${response.status}）`), { code: body.error?.code })
     return body.value
   }
-  return Object.freeze({ snapshot: signal => call('snapshot', undefined, signal), dispatch: (action, payload, signal) => call(action, payload, signal) })
+  return Object.freeze({ snapshot: signal => call('snapshot', undefined, signal), attention: signal => call('task.attention', {}, signal),
+    async dispatch(action, payload, signal) {
+      const value = await call(action, payload, signal)
+      for (const listener of [...listeners]) { try { listener(action) } catch {} }
+      return value
+    },
+    subscribeActions(listener) { listeners.add(listener); return () => listeners.delete(listener) },
+  })
 }
 
 export const TASK_STATES = Object.freeze({ queued: '排队中', ready:'等待执行', running: '执行中', cancelling: '停止中', cancelled: '已停止', succeeded: '已完成', failed: '失败',

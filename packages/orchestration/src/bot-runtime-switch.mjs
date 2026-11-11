@@ -52,11 +52,17 @@ export function openRuntimeSwitch({ file, now = Date.now } = {}) {
     },
     /**
      * Move one Bot to a runtime, atomically.
+     *
+     * `isBusy` may be asynchronous — a Host that has to ask a live runtime about a running turn
+     * can. `assertIdle` is the one that protects the commit: it is synchronous and it stands
+     * directly in front of the write, because the await above can lose the race to a turn that
+     * started while it was in flight.
+     *
      * @param {string} botId
      * @param {'integration'|'independent'} mode
-     * @param {{ isBusy?: (botId: string) => boolean | Promise<boolean> }} [options]
+     * @param {{ isBusy?: (botId: string) => boolean | Promise<boolean>, assertIdle?: (botId: string) => boolean, snapshot?: object }} [options]
      */
-    async move(botId, mode, { isBusy, snapshot = null } = {}) {
+    async move(botId, mode, { isBusy, assertIdle, snapshot = null } = {}) {
       if (!idOk(botId)) fail('INVALID_BOT_ID')
       if (!RUNTIME_MODES.includes(mode)) fail('INVALID_RUNTIME_MODE')
       const busy = typeof isBusy === 'function' ? await isBusy(botId) : false
@@ -65,6 +71,11 @@ export function openRuntimeSwitch({ file, now = Date.now } = {}) {
       const state = read()
       const current = state.bots[botId]?.mode ?? 'integration'
       if (current === mode) return { botId, mode, changed: false }
+      // Nothing may await between this check and the write below, or a turn admitted during the
+      // check above would be served by two runtimes at once.
+      if (typeof assertIdle === 'function' && assertIdle(botId) === false) {
+        fail('BOT_BUSY', '这个 Bot 正在一轮对话中，等它空闲后再切换运行时。')
+      }
       // A snapshot makes a move auditable afterwards: counts only, never message bodies.
       state.bots[botId] = { mode, changedAt: now(), ...(snapshot ? { snapshot } : {}) }
       write(state)

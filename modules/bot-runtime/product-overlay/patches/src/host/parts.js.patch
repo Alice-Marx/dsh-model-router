@@ -1,0 +1,95 @@
+--- a/src/host/parts.js
++++ b/src/host/parts.js
+@@ -446,6 +446,11 @@
+     const session = agent.session
+     const header = session.requestHeader()
+     const route = header?.config
+     if (!route?.provider || !route?.model) throw new Error('the Session has not called a model yet')
++    // The Host's prepared auxiliary stream binds one adapter generation for this note and
++    // admits the money against that same generation. A Host that has not wired it refuses
++    // the note here, rather than re-resolving the route at dispatch the way a bare stream
++    // does.
++    const auxiliary = ctx.get('botAuxiliaryModelStream')
++    if (typeof auxiliary !== 'function') throw new Error('the Host has no prepared auxiliary model stream')
+     const messages = session.deriveMessages()
+     const base = folder ? FOLDER_PROMPT : HANDOFF_PROMPT
+     let retry
+@@ -453,7 +458,7 @@
+     for (let attempt = 1; attempt <= NOTE_ATTEMPTS; attempt += 1) {
+       const prompt = retry === undefined ? base : `${base}\n\n${retry}`
+       const assembler = new BlockAssembler()
+-      for await (const chunk of ctx.llm.stream({
++      for await (const chunk of auxiliary.stream({
+         provider: route.provider,
+         model: route.model,
+         ...(route.reasoningEffort ? { reasoningEffort: route.reasoningEffort } : {}),
+@@ -515,6 +520,12 @@
+   async function writeCheckpoint(input, agent, signal) {
+     const session = agent.session
+     const route = session.requestHeader()?.config
+     if (!route?.provider || !route?.model) throw new Error('the Session has not called a model yet')
++    // The Host's prepared auxiliary stream binds one adapter generation for this checkpoint,
++    // so the summary is written by the generation the accounting admitted. A Host that has
++    // not wired it refuses the checkpoint instead of pricing one generation and streaming
++    // another.
++    const auxiliary = ctx.get('botAuxiliaryModelStream')
++    if (typeof auxiliary !== 'function') throw new Error('the Host has no prepared auxiliary model stream')
+     // The results list grows with the work, so the checkpoint may write as much as one
+     // of the Bot's own replies.
+     const maxTokens = route.maxTokens
+@@ -522,7 +531,7 @@
+     const tail = checkpointTail(head, session.deriveMessages())
+     const prompt = tail.length === 0 ? CHECKPOINT_PROMPT : `${CHECKPOINT_PROMPT}\n\n${checkpointTailNote(tail)}`
+     const assembler = new BlockAssembler()
+-    for await (const chunk of ctx.llm.stream({
++    for await (const chunk of auxiliary.stream({
+       provider: route.provider,
+       model: route.model,
+       ...(route.reasoningEffort ? { reasoningEffort: route.reasoningEffort } : {}),
+@@ -571,18 +582,19 @@
+     const lines = []
+     for await (const line of partLines(agent.id, AbortSignal.timeout(HANDOFF_READ_MS), { group })) {
+       lines.push({ who: line.who, text: line.who === 'you' || line.who === 'user' ? line.text.replace(/^(?:You|User): /, '') : line.text })
+       if (lines.length >= STEWARD_LINES) break
+     }
+-    const info = await ctx.llm.resolveModelInfo(route.provider, route.model).catch(() => undefined)
+-    // The decision needs no long thinking.
+-    const off = info?.reasoning?.efforts?.some(effort => effort.id === 'off')
++    // The decision needs no long thinking. Whether this model can be asked to think less
++    // is decided from the generation this very call prepares, not from a read of whatever
++    // registration happens to be current now.
++    const auxiliary = ctx.get('botAuxiliaryModelStream')
++    if (typeof auxiliary !== 'function') throw new Error('the Host has no prepared auxiliary model stream')
+     const assembler = new BlockAssembler()
+-    for await (const chunk of ctx.llm.stream({
++    for await (const chunk of auxiliary.stream({
+       provider: route.provider,
+       model: route.model,
+-      ...(off ? { reasoningEffort: 'off' } : {}),
+       system: STEWARD_SYSTEM,
+       messages: rt.tagUsage([{ role: 'user', content: [{ type: 'text', text: stewardRequest({ lines, midTurn, checkpoints: checkpointCount(session.deriveMessages()), group }) }] }], { sessionId: agent.id, kind: 'compaction' }),
+       maxTokens: STEWARD_MAX_TOKENS,
+       sessionId: session.id,
+       purpose: 'compaction',
+       signal: AbortSignal.timeout(STEWARD_TIMEOUT_MS),
+-    })) assembler.push(chunk)
++    }, { controls: auxiliary.reasoningOff })) assembler.push(chunk)
+@@ -732,7 +743,10 @@
+ 
+   const placeOf = (sessionId) => {
+     const botId = rt.chatOwners.get(sessionId)
+-    if (botId !== undefined) return { botId }
++    // A thread is not a part chain: it keeps its own Session for as long as it
++    // lives, so the steward neither condenses it nor hands its input on to the
++    // Bot's default chat.
++    if (botId !== undefined) return rt.threadOf(sessionId) === undefined ? { botId } : undefined
+     const owner = rt.groupOwners.get(sessionId)
+     if (owner !== undefined) return { botId: owner.botId, roomId: owner.roomId }
+@@ -1234,6 +1245,7 @@
+   // past it.
+   async function checkContext(agent) {
+     if (switches.has(agent.id) || freshParts.has(agent.id) || checking.has(agent.id) || readOnly()) return
++    if (placeOf(agent.id) === undefined) return
+     if (lastTurnEnd(agent)?.data?.reason?.kind === 'error') return
+     const lines = await contextLines(agent.session)
+     const tokens = tokensOf(agent.session)

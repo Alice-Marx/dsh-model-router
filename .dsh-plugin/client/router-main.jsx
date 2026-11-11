@@ -14,7 +14,7 @@ import { remoteErrorText, staleHostNotice } from './host-version.mjs'
 import { ADAPTIVE_DEFAULTS } from './adaptive-state.mjs'
 import stylesheet from './router-main.css'
 import { ROUTER_PACKAGE_NAME } from './package-info.mjs'
-import { WORKSPACE_VIEWS, TASK_TEMPLATES, validWorkbenchView, savedWorkbenchView, rememberWorkbenchView, workbenchDraft, rememberWorkbenchDraft } from './workbench-state.mjs'
+import { WORKSPACE_VIEWS, TASK_TEMPLATES, validWorkbenchView, savedWorkbenchView, rememberWorkbenchView, workbenchDraft, rememberWorkbenchDraft, takeWorkbenchView, subscribeWorkbenchView } from './workbench-state.mjs'
 
 const money = value => value === null || value === undefined ? '价格待配置' : `$${Number(value).toFixed(4)}`
 const text = value => typeof value === 'string' ? value.trim() : ''
@@ -915,7 +915,11 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
     const value = settingsScope.getSnapshot().value ?? {}
     return routingSettingsSignature(value)
   })
-  const [view, setView] = React.useState(savedWorkbenchView)
+  const [view, setView] = React.useState(() => takeWorkbenchView() ?? savedWorkbenchView())
+  React.useEffect(() => subscribeWorkbenchView(id => {
+    setView(id)
+    if (workspaceElement.current) workspaceElement.current.scrollTop = 0
+  }), [])
   const [attentionHidden, setAttentionHidden] = React.useState(() => {
     try { return globalThis.localStorage?.getItem(ATTENTION_VISIBILITY_KEY) === 'true' } catch { return false }
   })

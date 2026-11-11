@@ -1,14 +1,25 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { PRODUCT_PANELS, TASK_STATES, modelName, money } from './api.mjs'
 import { TaskWorkspace } from './tasks-panel.jsx'
 import { normalizeEndpoint, parsePairingPaste, secretNameFor } from './pairing.mjs'
 import { framePoint } from '../../packages/orchestration/src/desktop-contract.mjs'
 import { BotBindingEditor } from './binding-editor.jsx'
 import { LibraryPanel } from './library-panel.jsx'
+import { SecurePairingSetup } from './secure-pairing.jsx'
+import { UsageExplorer } from './usage-explorer.jsx'
 import { DesktopWorkbench } from './desktop-pane.jsx'
 import { RoutinesPanel } from './routines-panel.jsx'
 import { UiIcon } from './ui-icons.jsx'
+import { NotificationsPanel } from './notifications-panel.jsx'
+import { DataPanel } from './data-panel.jsx'
+import { BotThreadsPanel } from './bot-threads-panel.jsx'
+import { WebPanelsPanel } from './web-panel-page.jsx'
+import { BotConversationLink } from './independent-chat-entry.jsx'
+import { openIndependentChat } from './independent-chat-navigation.mjs'
+import { requestWorkbenchView } from '../../.dsh-plugin/client/workbench-state.mjs'
 import { routingSubmissions, submissionCode } from './routing-submissions.mjs'
+import { WORKSPACE_SECTIONS, workspaceNavigation } from './workspace-navigation.mjs'
+import { TeamDirectory, WorkspaceCommandPalette, WorkspaceHome, WorkspaceInbox, WorkspaceToolbar } from './workspace-ui.jsx'
 
 const NAV_EVENT = 'bot-product:navigation'
 let activePanel = null
@@ -18,7 +29,7 @@ const announcePanel = (id, clear = false) => {
   document.dispatchEvent(new document.defaultView.CustomEvent(NAV_EVENT, { detail: { id: activePanel } }))
 }
 
-export function ProductNavigation({ openPanel, panels, compact = false }) {
+export function ProductNavigation({ openPanel, panels, compact = false, onSearch }) {
   const [active, setActive] = useState(() => activePanel)
   useEffect(() => {
     const change = event => setActive(event.detail.id)
@@ -27,15 +38,11 @@ export function ProductNavigation({ openPanel, panels, compact = false }) {
     return () => document.removeEventListener(NAV_EVENT, change)
   }, [])
   return <nav className={`bp-nav${compact ? ' bp-nav-compact' : ''}`} aria-label="Bot 工作系统">
-    <p className="bp-nav-label">工作空间</p>
-    {[
-      [panels.bindings, 'Bot 绑定', 'team', '绑定'], [panels.tasks, '任务', 'tasks', '任务'], [panels.machines, '远程电脑', 'computer', '电脑'],
-      [panels.library, '资料库', 'folder', '资料'], [panels.routine, '例行任务', 'repeat', '例行'], [panels.usage, '费用与用量', 'chart', '费用'], ['model-router-galgame', '高级工作台', 'settings', '工作台'],
-    ].map(([id, label, icon, caption]) => <button key={id} type="button" aria-current={active === id ? 'page' : undefined}
-      onClick={() => { announcePanel(id); openPanel(id) }} title={label} aria-label={label}>
-      {/* A narrow column still says what each icon opens, so the row is readable without hovering. */}
-      <UiIcon name={icon} size={17} /><span className="bp-nav-name">{label}</span><span className="bp-nav-caption">{caption}</span>
-    </button>)}
+    <button type="button" className="bp-nav-search" aria-label="搜索工作空间" onClick={() => onSearch ? onSearch() : openPanel(panels.home)} title="搜索工作空间"><UiIcon name="search" size={17} /><span className="bp-nav-name">搜索工作空间</span><span className="bp-nav-caption">查找</span></button>
+    {['工作', '资源', '管理'].map(group => <div className="bp-nav-group" key={group}><p className="bp-nav-label">{group}</p>{WORKSPACE_SECTIONS.filter(row => row.group === group).map(({ section, label, icon }) => <button key={section} type="button" aria-current={active === panels[section] ? 'page' : undefined}
+      onClick={() => { announcePanel(panels[section]); openPanel(panels[section]) }} title={label} aria-label={label}>
+      <UiIcon name={icon} size={17} /><span className="bp-nav-name">{label}</span><span className="bp-nav-caption">{label.slice(0, 2)}</span>
+    </button>)}{group === '管理' && <button type="button" aria-current={active === 'model-router-galgame' ? 'page' : undefined} onClick={() => { announcePanel('model-router-galgame'); openPanel('model-router-galgame') }} title="高级工作台" aria-label="高级工作台"><UiIcon name="settings" size={17} /><span className="bp-nav-name">高级工作台</span><span className="bp-nav-caption">路由</span></button>}</div>)}
   </nav>
 }
 
@@ -54,85 +61,43 @@ export
  * 运行时: which path serves this Bot. Only rendered when the Host exposes the switch, so an older
  * Host shows nothing instead of a dead control.
  */
-function BotRuntimeRow({ botId, dispatch, busy }) {
-  const [state, setState] = React.useState(null)
-  const [error, setError] = React.useState('')
-  const [working, setWorking] = React.useState(false)
+function BotRuntimeRow({ botId, dispatch, busy, onOpenChat }) {
+  const [state, setState] = React.useState(null), [error, setError] = React.useState(''), [working, setWorking] = React.useState(false)
+  const generation = React.useRef(0)
   const load = React.useCallback(async () => {
-    if (typeof dispatch !== 'function') return
+    const mine = ++generation.current
     try {
       const rows = await dispatch('botRuntimeStatus', {})
-      const row = Array.isArray(rows) ? rows.find(item => item.botId === botId) : null
-      setState({ runtime: row?.mode ?? 'integration', changedAt: row?.changedAt ?? null,
-        turns: row?.turns ?? null, messages: row?.messages ?? null, snapshot: row?.snapshot ?? null })
-      setError('')
-    } catch (failure) {
-      setState(null)
-      setError(String(failure?.message ?? failure))
-    }
+      if (mine !== generation.current) return
+      if (!Array.isArray(rows)) throw new Error('宿主未确认运行时状态。')
+      const row = rows.find(item => item.botId === botId)
+      const mode = row ? row.mode : 'integration'
+      if (!['integration', 'independent'].includes(mode)) throw new Error('未知运行时，已暂停操作。')
+      setState({ runtime: mode, changedAt: row?.changedAt ?? null }); setError('')
+    } catch (failure) { if (mine === generation.current) { setState(null); setError(String(failure?.message ?? failure)) } }
   }, [botId, dispatch])
-  const [history, setHistory] = React.useState([])
-  const [historyError, setHistoryError] = React.useState('')
-  const loadHistory = React.useCallback(async () => {
-    if (typeof dispatch !== 'function') return
-    try {
-      const rows = await dispatch('botRuntimeHistory', { botId, limit: 20 })
-      setHistory(Array.isArray(rows) ? rows : [])
-      setHistoryError('')
-    } catch (failure) {
-      setHistory([])
-      setHistoryError(String(failure?.message ?? failure))
-    }
-  }, [botId, dispatch])
-  const [full, setFull] = React.useState(null)
-  const openFull = React.useCallback(async index => {
-    try {
-      const message = await dispatch('botRuntimeMessage', { botId, index })
-      setFull({ index, ...message })
-      setHistoryError('')
-    } catch (failure) {
-      setHistoryError(String(failure?.message ?? failure))
-      setFull(null)
-    }
-  }, [botId, dispatch])
-  React.useEffect(() => { void load() }, [load])
-  if (!state && !error) return null
+  React.useEffect(() => { void load(); return () => { generation.current++ } }, [load])
   const target = state?.runtime === 'independent' ? 'integration' : 'independent'
   const move = async () => {
     setWorking(true)
-    try {
-      await dispatch('botRuntimeMove', { botId, mode: target })
-      await load()
-    } catch (failure) {
-      setError(String(failure?.message ?? failure))
-    } finally {
-      setWorking(false)
-    }
+    try { await dispatch('botRuntimeMove', { botId, mode: target }); await load() }
+    catch (failure) { setError(String(failure?.message ?? failure)) }
+    finally { setWorking(false) }
   }
   return <div className="bp-runtime">
-    <dl className="bp-facts"><Value label="运行时">{state?.runtime === 'independent' ? '独立循环 + 独立会话库' : 'Harness 会话集成'}</Value>
-      <Value label="切换时间">{state?.changedAt ? new Date(state.changedAt).toLocaleString('zh-CN') : '从未切换'}</Value></dl>
-    <div className="bp-actions"><button disabled={busy || working} onClick={() => { void move() }}>{working ? '切换中…' : target === 'independent' ? '迁移到独立运行时' : '迁回 Harness 会话'}</button></div>
-    <p className="bp-muted">迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。</p>
+    <dl className="bp-facts"><Value label="运行时">{state ? state.runtime === 'independent' ? '独立循环 + 独立会话库' : 'Harness 会话集成' : '等待宿主确认'}</Value><Value label="切换时间">{state?.changedAt ? new Date(state.changedAt).toLocaleString('zh-CN') : '从未切换'}</Value></dl>
+    <div className="bp-actions"><button type="button" disabled={!state || busy || working} onClick={() => { void move() }}>{working ? '切换中…' : target === 'independent' ? '迁移到独立运行时' : '迁回 Harness 会话'}</button>{state?.runtime === 'independent' && <button type="button" onClick={() => onOpenChat?.(botId)}>打开独立聊天</button>}</div>
+    <p className="bp-muted">Bot 正在对话时不能迁移。独立运行时请打开独立聊天继续发送，完整消息按稳定编号分页读取。迁回后可从“打开私聊”回到此 Bot 的真实原生会话。</p>
     {error && <p className="bp-error" role="alert">{error}</p>}
-    {state ? <details className="bp-log"><summary>最近会话（仅预览）</summary>
-      <button type="button" disabled={working} onClick={() => { void loadHistory() }}>读取预览</button>
-      {historyError && <p className="bp-error" role="alert">{historyError}</p>}
-      {history.length === 0 ? <p className="bp-muted">点“读取预览”加载最近 20 条。</p> : <ul className="bp-checklist">{history.map((row, index) => (
-        <li key={index}><strong>{row.role}</strong>{row.name ? ` · ${row.name}` : ''} · {row.chars} 字
-          {row.at ? ` · ${new Date(row.at).toLocaleTimeString('zh-CN')}` : ''}
-          <small>{row.preview}{String(row.preview ?? '').length < row.chars ? '…' : ''}</small>
-          <button type="button" onClick={() => { void openFull(index) }}>查看全文</button></li>
-      ))}</ul>}
-      {full ? <div className="bp-fulltext"><p className="bp-muted">第 {full.index + 1} 条（从最新往前数）· {full.role} · {full.chars} 字</p>
-        <pre>{full.content}</pre></div> : null}
-    </details> : null}
   </div>
 }
 
-export function BotBindings({ snapshot, openSession, dispatch, busy }) {
+let bindingScopeKey = 0
+export function BotBindings({ snapshot, openSession, dispatch, busy, focus, scope, onOpenTools, onOpenChatPanel }) {
+  const scopeKey = useMemo(() => ++bindingScopeKey, [scope])
   const bots = snapshot.bots ?? []
   const [selected, setSelected] = useState(bots[0]?.id ?? '')
+  useEffect(() => { if (focus?.botId && bots.some(row => row.id === focus.botId)) setSelected(focus.botId) }, [focus?.version, focus?.botId])
   const bot = bots.find(row => row.id === selected) ?? bots[0]
   const section = snapshot.botBindings ?? snapshot.bindings
   const binding = section?.items?.find(row => row.botId === bot?.id)
@@ -143,12 +108,12 @@ export function BotBindings({ snapshot, openSession, dispatch, busy }) {
     ['资料库', /^tool\/bot_library_/], ['例行任务', /^tool\/bot_routine_/], ['远程工具', /^remote\//],
   ].filter(([, pattern]) => capabilities.some(value => pattern.test(value))).map(([label]) => label)
   if (!bots.length) return <p>还没有 Bot。返回 Main 完成首次设置，或从侧栏新建 Bot。</p>
-  return <div className="bp-columns">
-    <div className="bp-bot-list" aria-label="Bot 列表">{bots.map(item => <button key={item.id} aria-current={item.id === bot?.id ? 'true' : undefined} onClick={() => setSelected(item.id)}>
-      <span className="bp-person-avatar"><UiIcon name="bot" size={23} /></span><span className="bp-person-copy"><strong>{item.name}</strong>{item.main && <Tag>Main</Tag>}<small>{item.role || '尚未填写职责'}</small></span></button>)}</div>
-    <article className="bp-card"><div className="bp-card-title"><div className="bp-person-heading"><span className="bp-person-avatar bp-person-avatar-large"><UiIcon name="bot" size={27} /></span><div><h2>{bot.name}</h2><p className="bp-muted">{bot.main ? '团队协调 Bot' : '团队成员'}</p></div></div><button className="bp-button-primary" onClick={() => openSession(bot.sessionId)}>打开私聊<UiIcon name="arrow" size={15} /></button></div>
-      <dl className="bp-facts"><Value label="职责">{bot.role || '未填写'}</Value>
-        <Value label="准确模型">{modelName(bot.model)}</Value><Value label="模型策略">精确绑定；不可用时暂停并说明原因</Value>
+  return <div className="bp-columns bp-team-layout">
+    <TeamDirectory snapshot={snapshot} selected={bot?.id} onSelect={setSelected} />
+    <article className="bp-card"><div className="bp-card-title"><div className="bp-person-heading"><span className="bp-person-avatar bp-person-avatar-large"><UiIcon name="bot" size={27} /></span><div><h2>{bot.name}</h2><p className="bp-muted">{bot.main ? '团队协调 Bot' : '团队成员'}</p></div></div><BotConversationLink productApi={scope} bot={bot} openSession={openSession} onOpenIndependent={id => openIndependentChat(scope, onOpenChatPanel, id)} available={snapshot.availableActions?.includes('independentChat.view')}/></div>
+      {dispatch && (!snapshot.availableActions || snapshot.availableActions.includes('binding.save')) ? <BotBindingEditor key={`${scopeKey}:${bot.id}`} hostScope={scope} bot={bot} record={binding} accounts={snapshot.fundingAccounts} dispatch={dispatch} busy={busy} onOpenTools={onOpenTools} /> : <p className="bp-muted">当前连接可以查看 Bot 配置，暂不支持保存修改。</p>}
+      <details className="bp-technical"><summary>当前权限与运行配置</summary><dl className="bp-facts"><Value label="职责">{bot.role || '未填写'}</Value>
+        <Value label="宿主已选模型">{modelName(bot.model)}</Value><Value label="最近应用模型">{bot.appliedModel ? modelName(bot.appliedModel) : '宿主尚未报告'}</Value><Value label="模型策略">精确绑定；不可用时暂停并说明原因</Value>
         <Value label="工作区">{binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? '未指定，请在 Bot 详情选择文件夹'}</Value>
         <Value label="执行位置">{binding?.machineId ?? binding?.workspaceRef?.machineId ?? '尚未取得宿主绑定'}</Value>
         <Value label="最大并发">{binding?.maxConcurrentTasks}</Value></dl>
@@ -158,8 +123,8 @@ export function BotBindings({ snapshot, openSession, dispatch, busy }) {
         {binding.blockedReason && <Blocked value={{ reason: binding.blockedReason, nextAction: binding.nextAction }} />}
       </> : <Blocked value={{ reason: '此 Bot 尚未取得有效绑定。', nextAction: '在宿主 Bot 绑定配置中授予明确工具、机器与工作区。' }} />}
       <p className="bp-muted">角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。</p>
-      {dispatch && <details className="bp-edit-section"><summary><UiIcon name="settings" size={16} />编辑权限与预算</summary><BotBindingEditor bot={bot} record={binding} accounts={snapshot.fundingAccounts} dispatch={dispatch} busy={busy} /></details>}
-      <details className="bp-technical"><summary>连接与运行详情</summary><dl className="bp-facts"><Value label="稳定 Bot ID">{bot.id}</Value><Value label="预算范围">{binding?.budgetScope}</Value></dl><h3>完整权限标识</h3><p className="bp-code">{capabilities.join('、') || '无额外能力'}</p>{snapshot.availableActions?.includes('botRuntimeStatus') && <BotRuntimeRow botId={bot.id} dispatch={dispatch} busy={busy} />}</details>
+      </details>
+      <details className="bp-technical"><summary>连接与运行详情</summary><dl className="bp-facts"><Value label="稳定 Bot ID">{bot.id}</Value><Value label="预算范围">{binding?.budgetScope}</Value></dl><h3>完整权限标识</h3><p className="bp-code">{capabilities.join('、') || '无额外能力'}</p>{snapshot.availableActions?.includes('botRuntimeStatus') && <BotRuntimeRow key={bot.id} botId={bot.id} dispatch={dispatch} busy={busy} onOpenChat={id => openIndependentChat(scope, onOpenChatPanel, id)} />}</details>
     </article>
   </div>
 }
@@ -189,7 +154,7 @@ const submissionFailureMessage = failure => {
   return '原提交核对尚未完成，请恢复宿主连接后再次核对；请保留核对码，不会重新提交任务。'
 }
 
-function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }) {
+function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, navigation, focus }) {
   const submissions = useMemo(() => routingSubmissions(submissionScope), [submissionScope])
   const submission = useSyncExternalStore(submissions.subscribe, submissions.getSnapshot, submissions.getSnapshot)
   const [view, setView] = React.useState(null)
@@ -208,6 +173,8 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
   const control = useRef({ live: false, epoch: 0, draft: 0, active: null, prepared: null, ready: false })
   const form = useRef({ text: '', pin: '', machine: '', root: '', effect: 'read' })
   const busyRef = useRef(busy)
+  const draftFocus = useRef(null)
+  const card = useRef(null)
   busyRef.current = busy
   const call = useCallback(async (action, payload) => {
     if (typeof dispatch !== 'function') throw new Error('宿主接口尚未就绪。')
@@ -222,11 +189,26 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
   const editDraft = changes => {
     const next = { ...form.current, ...changes }
     form.current = next
+    if (Object.hasOwn(changes, 'text')) navigation?.saveGoalDraft(next.text)
     setText(next.text); setPin(next.pin); setMachine(next.machine); setRoot(next.root); setEffect(next.effect)
     const previous = submissions.getSnapshot()
     if (previous?.state === 'confirmed') submissions.clear(previous)
     invalidate()
   }
+  useEffect(() => {
+    draftFocus.current = null
+    const restored = navigation?.getGoalDraft() ?? ''
+    form.current = { text: restored, pin: '', machine: '', root: '', effect: 'read' }
+    setText(restored); setPin(''); setMachine(''); setRoot(''); setEffect('read')
+  }, [navigation, submissionScope])
+  useEffect(() => {
+    if (!focus?.compose || !viewReady || draftFocus.current === focus.version) return
+    draftFocus.current = focus.version
+    const draft = navigation?.claimDraft(focus.version)
+    if (draft !== null && draft !== undefined) editDraft({ text: draft })
+    card.current?.scrollIntoView?.({ block: 'start', behavior: 'auto' })
+    card.current?.querySelector('textarea')?.focus({ preventScroll: true })
+  }, [focus?.version, focus?.compose, viewReady, navigation])
   const begin = useCallback(kind => {
     const state = control.current
     if (!state.live || state.active || busyRef.current) return null
@@ -300,6 +282,7 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
       if (next?.accepted !== true || typeof planId !== 'string' || !planId.trim()) throw new Error('未取得有效的任务计划编号。')
       // The receipt belongs to the captured Host even if its card was unmounted meanwhile.
       submissions.update(reference, { state: 'confirmed', planId, planState: next.planState })
+      navigation?.saveGoalDraft('')
       if (current(token)) state.prepared = null
     } catch (failure) {
       if (reference) submissions.update(reference, { state: 'unknown' })
@@ -400,7 +383,7 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
   const machines = (snapshot.machines?.items ?? []).filter(item => item.status !== 'revoked')
   const inputDisabled = busy || !viewReady || working === 'dispatch' || working === 'settings'
   const nameOf = botId => view.candidates.find(row => row.botId === botId)?.name ?? botId
-  return <article className="bp-card"><div className="bp-card-title"><h2>Bot 路由</h2><Tag>{view.enabled ? `已开启 · ${routingPresetLabel(view.preset)}` : '未开启'}</Tag>
+  return <article className="bp-card bp-task-composer" ref={card}><div className="bp-card-title"><h2>Bot 路由</h2><Tag>{view.enabled ? `已开启 · ${routingPresetLabel(view.preset)}` : '未开启'}</Tag>
     <button type="button" disabled={busy || Boolean(working)} onClick={() => { void load() }}>刷新候选</button></div>
     <div className="bp-actions"><label className="bp-check"><input type="checkbox" checked={view.enabled} disabled={busy || Boolean(working) || !viewReady} onChange={event => { void saveSettings({ enabled: event.target.checked, preset: view.preset, autoGrant: view.autoGrant }) }} />开启 Bot 路由</label>
       <label>策略<select value={view.preset} disabled={busy || Boolean(working) || !viewReady} onChange={event => { void saveSettings({ enabled: view.enabled, preset: event.target.value, autoGrant: view.autoGrant }) }}>
@@ -463,10 +446,10 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
   </article>
 }
 
-export function Tasks({ snapshot, dispatch, busy, submissionScope = dispatch, inspect, openSession }) {
+export function Tasks({ snapshot, dispatch, busy, submissionScope = dispatch, inspect, openSession, focus, navigation }) {
   if (snapshot.tasks?.status !== 'available') return <Blocked value={snapshot.tasks} />
   return <TaskWorkspace snapshot={snapshot} dispatch={dispatch} busy={busy} scope={submissionScope} inspect={inspect} openSession={openSession}
-    routingCard={snapshot.availableActions?.includes('botRoutingInspect') ? <BotRoutingCard snapshot={snapshot} dispatch={dispatch} busy={busy} submissionScope={submissionScope} /> : null} />
+    focus={focus} routingCard={snapshot.availableActions?.includes('botRoutingInspect') ? <BotRoutingCard snapshot={snapshot} dispatch={dispatch} busy={busy} submissionScope={submissionScope} navigation={navigation ?? workspaceNavigation(submissionScope)} focus={focus} /> : null} />
 }
 
 
@@ -599,6 +582,7 @@ function MachineSetup({ snapshot, dispatch, busy }) {
       // The channel reports failures as {ok:false}; silence here is how a pairing looks successful
       // while nothing was stored, so every step is checked.
       const unwrap = response => {
+        if (response === undefined || response === null) throw new Error('宿主尚未确认这一步，请刷新后核对原始结果。')
         if (response && response.ok === false) throw new Error(response.error?.message ?? response.error ?? '宿主拒绝了这一步。')
         return response
       }
@@ -625,7 +609,7 @@ function MachineSetup({ snapshot, dispatch, busy }) {
       setWorking(false)
     }
   }
-  return <details className="bp-card bp-machine-setup"><summary>添加电脑（导入配对文件）</summary>
+  return <><SecurePairingSetup snapshot={snapshot} dispatch={dispatch} busy={busy} /><details className="bp-card bp-machine-setup"><summary>兼容已有电脑（导入长期配对文件）</summary>
     <p className="bp-muted">在你自己的 Windows 电脑或云电脑上解压 Agent 包，双击 <code>start.cmd</code>，按向导选共享文件夹和连接地址。回到这里导入向导生成的 <code>pairing.private.json</code>，地址、目录和权限会自动填好。</p>
     {available.includes('machine.secret') && available.includes('machine.pair') ? <div className="bp-form">
       <label>配对文件<input type="file" accept=".json,application/json" onChange={event => { void importFile(event) }} /></label>
@@ -640,7 +624,7 @@ function MachineSetup({ snapshot, dispatch, busy }) {
       {status !== '' && <p className="bp-muted" role="status">{status}</p>}
       {error !== '' && <p className="bp-error" role="alert">{error}</p>}
     </div> : <p className="bp-muted">宿主尚未提供配对操作。</p>}
-  </details>
+  </details></>
 }
 
 function MachineControls({ machine, snapshot, dispatch, busy }) {
@@ -704,12 +688,18 @@ function ArtifactDownload({ machine, snapshot, dispatch, busy }) {
   </details>
 }
 
-export function Machines({ snapshot, dispatch, busy }) {
+export function Machines({ snapshot, dispatch, busy, focus, transport }) {
+  const machineCards = useRef(new Map())
+  useEffect(() => {
+    if (!focus?.machineId) return
+    const card = machineCards.current.get(focus.machineId)
+    card?.focus({ preventScroll: true }); card?.scrollIntoView?.({ block: 'start' })
+  }, [focus?.version, focus?.machineId])
   const section = snapshot.machines
   if (section?.status !== 'available') return <Blocked value={section} />
-  return <>{dispatch&&<><DesktopWorkbench snapshot={snapshot} dispatch={dispatch} />
+  return <>{dispatch&&<><DesktopWorkbench snapshot={snapshot} dispatch={dispatch} transport={transport} />
     <details><summary>兼容截图操作</summary><DesktopControl snapshot={snapshot} dispatch={dispatch} busy={busy} /></details>
-    <MachineSetup snapshot={snapshot} dispatch={dispatch} busy={busy} /></>}{section.items.length ? <div className="bp-grid">{section.items.map(machine => <article className="bp-card" key={machine.id ?? machine.machineId}>
+    <MachineSetup snapshot={snapshot} dispatch={dispatch} busy={busy} /></>}{focus?.machineId && !section.items.some(machine => (machine.id ?? machine.machineId) === focus.machineId) && <p className="bp-blocked" role="status">所选电脑不在当前宿主记录中，请刷新后核对。</p>}{section.items.length ? <div className="bp-grid">{section.items.map(machine => <article className={`bp-card${focus?.machineId === (machine.id ?? machine.machineId) ? ' bp-selected-resource' : ''}`} key={machine.id ?? machine.machineId} tabIndex={-1} ref={node => { const id = machine.id ?? machine.machineId; if (node) machineCards.current.set(id, node); else machineCards.current.delete(id) }}>
     <div className="bp-card-title"><h2>{machine.name ?? machine.id ?? machine.machineId}</h2><Tag>{machine.status ?? '未知'}</Tag></div>
     <dl className="bp-facts"><Value label="平台">{machine.platform}</Value><Value label="Agent 版本">{machine.version}</Value><Value label="最后在线">{machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString('zh-CN') : '从未取得心跳'}</Value>
       <Value label="能力">{machine.capabilities?.join('、')}</Value><Value label="桌面会话">{machine.desktop?.status ?? '未报告'}</Value></dl>
@@ -743,7 +733,7 @@ function UnknownReview({ item, dispatch, busy }) {
   </article>
 }
 
-export function Usage({ snapshot, dispatch, busy, openAdvanced }) {
+export function Usage({ snapshot, dispatch, busy, openAdvanced, scope }) {
   const section = snapshot.usage
   if (section?.status !== 'available') return <><Blocked value={section} /><button onClick={openAdvanced}>打开已有 MR 费用与订阅面板</button></>
   const unresolved = section.unresolved ?? []
@@ -755,11 +745,7 @@ export function Usage({ snapshot, dispatch, busy, openAdvanced }) {
       <p className="bp-muted">以下执行已经分派，但没有取得可核验的厂商账单；在核对完成前，其 Bot 与资金范围不会放行新的付费调用。核对说明会记录在运行记录中。</p>
       <div className="bp-grid">{unresolved.map(item => <UnknownReview key={`${item.runId}/${item.packageId}`} item={item} dispatch={dispatch} busy={busy} />)}</div>
     </section> : null}
-    {!section.items.length ? <p className="bp-empty">尚无费用收据。</p> : <div className="bp-table-wrap"><table><thead><tr><th>Bot / 任务</th><th>来源</th><th>准确模型</th><th>金额</th><th>状态</th></tr></thead>
-      <tbody>{section.items.map((row, i) => <tr key={row.id ?? row.receiptId ?? i}><td>{row.botName ?? row.botId ?? '未归属'}<small>{row.taskId ?? row.runId}</small></td>
-        <td>{({ bot: 'Bot 对话', aux: 'Bot 辅助调用', 'mr-api': 'MR API', cli: '官方 CLI', review: '评审' })[row.source] ?? row.source ?? '未报告'}</td>
-        <td>{modelName(row.model ?? (row.provider ? { provider: row.provider, model: row.modelId } : null))}</td><td>{row.billing === 'subscription' ? '订阅' : money(row.amountUsd ?? row.costUsd)}</td>
-        <td>{row.status ?? '未知'}{row.resolution && <Tag>{row.resolution.kind === 'waive' ? '已按零费用放行' : `已确认 ${money(row.resolution.costUsd)}`}</Tag>}</td></tr>)}</tbody></table></div>}
+    <UsageExplorer section={section} busy={busy} scope={scope}/>
     <button onClick={openAdvanced}>打开高级费用、订阅与历史能力</button>
   </>
 }
@@ -866,6 +852,29 @@ export function RoleCatalog({ dispatch, busy }) {
 }
 
 export function ProductPage({ section, productApi, openSession, openPanel }) {
+  const pageRef = useRef(null)
+  useLayoutEffect(() => { if (pageRef.current) { pageRef.current.scrollTop = 0; pageRef.current.scrollLeft = 0 } }, [section, productApi])
+  const navigation = useMemo(() => workspaceNavigation(productApi), [productApi])
+  const route = useSyncExternalStore(navigation.subscribe, navigation.getSnapshot, navigation.getSnapshot)
+  const focus = route?.section === section ? route : null
+  const [searchOpen, setSearchOpen] = useState(false)
+  const onNavigate = useCallback(destination => {
+    navigation.navigate(destination)
+    openPanel?.(PRODUCT_PANELS[destination.section])
+  }, [navigation, openPanel])
+  useEffect(() => { setSearchOpen(false) }, [productApi])
+  useEffect(() => { if (focus?.search) setSearchOpen(true) }, [focus?.version, focus?.search])
+  useEffect(() => {
+    const onKey = event => {
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.altKey || event.shiftKey || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return
+      if (typeof pageRef.current?.checkVisibility === 'function' && !pageRef.current.checkVisibility()) return
+      if (event.target instanceof Element && event.target.closest('.xterm, .bp-stream-canvas[data-control=true]')) return
+      if (document.querySelector('[aria-modal="true"]') && !document.querySelector('.bp-palette')) return
+      event.preventDefault(); event.stopPropagation(); setSearchOpen(value => !value)
+    }
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
+  }, [])
   useEffect(() => {
     const id = PRODUCT_PANELS[section]
     announcePanel(id)
@@ -925,31 +934,33 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     }
   }, [productApi, refresh])
   const inspectTask = useCallback((payload, signal) => productApi.dispatch('task.inspect', payload, signal), [productApi])
+  const desktopTransport = useCallback((action,payload,signal) => productApi.dispatch(action,payload,signal),[productApi])
   const disabled = busy || snapshotStale || snapshotApi.current !== productApi || Boolean(snapshot?.readOnly)
-  const title = { bindings: 'Bot 绑定与权限', tasks: '任务', machines: '远程电脑', library: '资料库', routine: '例行任务', usage: '费用与用量' }[section]
-  const meta = {
-    bindings: ['team', '让每位伙伴各司其职。管理模型、工具和工作空间。'],
-    tasks: ['tasks', '把工作交给合适的 Bot，在这里关注进展与结果。'],
-    machines: ['computer', '连接你自己的电脑，随时查看桌面或接过控制权。'],
-    library: ['folder', '给 Bot 一份有序的资料，让每次协作都有据可循。'],
-    routine: ['repeat', '演示一次，保存步骤，把重复的工作交给 Bot。'],
-    usage: ['chart', '查看真实使用记录，清楚掌握每一笔费用。'],
-  }[section] ?? ['bot', '']
-  return <main className="bp-page" data-section={section}><div className="bp-page-inner"><header className="bp-page-header">
-    <div className="bp-page-heading"><p className="bp-eyebrow"><UiIcon name={meta[0]} size={14} />工作空间<UiIcon name="chevron" size={12} /><span>{title}</span></p><h1>{title}</h1><p className="bp-page-description">{meta[1]}</p></div>
+  const meta = WORKSPACE_SECTIONS.find(row => row.section === section) ?? { title: '工作空间', icon: 'home', description: '' }
+  const title = meta.title
+  return <div className="bp-workspace"><WorkspaceToolbar title={title} onHome={() => onNavigate({ section: 'home' })} onSearch={() => setSearchOpen(true)} /><main ref={pageRef} className="bp-page" data-section={section}><div className="bp-page-inner"><header className={`bp-page-header${section === 'home' ? ' bp-home-header' : ''}`}>
+    <div className="bp-page-heading">{section === 'home' ? <p className="bp-eyebrow"><span className="bp-live-dot" />团队工作空间</p> : <><p className="bp-eyebrow"><UiIcon name={meta.icon} size={14} />工作空间<UiIcon name="chevron" size={12} /><span>{title}</span></p><h1>{title}</h1><p className="bp-page-description">{meta.description}</p></>}</div>
     <div className="bp-page-tools"><span className="bp-sync" data-state={snapshotStale ? 'stale' : snapshot ? 'ready' : 'loading'}>{snapshotStale ? '等待同步' : snapshot ? '已同步' : '正在连接'}</span>
       <button className="bp-refresh" disabled={busy} onClick={() => refresh()} title="刷新当前页面"><UiIcon name="refresh" size={16} className={busy ? 'bp-spinning' : ''} /><span>刷新</span></button></div>
     </header><div className="bp-page-body">
     {error && <div role="alert" className="bp-blocked"><strong>无法取得最新宿主状态</strong><p>{error}</p>{snapshot && <p>{snapshotStale ? '下面保留上次读取结果；状态未更新时，操作暂不可用。' : '下面保留上次读取结果，操作以宿主当前授权为准。'}</p>}</div>}
     {snapshot?.readOnly && <Blocked value={{ reason: snapshot.readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
     {!snapshot && !error && <div className="bp-loading" role="status"><span className="bp-loading-line" aria-hidden="true" /><span className="bp-loading-line" aria-hidden="true" /><p>正在读取宿主状态…</p></div>}
-    {snapshot && <>{section === 'bindings' && <><BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} />{snapshot.availableActions?.includes('roles.list') && <RoleCatalog dispatch={dispatch} busy={disabled} />}</>}
-      {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} submissionScope={productApi} inspect={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly ? inspectTask : undefined} openSession={openSession} />}
-      {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
+    {snapshot && <>{section === 'home' && <WorkspaceHome snapshot={snapshot} onNavigate={onNavigate} openSession={openSession} disabled={disabled} />}
+      {section === 'inbox' && <WorkspaceInbox snapshot={snapshot} onNavigate={onNavigate} openSession={openSession} />}
+      {section === 'notifications' && <NotificationsPanel productApi={productApi} botIds={snapshot.bots.map(bot => bot.id)} available={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly && snapshot.availableActions?.includes('notifications.list')} onNavigate={onNavigate} />}
+      {section === 'threads' && <BotThreadsPanel productApi={productApi} botId={focus?.botId ?? snapshot.mainBotId} onOpenSession={!snapshotStale && snapshotApi.current === productApi ? openSession : undefined} available={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly && snapshot.availableActions?.includes('threads.list')} />}
+      {section === 'webPanel' && <WebPanelsPanel productApi={productApi} dispatch={dispatch} busy={disabled} snapshot={snapshot} focus={focus}
+        available={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly && snapshot.availableActions?.includes('webPanels.list')}
+        selectedId={focus?.panelId} onSelect={panelId => navigation.navigate({ section: 'webPanel', panelId })} onLeave={() => onNavigate({ section: 'home' })} />}
+      {section === 'bindings' && <>{!snapshotStale && snapshotApi.current === productApi ? <BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} focus={focus} scope={productApi} onOpenChatPanel={openPanel} onOpenTools={typeof openPanel === 'function' ? () => { requestWorkbenchView('tools'); openPanel('model-router-galgame') } : undefined} /> : <p role="status">正在读取当前连接的 Bot 配置…</p>}{snapshot.availableActions?.includes('roles.list') && <RoleCatalog dispatch={dispatch} busy={disabled} />}</>}
+      {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} submissionScope={productApi} inspect={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly ? inspectTask : undefined} openSession={openSession} focus={focus} navigation={navigation} />}
+      {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} focus={focus} transport={desktopTransport} />}
       {section === 'routine' && <RoutinesPanel snapshot={snapshot} dispatch={dispatch} busy={disabled} onOpenMachines={() => openPanel(PRODUCT_PANELS.machines)} />}
-      {section === 'library' && <Library snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
-      {section === 'usage' && <Usage snapshot={snapshot} dispatch={dispatch} busy={disabled} openAdvanced={() => openPanel('model-router-galgame')} />}
+      {section === 'library' && <Library snapshot={snapshot} dispatch={dispatch} busy={disabled} focus={focus} />}
+      {section === 'data' && <DataPanel snapshot={snapshot} dispatch={dispatch} busy={disabled || !snapshot.availableActions?.includes('data.catalog')} focus={focus} transport={desktopTransport} scope={productApi} />}
+      {section === 'usage' && <Usage snapshot={snapshot} dispatch={dispatch} busy={disabled} scope={productApi} openAdvanced={() => openPanel('model-router-galgame')} />}
       <footer className="bp-page-footer bp-muted">上次同步 {new Date(snapshot.observedAt).toLocaleString('zh-CN')}</footer></>}
     </div></div>
-  </main>
+  </main><WorkspaceCommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} snapshot={snapshotApi.current === productApi ? snapshot : null} onNavigate={onNavigate} openSession={snapshotApi.current === productApi ? openSession : undefined} /></div>
 }

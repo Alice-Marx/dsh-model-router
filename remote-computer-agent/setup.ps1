@@ -88,7 +88,7 @@ try {
     # Snapshot only installer-owned files, never the running SQLite database.
     $privateDir = Join-Path $InstallRoot 'private'; PrivateDirectory $privateDir
     $backupDir = Join-Path $privateDir ('backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,6)); PrivateDirectory $backupDir
-    foreach ($relative in @('config.json','launch.json','connection.json','private/pairing.private.json','private/native.secret','private/ceiling.json')) {
+    foreach ($relative in @('config.json','launch.json','connection.json','private/pairing.private.json','private/pairing.html','private/pairing.html.private.json','private/native.secret','private/ceiling.json')) {
       $source = Join-Path $InstallRoot $relative
       if (Test-Path -LiteralPath $source -PathType Leaf) { $target = Join-Path $backupDir ($relative.Replace('/','-')); Copy-Item -LiteralPath $source -Destination $target; PrivateAcl $target }
     }
@@ -112,17 +112,20 @@ try {
   if (!$HelperPath) { foreach ($candidate in @((Join-Path $PackageRoot 'helpers/dsh-desktop-helper.exe'),(Join-Path $PackageRoot 'dsh-desktop-helper.exe'))) { if (Test-Path -LiteralPath $candidate -PathType Leaf) { $HelperPath=$candidate; break } } }
   if (!$HelperPath -or !(Test-Path -LiteralPath $HelperPath -PathType Leaf)) { throw 'The interactive desktop helper is missing from the package.' }
   $HelperPath = [IO.Path]::GetFullPath($HelperPath)
-  $workspace = [IO.Path]::GetFullPath((Answer 'workspace' 'Workspace directory for this cloud computer' (Join-Path $env:USERPROFILE 'DSH-Workspace')))
-  $bindAddress = [string](Answer 'bindAddress' 'Private VPN IP to listen on, or 127.0.0.1 for local use' '127.0.0.1')
+  $pairingMode = [string](Answer 'pairingMode' 'Pairing mode: secure for a short invitation, or legacy for an existing Host' 'secure')
+  if ($pairingMode -notin @('secure','legacy')) { throw 'Choose secure or legacy pairing.' }
+  $securePairing = $pairingMode -eq 'secure'
+  $workspace = [IO.Path]::GetFullPath((Answer 'workspace' 'Shared workspace directory on this computer' (Join-Path $env:USERPROFILE 'DSH-Workspace')))
+  $bindAddress = [string](Answer 'bindAddress' 'One local IP to listen on, or 127.0.0.1 for local use' '127.0.0.1')
   $parsedAddress = $null; if (![Net.IPAddress]::TryParse($bindAddress, [ref]$parsedAddress) -or $bindAddress -in @('0.0.0.0','::')) { throw 'Supply one concrete local/private VPN IP address.' }
   $loopbackBind = [Net.IPAddress]::IsLoopback($parsedAddress)
-  $protectedTunnel = if ($loopbackBind) { $false } else { YesNo 'protectedTunnel' 'This address is on your configured private WireGuard/Tailscale network. Confirm y/n' }
-  if (!$loopbackBind -and !$protectedTunnel) { throw 'Configure a private VPN or HTTPS reverse proxy before exposing this Agent.' }
+  $protectedTunnel = if ($loopbackBind -or $securePairing) { $false } else { YesNo 'protectedTunnel' 'This address is on your configured private WireGuard/Tailscale network. Confirm y/n' }
+  if (!$loopbackBind -and !$protectedTunnel -and !$securePairing) { throw 'Configure a private VPN or HTTPS reverse proxy before exposing this Agent.' }
   $port = [int](Answer 'port' 'Agent port' 9701); if ($port -lt 1 -or $port -gt 65535) { throw 'Invalid port.' }
   $displayHost = if ($bindAddress.Contains(':')) { "[$bindAddress]" } else { $bindAddress }
   $endpoint = [string](Answer 'endpoint' 'Agent URL reachable from your Host computer' ("http://{0}:{1}" -f $displayHost,$port))
   $endpointUri = $null; if (![Uri]::TryCreate($endpoint, [UriKind]::Absolute, [ref]$endpointUri) -or $endpointUri.Scheme -notin @('http','https') -or $endpointUri.UserInfo -or $endpointUri.Query -or $endpointUri.Fragment -or $endpointUri.AbsolutePath -ne '/') { throw 'Supply an http(s) Agent base URL without credentials, query or path.' }
-  if ($endpointUri.Scheme -eq 'http' -and !$endpointUri.IsLoopback -and !$protectedTunnel) { throw 'HTTP remote endpoints require your explicitly confirmed private VPN.' }
+  if ($endpointUri.Scheme -eq 'http' -and !$endpointUri.IsLoopback -and !$protectedTunnel -and !$securePairing) { throw 'HTTP remote endpoints require your explicitly confirmed private VPN.' }
   $managed = YesNo 'hostManagedBots' 'Allow this trusted Host to manage all of its team Bots (recommended for automatic Bot setup)? Explicit y enables it'
   $botIds = @(); if (!$managed) { $botIds = @(([string](Answer 'botIds' 'Allowed Bot IDs, separated by commas' '')).Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }); if (!$botIds.Count) { throw 'At least one fixed Bot ID is required when team management is disabled.' } }
   $clientId = [string](Answer 'clientId' 'Name for this paired Host' 'desktop-host')
@@ -137,7 +140,7 @@ try {
   if (!(Test-Path -LiteralPath $workspace)) { New-Item -ItemType Directory -Path $workspace -Force | Out-Null }
   $nativeSecret=Join-Path $privateDir 'native.secret'; $bytes=New-Object byte[] 32; $rng=[Security.Cryptography.RandomNumberGenerator]::Create(); try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }; PrivateText $nativeSecret ([Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+','-').Replace('/','_'))
   $powershellExe=Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
-  $config=@{dataDir=(Join-Path $privateDir 'data');roots=@{project=$workspace};isolation='application';network=@{mode=$(if($loopbackBind){'loopback'}else{'wireguard'});host=$bindAddress;port=$port;allowedHosts=@(@($endpointUri.Authority,("{0}:{1}" -f $displayHost,$port))|Select-Object -Unique)};desktop=@{pipeName="dsh-desktop-$installationId";secretFile=$nativeSecret};browserOrigins=@();executables=@{}}
+  $config=@{dataDir=(Join-Path $privateDir 'data');roots=@{project=$workspace};isolation='application';network=@{mode=$(if($securePairing){'e2e'}elseif($loopbackBind){'loopback'}else{'wireguard'});host=$bindAddress;port=$port;allowedHosts=@(@($endpointUri.Authority,("{0}:{1}" -f $displayHost,$port))|Select-Object -Unique)};desktop=@{pipeName="dsh-desktop-$installationId";secretFile=$nativeSecret};browserOrigins=@();executables=@{}}
   if ($protectedTunnel) { $config.network.protectedTunnel=$true }
   if ($browserOrigin) { $config.browserOrigins=@($browserOrigin) }
   $jobHelper=Join-Path (Split-Path -Parent $HelperPath) 'dsh-process-job.exe'
@@ -146,16 +149,27 @@ try {
   $toolNames=@('machine_ping','fs_list','fs_read','fs_write','operation_status','operation_cancel','artifact_stat','artifact_read','worktree_create','worktree_diff','worktree_integrate','browser_open','browser_snapshot','browser_click','browser_type','browser_script','browser_upload','browser_download','browser_close','desktop_screenshot','desktop_click','desktop_type','desktop_key','desktop_scroll')
   if ($allowCommands) { $toolNames += 'shell_exec' }
   $ceilingFile=Join-Path $privateDir 'ceiling.json'; PrivateJson $ceilingFile @{botIds=$botIds;hostManagedBots=$managed;roots=@('project');tools=$toolNames}
-  # Capture CLI pairing output in memory. A pairing token is never printed.
-  $pairLines=@(& $NodePath $cliFile pair $configFile $clientId $ceilingFile);if($LASTEXITCODE -ne 0){throw 'Local pairing failed; check the complete package and private configuration.'}
-  $paired=($pairLines -join "`n")|ConvertFrom-Json
-  if ($paired.token -notmatch '^[A-Za-z0-9_-]{43}$' -or !$paired.machineId) { throw 'Invalid local pairing receipt.' }
-  $pairFile=Join-Path $privateDir 'pairing.private.json'
-  $pairExport=@{schemaVersion=1;agentApiMajor=1;machineId=$paired.machineId;clientId=$paired.clientId;secretRef=$paired.secretRef;token=$paired.token;endpoint=$endpoint.TrimEnd('/');protectedTunnel=$protectedTunnel;hostManagedBots=$managed;botIds=$botIds;rootIds=@('project');tools=$toolNames}
-  PrivateJson $pairFile $pairExport
-  PrivateJson (Join-Path $InstallRoot 'connection.json') @{schemaVersion=1;machineId=$paired.machineId;clientId=$clientId;endpoint=$pairExport.endpoint;protectedTunnel=$protectedTunnel;hostManagedBots=$managed;botIds=$botIds;rootIds=@('project');tools=$toolNames;pairingFile=$pairFile}
+  if ($securePairing) {
+    $identityLines=@(& $NodePath $cliFile identity $configFile);if($LASTEXITCODE -ne 0){throw 'Cannot initialize the device identity.'}
+    $paired=($identityLines -join "`n")|ConvertFrom-Json
+    $pairFile=Join-Path $privateDir 'pairing.html.private.json'
+  } else {
+    # Compatibility path: a long-term pairing token is never printed.
+    $pairLines=@(& $NodePath $cliFile pair $configFile $clientId $ceilingFile);if($LASTEXITCODE -ne 0){throw 'Local pairing failed; check the complete package and private configuration.'}
+    $paired=($pairLines -join "`n")|ConvertFrom-Json
+    if ($paired.token -notmatch '^[A-Za-z0-9_-]{43}$' -or !$paired.machineId) { throw 'Invalid local pairing receipt.' }
+    $pairFile=Join-Path $privateDir 'pairing.private.json'
+    $pairExport=@{schemaVersion=1;agentApiMajor=1;machineId=$paired.machineId;clientId=$paired.clientId;secretRef=$paired.secretRef;token=$paired.token;endpoint=$endpoint.TrimEnd('/');protectedTunnel=$protectedTunnel;hostManagedBots=$managed;botIds=$botIds;rootIds=@('project');tools=$toolNames}
+    PrivateJson $pairFile $pairExport
+  }
+  PrivateJson (Join-Path $InstallRoot 'connection.json') @{schemaVersion=1;machineId=$paired.machineId;clientId=$clientId;endpoint=$endpoint.TrimEnd('/');protectedTunnel=$protectedTunnel;hostManagedBots=$managed;botIds=$botIds;rootIds=@('project');tools=$toolNames;pairingFile=$pairFile;pairingMode=$pairingMode;ceilingFile=$ceilingFile}
   PrivateJson (Join-Path $InstallRoot 'launch.json') @{node=$NodePath;cli=$cliFile;config=$configFile;packageRoot=$PackageRoot;stdout=(Join-Path $privateDir 'agent.stdout.log');stderr=(Join-Path $privateDir 'agent.stderr.log')}
   $launcher=Join-Path $InstallRoot 'launch-agent.ps1';Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'launch-agent.ps1') -Destination $launcher;PrivateAcl $launcher
+  if ($securePairing) {
+    $pairLauncher=Join-Path $InstallRoot 'pair-device.ps1';Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'pair-device.ps1') -Destination $pairLauncher;PrivateAcl $pairLauncher
+    $pairCmd = @('@echo off', 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0pair-device.ps1" -OpenPage %*', 'if errorlevel 1 pause') -join [Environment]::NewLine
+    PrivateText (Join-Path $InstallRoot 'pair-device.cmd') $pairCmd
+  }
   $agentXml=TaskXml $powershellExe ('-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$launcher+'"') $InstallRoot
   $desktopXml=TaskXml $HelperPath ('--desktop-mode full --pipe '+$config.desktop.pipeName+' --secret-file "'+$nativeSecret+'"') (Split-Path -Parent $HelperPath)
   PrivateText (Join-Path $privateDir 'agent-task.xml') $agentXml;PrivateText (Join-Path $privateDir 'desktop-task.xml') $desktopXml
@@ -164,7 +178,15 @@ try {
   if (!$NoStart -and (YesNo 'startNow' 'Start the desktop helper and Agent now?' $true)) {
     foreach($taskName in @($desktopTask,$agentTask)){if($MockTaskRegistry){continue};Start-ScheduledTask -TaskName $taskName}
   }
+  if ($securePairing) {
+    $inviteLines=@(& $NodePath $cliFile invite-page $configFile $clientId $ceilingFile $endpoint (Join-Path $privateDir 'pairing.html'))
+    if ($LASTEXITCODE -ne 0) { throw 'Services were configured; invitation creation failed. Run pair-device.cmd to try again.' }
+    $inviteReceipt=($inviteLines -join "`n")|ConvertFrom-Json
+    PrivateAcl $inviteReceipt.pageFile;PrivateAcl $inviteReceipt.pairingFile
+    Write-Host ('Open the local pairing page: ' + $inviteReceipt.pageFile)
+    Write-Host 'This invitation lasts two minutes. Run pair-device.cmd to refresh an unredeemed invitation.'
+  }
   Write-Host "Configured user-owned cloud computer at $InstallRoot"
   Write-Host "Import this private pairing file in your Host app: $pairFile"
-  Write-Host 'The token stays in that protected file. Keep this Windows user signed in for full desktop access.'
+  Write-Host 'Keep this Windows user signed in for full desktop access.'
 } catch { Write-Error ('Setup stopped: ' + $_.Exception.Message); exit 1 }

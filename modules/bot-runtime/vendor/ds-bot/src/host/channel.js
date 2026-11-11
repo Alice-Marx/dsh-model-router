@@ -43,8 +43,16 @@ export function install(rt) {
     // `sessionId` is the Bot's current own-chat part; `parts` its earlier ones.
     // `waiting`: the Bot holds its greeting until the user picks its model or fixes
     // what failed it. `blocked`: the facts of a failure only the user can fix (turns.js).
-    bots: Object.values(state.bots).map(({ segments, kickoff, ...bot }) => ({
-      ...bot, sessionId: rt.chatOf(bot.id), parts: (segments ?? []).map(segment => segment.sessionId), ...(kickoff ? { waiting: true } : {}),
+    bots: Object.values(state.bots).map(({ segments, threads, kickoff, ...bot }) => ({
+      ...bot, sessionId: rt.chatOf(bot.id), parts: (segments ?? []).map(segment => segment.sessionId),
+      // `sessionId` stays the default chat; `threads` are the Bot's other own
+      // chats, each with its own Session. An archived thread keeps its id and
+      // its history and opens read-only.
+      threads: (threads ?? []).map(thread => ({ threadId: thread.threadId, sessionId: thread.sessionId,
+        ...(thread.name === undefined ? {} : { name: thread.name }),
+        ...(thread.createdAt === undefined ? {} : { createdAt: thread.createdAt }),
+        ...(thread.archivedAt === undefined || thread.archivedAt === null ? {} : { archivedAt: thread.archivedAt }) })),
+      ...(kickoff ? { waiting: true } : {}),
     })),
     // `sessionId` is the group's own Session's current part, `ownParts` its earlier
     // ones; `parts` the members' hidden group Sessions and their earlier segments,
@@ -435,6 +443,7 @@ export function install(rt) {
           await rt.load()
           const past = rt.pastOwners.get(body.sessionId)
           const sessionId = rt.botOf(body.sessionId) ? rt.chatOf(body.sessionId) : past && past.roomId === undefined ? rt.chatOf(past.botId) : body.sessionId
+          if (past?.threadId !== undefined) return fail('This thread is archived; open it again to write in it', 'bot/archived')
           const question = rt.own(state.questions, sessionId)
           if (question === undefined || question.id !== body.questionId) return fail('This question is no longer open', 'bot/stale')
           const reply = questionReply(question, body.answer)
@@ -458,6 +467,7 @@ export function install(rt) {
           await rt.load()
           const past = rt.pastOwners.get(body.sessionId)
           const sessionId = rt.botOf(body.sessionId) ? rt.chatOf(body.sessionId) : past && past.roomId === undefined ? rt.chatOf(past.botId) : body.sessionId
+          if (past?.threadId !== undefined) return fail('This thread is archived; open it again to write in it', 'bot/archived')
           const pending = rt.own(state.views, sessionId)
           if (pending === undefined || pending.id !== body.viewId) return fail('This view is no longer open', 'bot/stale')
           const checked = validateViewAnswer(pending.view, body.action, body.values)
@@ -485,6 +495,8 @@ export function install(rt) {
           // A Bot id, a group chat's id, or an earlier part of either means the
           // current part.
           const past = rt.pastOwners.get(body.sessionId)
+          // An archived thread keeps its history but takes no new input.
+          if (past?.threadId !== undefined) return fail('This thread is archived; open it again to write in it', 'bot/archived')
           const room = rt.roomOf(body.sessionId)
           const sessionId = rt.botOf(body.sessionId) ? rt.chatOf(body.sessionId)
             : room !== undefined ? rt.sessionOfRoom(room)

@@ -1,0 +1,23 @@
+--- a/src/client/turn-error.js
++++ b/src/client/turn-error.js
+@@ -1,9 +1,10 @@
+ import { createElement as h, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+-import { currentPart, isHiddenTurn } from './text.js'
++import { isHiddenTurn } from './text.js'
+ import { CheckIcon, CopyIcon } from './icons.js'
+ import { ModelKeyCard, manageModels } from './model-menu.js'
+ import { knownFailure } from './diagnostics.js'
+ import { hostText, t } from './i18n.js'
++import { isOwnChatOf } from './sources.js'
+ 
+ // -------------------------------------------------------------------------
+ // A failed turn in a Bot's chat: what went wrong and what the user can do about it,
+@@ -157,7 +158,7 @@
+   const provider = blocked?.provider ?? providerOf(bot, roster)
+   const text = failureText(data.code, { name: bot?.name ?? t('This Bot'), provider: providerName(roster, provider), status: blocked?.status })
+   const facts = failureFacts(data, blocked)
+-  const current = bot !== undefined && currentPart(bot) === sessionId && !later
++  const current = bot !== undefined && isOwnChatOf(bot, sessionId) && !later
+   // The key route never takes the account's credential, so a sign-in alone leaves the Bot
+   // failing; it moves onto the account route. With no account model listed yet, the
+   // user picks one.

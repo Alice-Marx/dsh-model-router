@@ -4,6 +4,7 @@ import {actualCost} from '../../../.dsh-plugin/shared/run-ledger.mjs'
 import {managedModelRequest,taskModelRequest} from './model-receipt.mjs'
 import {assessFundingAdmission} from './funding-admission.mjs'
 import {taskHash} from './task-contract.mjs'
+import {planOutputBound,requestFieldAccess} from './model-request-bounds.mjs'
 
 const fail=code=>{throw Object.assign(new Error(code),{code})}
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r});return {promise,resolve}}
@@ -25,7 +26,7 @@ function usageOf(value){
 }
 
 /** Every observed model call has one source receipt; only the linked run owns money. */
-export function createModelAccounting({store,authority,pricingFor,inputBoundFor,machineId,workspaceId,now=Date.now,ttlMs=120000,limits={dailyLimitUsd:1,monthlyLimitUsd:0},maxActive=16}){
+export function createModelAccounting({store,authority,pricingFor,fundingRevisionFor,inputBoundFor,modelBoundsFor,preparedFrameFor,machineId,workspaceId,now=Date.now,ttlMs=120000,limits={dailyLimitUsd:1,monthlyLimitUsd:0},maxActive=16}){
   if(store?.kind!=='sqlite-router-state'||typeof store.recordModelReceipt!=='function'||typeof pricingFor!=='function')fail('MODEL_ACCOUNTING_STORAGE_REQUIRED')
   const active=new Set();let closed=false
   const controllerSet=new Set()
@@ -37,7 +38,8 @@ export function createModelAccounting({store,authority,pricingFor,inputBoundFor,
       ...(policy.scopeId?{fundingScopeId:policy.scopeId}:{}),...(policy.projectId?{fundingProjectId:policy.projectId}:{}),
       requestHash:requestHash(options),createdAt,ownerPid:process.pid,state:'admitted',finishedAt:null,usage:null,usageComplete:false,actualModel:null,reportedCostUsd:null,finishKind:null,outcome:null}
   }
-  const callStore=(receipt,config,estimate)=>({read:()=>store.read(),update:(change,options)=>store.update(current=>{
+  const callStore=(receipt,config,estimate,assertFunding)=>({read:()=>store.read(),update:(change,options)=>store.update(current=>{
+    if (receipt.state === 'admitted' || receipt.state === 'running') assertFunding()
     if(receipt.state==='admitted'&&config.funding==='api'){
       const checked=assessFundingAdmission({store,state:current,botId:receipt.botId,scopeId:config.scopeId,projectId:config.projectId,policy:config,estimatedCostUsd:estimate,excludeRunId:receipt.runId,now:now()})
       if(!checked.accepted)return checked
@@ -65,30 +67,92 @@ export function createModelAccounting({store,authority,pricingFor,inputBoundFor,
       authority.assertTool(identity.subject,'model/infer')
       if(authority.describe(identity.subject).botId!==identity.botId)fail('MODEL_OWNER_MISMATCH')
       if(task&&(task.botId!==identity.botId||task.provider!==options.provider||task.model!==options.model))fail('MODEL_TASK_OWNER_MISMATCH')
-      const config=await pricingFor({botId:identity.botId,provider:options.provider,model:options.model,source:identity.source})
+      const fundingQuery={botId:identity.botId,provider:options.provider,model:options.model,source:identity.source}
+      const config=await pricingFor(fundingQuery)
       if(active.size>=maxActive||active.has(options))fail('MODEL_CONCURRENCY_LIMIT')
       if(!config||!['api','subscription'].includes(config.funding))fail('MODEL_FUNDING_REQUIRED')
       if(config.funding==='api'&&(!config.pricing||!['input','output'].every(k=>Number.isFinite(config.pricing[k])&&config.pricing[k]>=0)))fail('MODEL_PRICE_REQUIRED')
-      if(options.maxTokens!==undefined&&options.maxTokens!==null&&(!Number.isSafeInteger(options.maxTokens)||options.maxTokens<1))fail('MODEL_OUTPUT_BOUNDARY_REQUIRED')
+      if(options.maxTokens!==undefined&&(!Number.isSafeInteger(options.maxTokens)||options.maxTokens<1))fail('MODEL_OUTPUT_BOUNDARY_REQUIRED')
       if(config.funding==='api'&&(!Number.isSafeInteger(config.maxOutputTokens)||config.maxOutputTokens<1))fail('MODEL_ESTIMATE_REQUIRED')
-      // A declared request allowance is not a tokenizer. The trusted Host must
-      // supply an upper bound, normally the pinned model's whole context window.
-      // This also covers images and adapter framing instead of guessing from URL bytes.
+      // A declared request allowance is a price, not a capacity: the trusted
+      // input upper bound is the pinned model's own context window, resolved
+      // per admission because an adapter registration can be replaced under a
+      // live Host. That whole window already covers images, tool declarations
+      // and adapter framing, so no tokenizer and no source-length estimate
+      // stands in for it. A route whose adapter declares no window has no bound
+      // to admit, which is a required-bound failure rather than a smaller number
+      // to pretend with.
+      // A prepared call (the independent path) already bound one adapter generation and
+      // recorded its exact capacities in a Host-owned frame keyed by this request's signal.
+      // When that frame is present and names this exact route, admission uses it instead of
+      // reading the current registration: the window and default it prices are the ones the
+      // prepared dispatch will actually stream, so no metadata read can combine one
+      // generation's window with another's endpoint. A frame about another route is ignored.
+      const frame=preparedFrameFor?await preparedFrameFor(options):null
+      if (!managed && (config.fundingRevision || frame?.fundingRevision)) {
+        if (!frame || !Object.hasOwn(frame, 'fundingRevision')) fail('MODEL_FUNDING_FRAME_MISSING')
+        if (frame.fundingRevision !== (config.fundingRevision ?? null)) fail('MODEL_FUNDING_CHANGED')
+      }
+      const assertFunding=()=>{
+        if (config.fundingRevision && fundingRevisionFor?.(fundingQuery) !== config.fundingRevision) fail('MODEL_FUNDING_CHANGED')
+      }
+      assertFunding()
+      if(closed)fail('MODEL_ACCOUNTING_CLOSED')
+      if(active.size>=maxActive||active.has(options))fail('MODEL_CONCURRENCY_LIMIT')
+      options.signal?.throwIfAborted()
+      const frameBounds=frame&&frame.bounds&&frame.provider===options.provider&&frame.model===options.model?frame.bounds:null
+      let outputDefault=null
       if(config.funding==='api'){
-        const inputBound=await inputBoundFor?.({options,identity,config})
+        let inputBound
+        if(frameBounds){
+          inputBound=frameBounds.contextWindow
+          outputDefault=frameBounds.defaultMaxTokens??null
+        }else{
+          const bounds=modelBoundsFor?await modelBoundsFor({options,identity,config,signal:options.signal??null}):null
+          inputBound=bounds?.inputBound??(inputBoundFor?await inputBoundFor({options,identity,config}):null)
+          outputDefault=bounds?.outputDefault??null
+        }
         if(!Number.isSafeInteger(inputBound)||inputBound<1||!Number.isSafeInteger(config.maxInputTokens)||inputBound>config.maxInputTokens)fail('MODEL_INPUT_BOUNDARY_REQUIRED')
       }
+      // The output bound the provider will actually see. An omitted bound is not
+      // an unbounded one: the pinned adapter materializes its own per-request
+      // cap into the request before dispatch, so that declared cap — and nothing
+      // else — is what arrives. A request the Host cannot bring under the
+      // allowance, whether frozen above it or declaring no bound at all, is
+      // refused here: before a receipt, a reservation, a lease, an active slot or
+      // any provider call exists.
       const outputBound=config.maxOutputTokens
-      const effectiveOutput=Number.isSafeInteger(outputBound)&&outputBound>0?Math.min(options.maxTokens??outputBound,outputBound):options.maxTokens
-      // The SDK AgentLoop hands the adapter a frozen request that already carries the model's own
-      // output bound, so the Host cannot lower it. Such a request is admitted with the configured
-      // allowance as its estimate (decision: usability first); the daily/monthly budget stays the
-      // hard limit, and the per-call output bound is advisory where the request cannot be changed.
-      const descriptor=Object.getOwnPropertyDescriptor(options,'signal'),tokenDescriptor=Object.getOwnPropertyDescriptor(options,'maxTokens')
-      const carrier=descriptor?descriptor.writable:Object.isExtensible(options)
-      const clampable=carrier&&!(tokenDescriptor&&!tokenDescriptor.writable)&&Boolean(tokenDescriptor||Object.isExtensible(options))
+      let plan
+      if(frameBounds){
+        // The prepared config already carries the dispatched bound (clamped before it
+        // froze). Admit it as-is and only validate it against the current allowance; a
+        // second clamp here would change the dispatched config and fail the prepared call
+        // with INVALID_PREPARED_CALL, so a lowered allowance is a refusal, never a re-clamp.
+        const dispatched=options.maxTokens??null
+        if(config.funding==='api'){
+          if(!Number.isSafeInteger(dispatched)||dispatched<1)fail('MODEL_ESTIMATE_REQUIRED')
+          if(dispatched>outputBound)fail('MODEL_OUTPUT_BOUND_EXCEEDED')
+        }
+        plan={ok:true,maxTokens:options.maxTokens??undefined,source:'prepared'}
+      }else{
+        plan=Number.isSafeInteger(outputBound)&&outputBound>0
+          ?planOutputBound({requested:options.maxTokens??null,allowance:outputBound,adapterDefault:outputDefault})
+          :{ok:true,maxTokens:options.maxTokens??undefined,source:'none'}
+      }
+      if(!plan.ok)fail(plan.code)
+      // Mutability is per field and independent of every other field's: a request
+      // whose signal is read-only may still carry a writable maxTokens.
+      const tokenAccess=requestFieldAccess(options,'maxTokens'),signalAccess=requestFieldAccess(options,'signal')
+      if(plan.source==='clamp'&&!tokenAccess.canWrite)fail(plan.refusal)
+      const effectiveOutput=plan.maxTokens
+      // The bounds lookup is asynchronous, so the gates it ran past are re-run
+      // here: an accounting that closed while the adapter was being asked, or an
+      // active set another admission filled, must not gain a slot because a
+      // metadata read was slow.
+      if(closed)fail('MODEL_ACCOUNTING_CLOSED')
+      if(active.size>=maxActive||active.has(options))fail('MODEL_CONCURRENCY_LIMIT')
       const record=receiptBase(identity,{...options,...(effectiveOutput!==undefined?{maxTokens:effectiveOutput}:{})},config,managed,task)
-      let manager,accepted,binding,lease,guard,inner,estimate,previousSignal=options.signal,changedOutput=false,leaseSignal=null
+      let manager,accepted,binding,lease,guard,inner,estimate,previousSignal=options.signal,changedOutput=false,changedSignal=false,leaseSignal=null
       let started=false,exhausted=false,terminal=false,finishKind=null,observed={usage:null,complete:false},primaryError,cleanupError,propagated=false,aborted=false,consumerClosed=false
       const controller=new AbortController();controllerSet.add(controller);active.add(options)
       const build=()=>{
@@ -116,37 +180,35 @@ export function createModelAccounting({store,authority,pricingFor,inputBoundFor,
           estimate=record.funding==='subscription'?0:(input*config.pricing.input+output*config.pricing.output)/1e6
           if(!Number.isFinite(estimate))fail('MODEL_ESTIMATE_REQUIRED')
           const pending={id:record.runId,createdAt:record.createdAt,status:'running',finishedAt:null,packages:[],reviews:[],modelCall:{schemaVersion:1,id:record.id,botId:record.botId,source:record.source,...(record.fundingScopeId?{fundingScopeId:record.fundingScopeId}:{}),...(record.fundingProjectId?{fundingProjectId:record.fundingProjectId}:{})}}
-          manager=createBudgetReservations({state:callStore(record,config,estimate)})
+          manager=createBudgetReservations({state:callStore(record,config,estimate,assertFunding)})
           accepted=await manager.beginExecution({run:pending,packageEstimates:[{id:'inference',billing:record.funding,estimatedCostUsd:estimate}],...limits})
           if(!accepted.accepted)fail(accepted.reason==='subscription-call-limit'?'MODEL_SUBSCRIPTION_LIMIT':'MODEL_WAITING_BUDGET')
         }
         binding={taskId:record.taskId??record.runId,attemptId:record.attemptId,machineId,workspaceId,location:'local'}
         lease=authority.issue(identity.subject,{binding,tools:['model/infer'],ttlMs})
         // The caller request may be frozen (the SDK AgentLoop passes one). A
-        // mutable request carries the combined lease signal so the provider
-        // aborts directly; a frozen request cannot, so the lease gates the
+        // request whose signal field is writable carries the combined lease
+        // signal so the provider aborts directly; otherwise the lease gates the
         // iteration instead and cleanup still returns the provider iterator.
-        // Clamping happens when the request allows it; when it does not, the
-        // reservation above already covers the bound the provider will see.
-        const clampNeeded=effectiveOutput!==undefined&&options.maxTokens!==undefined&&options.maxTokens!==effectiveOutput
-        if(clampNeeded&&clampable){
-          options.maxTokens=effectiveOutput;changedOutput=true
-        }else if(carrier&&effectiveOutput!==undefined&&options.maxTokens===undefined&&(!tokenDescriptor||tokenDescriptor.writable)&&Object.isExtensible(options)){
-          // Adoption is best effort: the estimate above already uses the full allowance, so a
-          // sealed request without an output bound is admitted as it is instead of failing.
-          options.maxTokens=effectiveOutput;changedOutput=true
+        if(plan.source==='clamp'){
+          // Write the bound the provider will see, then read it back: a field
+          // that reports writable but does not take the value is not one the
+          // Host may claim it clamped.
+          if(!Reflect.set(options,'maxTokens',effectiveOutput)||options.maxTokens!==effectiveOutput)fail(plan.refusal)
+          changedOutput=true
         }
         guard=authority.run(lease.token,binding,'model/infer',async({signal})=>{
-          if(carrier){options.signal=AbortSignal.any([signal,...(previousSignal?[previousSignal]:[])]);options.signal.throwIfAborted()}
+          if(signalAccess.canWrite){options.signal=AbortSignal.any([signal,...(previousSignal?[previousSignal]:[])]);changedSignal=true;options.signal.throwIfAborted()}
           else{leaseSignal=signal;signal.throwIfAborted()}
           record.state='running'
           if(managed)await store.recordModelReceipt(record)
           else{
-            const value=await createBudgetReservations({state:callStore(record,config,estimate)}).checkpointExecution({reservationId:accepted.reservationId,ownerToken:accepted.ownerToken,run:{id:record.runId,createdAt:record.createdAt,status:'running',packages:[],reviews:[]},startedIds:['inference'],...limits,checkBudget:true})
+            const value=await createBudgetReservations({state:callStore(record,config,estimate,assertFunding)}).checkpointExecution({reservationId:accepted.reservationId,ownerToken:accepted.ownerToken,run:{id:record.runId,createdAt:record.createdAt,status:'running',packages:[],reviews:[]},startedIds:['inference'],...limits,checkBudget:true})
             if(value.accepted===false)fail('MODEL_WAITING_BUDGET')
           }
           authority.assertModel(identity.subject,options.provider,options.model)
-          if(carrier)options.signal.throwIfAborted();else signal.throwIfAborted()
+          assertFunding()
+          if(signalAccess.canWrite)options.signal.throwIfAborted();else signal.throwIfAborted()
           inner=next()[Symbol.asyncIterator]();started=true;ready.resolve(true)
           await done.promise
         },{signal:controller.signal})
@@ -176,15 +238,17 @@ export function createModelAccounting({store,authority,pricingFor,inputBoundFor,
         try{await inner?.return?.()}catch(e){cleanupError=e}
         done.resolve();try{await guard}catch(e){primaryError??=e}
         aborted=Boolean(options.signal?.aborted||controller.signal.aborted||previousSignal?.aborted)
-        if(descriptor)Object.defineProperty(options,'signal',descriptor);else delete options.signal
-        if(changedOutput){if(tokenDescriptor)Object.defineProperty(options,'maxTokens',tokenDescriptor);else delete options.maxTokens}
+        // Restore exactly what this call wrote, and nothing it did not: a request
+        // the Host never touched keeps its own shape, sealed or frozen alike.
+        if(changedSignal){if(signalAccess.descriptor)Object.defineProperty(options,'signal',signalAccess.descriptor);else delete options.signal}
+        if(changedOutput){if(tokenAccess.descriptor)Object.defineProperty(options,'maxTokens',tokenAccess.descriptor);else delete options.maxTokens}
         record.finishedAt=now();record.usage=observed.usage;record.usageComplete=terminal&&observed.complete;record.finishKind=finishKind
         record.state=started&&(!terminal||cleanupError)?'unknown':'settled'
         record.outcome=!started?'cancelled':!terminal||cleanupError?'unknown':aborted||finishKind==='aborted'?'cancelled':finishKind==='error'?'failed':'succeeded'
         try{
           if(managed){if(lease)await store.recordModelReceipt(record)}
           else if(accepted?.accepted){
-            const run=build();await createBudgetReservations({state:callStore(record,config,estimate)}).finishExecution({reservationId:accepted.reservationId,ownerToken:accepted.ownerToken,run})
+            const run=build();await createBudgetReservations({state:callStore(record,config,estimate,assertFunding)}).finishExecution({reservationId:accepted.reservationId,ownerToken:accepted.ownerToken,run})
           }
         }finally{
           if(lease)authority.release(lease.token);active.delete(options);controllerSet.delete(controller)

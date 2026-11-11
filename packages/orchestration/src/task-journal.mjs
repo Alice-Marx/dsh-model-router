@@ -647,6 +647,35 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
           updated_ms DESC,id LIMIT ?`).all(JSON.stringify(ids),limit))
       return {items,total,truncated:total>items.length}
     },
+    // A sanitized cross-task event feed for the notification center: it names the
+    // safe structured fields only (seq/task/attempt/kind/at plus a validated
+    // outcome and code). Raw event detail — run ids, reference/evidence hashes,
+    // operation ids, gates — never leaves the journal, so a person-facing
+    // notification is built from structured state instead of a leak. Keyset
+    // pagination walks the monotonic seq; `maxSeq` is the feed watermark.
+    notificationEvents(owners,kinds,{before=null,after=0,limit=64}={}) {
+      const ids=[...new Set((Array.isArray(owners)?owners:[]).map(taskRef))]
+      const wanted=[...new Set((Array.isArray(kinds)?kinds:[]).filter(kind=>typeof kind==='string'))]
+      if(!ids.length||!wanted.length||!Number.isSafeInteger(limit)||limit<1||limit>512)return {items:[],maxSeq:0}
+      const bound=value=>Number.isSafeInteger(value)&&value>=0?value:0
+      const floor=bound(after),ceil=before===null?null:bound(before)
+      const range=ceil===null?'e.seq>?':'e.seq>? AND e.seq<?',params=ceil===null?[floor]:[floor,ceil]
+      const ownerJson=JSON.stringify(ids),kindJson=JSON.stringify(wanted)
+      const items=stmt(`SELECT e.seq,e.task_id,e.attempt_id,e.kind,e.at_ms,e.detail,t.owner_bot
+        FROM task_events e JOIN tasks t ON t.id=e.task_id
+        WHERE t.owner_bot IN (SELECT value FROM json_each(?)) AND e.kind IN (SELECT value FROM json_each(?)) AND ${range}
+        ORDER BY e.seq DESC LIMIT ?`).all(ownerJson,kindJson,...params,limit).map(row=>{
+          let outcome=null,notifyCode=null
+          try{const detail=JSON.parse(row.detail)
+            outcome=['succeeded','failed','cancelled','skipped','blocked','unknown','waiting-budget','needs-reconciliation','ready','running','admitting','cancelling'].includes(detail?.outcome)?detail.outcome:null
+            notifyCode=typeof detail?.code==='string'&&/^[A-Z0-9_:-]{1,128}$/.test(detail.code)?detail.code:null
+          }catch{}
+          return {seq:row.seq,taskId:row.task_id,ownerBotId:row.owner_bot,attemptId:row.attempt_id,kind:row.kind,at:row.at_ms,outcome,code:notifyCode}
+        })
+      const maxSeq=stmt(`SELECT COALESCE(MAX(e.seq),0) AS m FROM task_events e JOIN tasks t ON t.id=e.task_id
+        WHERE t.owner_bot IN (SELECT value FROM json_each(?)) AND e.kind IN (SELECT value FROM json_each(?))`).get(ownerJson,kindJson).m
+      return {items,maxSeq}
+    },
     // One Bot's durable tasks, oldest first; the read model never invents a task.
     list(owner) {taskRef(owner);return viewsOf(stmt('SELECT * FROM tasks WHERE owner_bot=? ORDER BY created_ms,id LIMIT 128').all(owner))},
     close() {if(!closed){closed=true;if(borrowed){try{db.pragma(`busy_timeout=${priorTimeout}`)}catch{}}else db.close();onClose()}},

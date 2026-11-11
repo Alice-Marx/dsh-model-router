@@ -37,7 +37,7 @@ function runSetup(dir,install,answers,registry){
 }
 test('desktop setup wizard: isolated config, private secrets/pair export, interactive tasks and safe repeat backup',{skip:process.platform!=='win32'},async()=>{
   const dir=await mkdtemp(join(parent,'wizard-')),install=join(dir,'new install with spaces'),answers=join(dir,'answers.json'),registry=join(dir,'mock-tasks.json'),workspace=join(dir,'workspace')
-  await writeFile(answers,JSON.stringify({workspace,bindAddress:'127.0.0.1',port:19701,endpoint:'http://127.0.0.1:19701',hostManagedBots:true,clientId:'test-host',allowCommands:false,existingAction:'keep'}))
+  await writeFile(answers,JSON.stringify({pairingMode:'legacy',workspace,bindAddress:'127.0.0.1',port:19701,endpoint:'http://127.0.0.1:19701',hostManagedBots:true,clientId:'test-host',allowCommands:false,existingAction:'keep'}))
   const output=runSetup(dir,install,answers,registry),config=JSON.parse(await readFile(join(install,'config.json'),'utf8')),pairFile=join(install,'private/pairing.private.json'),paired=JSON.parse(await readFile(pairFile,'utf8')),nativeSecret=await readFile(join(install,'private/native.secret'),'utf8')
   assert.equal(config.network.host,'127.0.0.1');assert.deepEqual(config.network.allowedHosts,['127.0.0.1:19701']);assert.equal(config.roots.project,workspace);assert.match(config.desktop.pipeName,/^dsh-desktop-[a-f0-9]{12}$/);assert.equal(config.shell,undefined);assert.deepEqual(config.executables,{})
   assert.equal(paired.hostManagedBots,true);assert.equal(paired.endpoint,'http://127.0.0.1:19701');assert.deepEqual(paired.rootIds,['project']);assert.match(paired.token,/^[A-Za-z0-9_-]{43}$/);assert.match(nativeSecret,/^[A-Za-z0-9_-]{43}$/);assert.notEqual(nativeSecret,paired.token)
@@ -53,6 +53,32 @@ test('desktop setup wizard: isolated config, private secrets/pair export, intera
   const repeated=runSetup(dir,install,answers,registry);assert.ok(repeated.includes('preserved'));assert.equal(await readFile(join(install,'config.json'),'utf8'),originalConfig);assert.equal(await readFile(pairFile,'utf8'),originalPair);assert.equal(await readFile(registry,'utf8'),originalTasks)
   const backups=(await readdir(join(install,'private'))).filter(name=>name.startsWith('backup-'));assert.equal(backups.length,1);assert.equal(await readFile(join(install,'private',backups[0],'private-pairing.private.json'),'utf8'),originalPair)
   const admin=new Store(config.dataDir,Database,{admin:true});try{const issued=admin.issue(admin.client(paired.token),grantRequest('new-bot-after-wizard'));assert.equal(issued.botId,'new-bot-after-wizard')}finally{admin.close()}
+})
+test('desktop setup wizard: secure default creates a private expiring invitation and QR page without a device credential',{skip:process.platform!=='win32'},async()=>{
+  const dir=await mkdtemp(join(parent,'secure-wizard-')),install=join(dir,'secure install'),answers=join(dir,'answers.json'),registry=join(dir,'tasks.json')
+  await writeFile(answers,JSON.stringify({workspace:join(dir,'workspace'),hostManagedBots:true,clientId:'secure-host'}))
+  const output=runSetup(dir,install,answers,registry)
+  const config=JSON.parse(await readFile(join(install,'config.json'),'utf8')),connection=JSON.parse(await readFile(join(install,'connection.json'),'utf8'))
+  const invitation=JSON.parse(await readFile(connection.pairingFile,'utf8')),page=await readFile(join(install,'private/pairing.html'),'utf8')
+  assert.equal(config.network.mode,'e2e');assert.equal(connection.pairingMode,'secure');assert.equal(invitation.version,2)
+  assert.match(invitation.token,/^dsh_pair_[A-Za-z0-9_-]{43}$/);assert.equal(Object.hasOwn(invitation,'code'),false);assert.equal(invitation.ceiling.hostManagedBots,true)
+  assert.match(page,/<svg/);assert.match(page,/Content-Security-Policy/);assert.equal(output.includes(invitation.token),false)
+  assert.equal(JSON.stringify(connection).includes(invitation.token),false)
+  const local=new Store(config.dataDir,Database,{admin:true})
+  try{assert.equal(local.db.prepare('SELECT count(*) n FROM clients').get().n,0);assert.equal(local.db.prepare('SELECT count(*) n FROM pairing_invites WHERE attempts_left>0').get().n,1)}finally{local.close()}
+  const refreshed=execFileSync('powershell.exe',['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',join(install,'pair-device.ps1')],{encoding:'utf8',windowsHide:true})
+  const next=JSON.parse(await readFile(connection.pairingFile,'utf8'));assert.notEqual(next.inviteId,invitation.inviteId);assert.notEqual(next.token,invitation.token);assert.equal(refreshed.includes(next.token),false)
+  assert.equal((await readFile(join(install,'pair-device.cmd'),'utf8')).includes('-OpenPage'),true)
+  const beforeConnection=await readFile(join(install,'connection.json'),'utf8'),beforeTasks=await readFile(registry,'utf8')
+  const admin=new Store(config.dataDir,Database,{admin:true});let prior
+  try{prior=admin.pair(connection.clientId,{hostManagedBots:true,roots:connection.rootIds,tools:connection.tools})}finally{admin.close()}
+  const refreshArgs=['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',join(install,'pair-device.ps1')]
+  assert.throws(()=>execFileSync('powershell.exe',refreshArgs,{stdio:'pipe',windowsHide:true}),error=>error.status===1)
+  execFileSync('powershell.exe',[...refreshArgs,'-ResetPairing'],{stdio:'pipe',windowsHide:true})
+  assert.equal(await readFile(join(install,'connection.json'),'utf8'),beforeConnection);assert.equal(await readFile(registry,'utf8'),beforeTasks)
+  const reset=JSON.parse(await readFile(connection.pairingFile,'utf8'));assert.notEqual(reset.inviteId,next.inviteId);assert.equal(Object.hasOwn(reset,'code'),false)
+  const checked=new Store(config.dataDir,Database,{admin:true})
+  try{assert.throws(()=>checked.client(prior.token),/AUTH_INVALID/);assert.equal(checked.db.prepare('SELECT count(*) n FROM clients WHERE revoked=0').get().n,0)}finally{checked.close()}
 })
 test('desktop setup wizard: an existing scheduled-task name is refused without replacing files/tasks',{skip:process.platform!=='win32'},async()=>{
   const dir=await mkdtemp(join(parent,'collision-')),install=join(dir,'new-install'),answers=join(dir,'answers.json'),registry=join(dir,'mock-tasks.json'),installationId=createHash('sha256').update(install.toLowerCase()).digest('hex').slice(0,12)

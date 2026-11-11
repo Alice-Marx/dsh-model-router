@@ -1,0 +1,4 @@
+body[data-bot-product-ui] .bp-draft-recovery { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; max-width: 100%; font-size: 12px; color: var(--bp-chat-muted, #687486); }
+body[data-bot-product-ui] .bp-draft-recovery button { border: 1px solid var(--bp-chat-line-strong, #7f8691); border-radius: 8px; padding: 5px 8px; background: var(--bp-chat-surface, #fff); color: var(--bp-chat-ink, #253247); cursor: pointer; }
+body[data-bot-product-ui] .bp-draft-recovery button:focus-visible { outline: 2px solid var(--bp-chat-accent, #5174a0); outline-offset: 2px; }
+@media (max-width: 600px) { body[data-bot-product-ui] .bp-draft-recovery button { min-height: 40px; } }

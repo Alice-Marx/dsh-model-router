@@ -8,7 +8,8 @@ import { AgentError, AGENT_VERSION, CATALOG, fail } from './protocol.js'
 import type { Agent } from './agent.js'
 import {AuthThrottle,validateAuthLimits,type AuthLimits} from './auth-throttle.js'
 import {WebSocketServer} from 'ws'
-export type NetworkConfig={mode?:'loopback'|'wireguard'|'tailscale'|'cloudflare-tunnel'|'public-tls';host?:string;port?:number;protectedTunnel?:boolean;allowedHosts?:string[];allowedOrigins?:string[];trustedProxies?:string[];authLimits?:AuthLimits;tls?:{keyFile:string;certFile:string;caFile?:string;requireClientCertificate?:boolean}}
+import {secureTransport} from './e2e-server.js'
+export type NetworkConfig={mode?:'loopback'|'wireguard'|'tailscale'|'cloudflare-tunnel'|'public-tls'|'e2e';host?:string;port?:number;protectedTunnel?:boolean;allowedHosts?:string[];allowedOrigins?:string[];trustedProxies?:string[];authLimits?:AuthLimits;tls?:{keyFile:string;certFile:string;caFile?:string;requireClientCertificate?:boolean}}
 const loopback=(host:string)=>['127.0.0.1','::1','::ffff:127.0.0.1'].includes(host)
 export function validateNetwork(c:NetworkConfig){const host=c.host??'127.0.0.1',mode=c.mode??'loopback';if(['0.0.0.0','::','localhost'].includes(host))fail('BIND_ADDRESS_REQUIRED')
   if(!isIP(host)||c.port!==undefined&&(!Number.isSafeInteger(c.port)||c.port<0||c.port>65535))fail('INVALID_NETWORK_CONFIG')
@@ -22,31 +23,42 @@ export function validateNetwork(c:NetworkConfig){const host=c.host??'127.0.0.1',
   if(['wireguard','tailscale'].includes(mode)){if(!Object.values(networkInterfaces()).flat().some(x=>x?.address===host))fail('BIND_INTERFACE_NOT_FOUND');if(!c.tls&&!c.protectedTunnel)fail('TUNNEL_ATTESTATION_REQUIRED')}
   if(mode==='cloudflare-tunnel'&&(!loopback(host)||!c.protectedTunnel))fail('TUNNEL_BACKEND_MUST_BE_LOOPBACK')
   if(mode==='public-tls'&&!c.tls&&(!loopback(host)||!c.trustedProxies?.length))fail('TLS_REQUIRED')
-  if(!c.tls&&!loopback(host)&&!c.protectedTunnel)fail('TLS_REQUIRED')
-  if(!['loopback','wireguard','tailscale','cloudflare-tunnel','public-tls'].includes(mode))fail('INVALID_NETWORK_MODE')
+  if(!c.tls&&!loopback(host)&&!c.protectedTunnel&&mode!=='e2e')fail('TLS_REQUIRED')
+  if(!['loopback','wireguard','tailscale','cloudflare-tunnel','public-tls','e2e'].includes(mode))fail('INVALID_NETWORK_MODE')
 }
 export async function serve(agent:Agent,c:NetworkConfig={}){
   c=structuredClone(c);validateNetwork(c);const throttle=new AuthThrottle(c.authLimits),host=c.host??'127.0.0.1'
-  const requestBoundary=(req:http.IncomingMessage,upgrade=false)=>{
+  if(c.mode==='e2e'&&!agent.store.pairing)fail('PAIRING_SERVICE_REQUIRED')
+  const requestBoundary=(req:http.IncomingMessage,upgrade=false,encrypted=false)=>{
     const address=server.address() as any,defaultHost=`${host.includes(':')?`[${host}]`:host}:${address.port}`
     if(!(c.allowedHosts??[defaultHost]).includes(req.headers.host??''))fail('HOST_DENIED',403)
     const origin=req.headers.origin
     if(origin!==undefined&&!(c.allowedOrigins??[]).includes(origin)&&!(upgrade&&agent.desktopSessions.hasOrigin(origin)))fail('ORIGIN_DENIED',403)
-    if(c.mode==='public-tls'&&!c.tls&&(!(c.trustedProxies??[]).includes(req.socket.remoteAddress??'unknown')||req.headers['x-forwarded-proto']!=='https'))fail('TLS_REQUIRED',403)
+    if(!encrypted&&c.mode==='public-tls'&&!c.tls&&(!(c.trustedProxies??[]).includes(req.socket.remoteAddress??'unknown')||req.headers['x-forwarded-proto']!=='https'))fail('TLS_REQUIRED',403)
     return defaultHost
   }
-  const handler=async(req:http.IncomingMessage,res:http.ServerResponse)=>{
+  const handler=async(req:http.IncomingMessage,res:http.ServerResponse,peer?:Parameters<typeof agent.store.pairing.validPeer>[0])=>{
     let context:any;const source=req.socket.remoteAddress??'unknown';const json=(status:number,value:any)=>{res.writeHead(status,{'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff'});res.end(JSON.stringify(value))}
     try{
-      const defaultHost=requestBoundary(req)
+      const defaultHost=requestBoundary(req,false,!!peer)
+      if(c.mode==='e2e'&&!peer)fail('E2E_REQUIRED',426)
+      const url=new URL(req.url??'/',`http://${defaultHost}`)
+      if(peer&&!agent.store.pairing.validPeer(peer))fail('AUTH_INVALID',401)
+      if(url.pathname==='/pair/v2/redeem'){
+        if(!peer||peer.kind!=='invite'||req.method!=='POST'||url.search)fail('PAIRING_CHANNEL_REQUIRED',403)
+        let body=Buffer.alloc(0);for await(const chunk of req){body=Buffer.concat([body,chunk]);if(body.length>2048)fail('REQUEST_TOO_LARGE',413)}
+        let input:any;try{input=JSON.parse(body.toString('utf8'))}catch{fail('INVALID_JSON')}
+        json(200,agent.store.pairing.redeem(peer,input));return
+      }
+      if(peer?.kind==='invite')fail('PAIRING_CHANNEL_ONLY',403)
       const reject=(decision:ReturnType<AuthThrottle['failure']>)=>{
         if(decision.audit)agent.store.audit(decision.code)
         if(decision.retryAfterMs)res.setHeader('retry-after',String(Math.max(1,Math.ceil(decision.retryAfterMs/1000))))
         fail(decision.code,decision.status)
       }
       const auth=req.headers.authorization??'';if(!/^Bearer [A-Za-z0-9_-]{43}$/.test(auth)){reject(throttle.failure(source))}
-      const url=new URL(req.url??'/',`http://${defaultHost}`);let client:any
-      const authenticate=()=>{try{if(url.pathname.startsWith('/control/v1/'))client=agent.store.client(auth.slice(7));else context=agent.store.grant(auth.slice(7))}catch{reject(throttle.failure(source))}}
+      let client:any
+      const authenticate=()=>{try{if(peer&&!agent.store.pairing.validPeer(peer))fail('AUTH_INVALID',401);if(url.pathname.startsWith('/control/v1/'))client=agent.store.client(auth.slice(7));else context=agent.store.grant(auth.slice(7));if(peer&&(client?.id??context?.clientId)!==peer.id)fail('AUTH_INVALID',401)}catch{reject(throttle.failure(source))}}
       authenticate()
       // Valid credentials bypass anonymous source cooldown, including shared proxies.
       const limited=throttle.authenticated(client?.id??context.clientId,client?.revision??context.revision)
@@ -59,6 +71,7 @@ export async function serve(agent:Agent,c:NetworkConfig={}){
       authenticate()
       if(url.pathname==='/control/v1/grants'){json(200,agent.store.issue(client,parsed));return}
       if(url.pathname==='/control/v1/grants/revoke'){const result=agent.store.revokeGrants(client,parsed);await agent.desktopSessions.sweep();json(200,result);return}
+      if(url.pathname==='/control/v1/desktop/close'){json(200,await agent.desktopSessions.closeClientSession(client.id,parsed));return}
       if(url.pathname==='/desktop/v1/session'){json(200,await agent.desktopSessions.open(context,parsed));return}
       if(url.pathname==='/desktop/v1/session/renew'){json(200,await agent.desktopSessions.renew(context,parsed));return}
       if(url.pathname==='/desktop/v1/session/close'){json(200,await agent.desktopSessions.closeSession(context,parsed));return}
@@ -74,16 +87,27 @@ export async function serve(agent:Agent,c:NetworkConfig={}){
     }catch(e){json(e instanceof AgentError?e.status:500,{error:{code:e instanceof AgentError?e.code:'AGENT_INTERNAL'}})}
   }
   const tls=c.tls?{key:readFileSync(c.tls.keyFile),cert:readFileSync(c.tls.certFile),ca:c.tls.caFile?readFileSync(c.tls.caFile):undefined,requestCert:!!c.tls.requireClientCertificate,rejectUnauthorized:!!c.tls.requireClientCertificate}:null
-  const server=tls?https.createServer(tls,handler):http.createServer(handler);server.requestTimeout=30000;server.headersTimeout=10000;server.maxConnections=128
+  const publicHandler=(req:http.IncomingMessage,res:http.ServerResponse)=>void handler(req,res)
+  const server=tls?https.createServer(tls,publicHandler):http.createServer(publicHandler);server.requestTimeout=30000;server.headersTimeout=10000;server.maxConnections=128
   const websocket=new WebSocketServer({noServer:true,clientTracking:true,maxPayload:65536,perMessageDeflate:false})
+  const desktopUpgrade=(req:http.IncomingMessage,socket:any,head:Buffer,peer?:Parameters<typeof agent.store.pairing.validPeer>[0])=>{
+    try{
+      const defaultHost=requestBoundary(req,true,!!peer),url=new URL(req.url??'/',`http://${defaultHost}`)
+      if(c.mode==='e2e'&&!peer)fail('E2E_REQUIRED',426)
+      if(peer&&(peer.kind!=='client'||!agent.store.pairing.validPeer(peer)))fail('AUTH_INVALID',401)
+      if(url.pathname!=='/desktop/v1/socket'||url.search)fail('NOT_FOUND',404)
+      if(websocket.clients.size>=16)fail('DESKTOP_CONNECTION_LIMIT',429)
+      websocket.handleUpgrade(req,socket,head,ws=>{websocket.emit('connection',ws,req);agent.desktopSessions.accept(ws,req.headers.origin,c.allowedOrigins??[],peer?.id)})
+    }catch(e){const status=e instanceof AgentError?e.status:500;socket.end(`HTTP/1.1 ${status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`)}
+  }
+  const encrypted=agent.store.pairing?secureTransport(agent.store.pairing,(req,res,peer)=>void handler(req,res,peer),desktopUpgrade):null
   server.on('upgrade',(req,socket,head)=>{
     try{
       const defaultHost=requestBoundary(req,true),url=new URL(req.url??'/',`http://${defaultHost}`)
-      if(url.pathname!=='/desktop/v1/socket'||url.search)fail('NOT_FOUND',404)
-      if(websocket.clients.size>=16)fail('DESKTOP_CONNECTION_LIMIT',429)
-      websocket.handleUpgrade(req,socket,head,ws=>{websocket.emit('connection',ws,req);agent.desktopSessions.accept(ws,req.headers.origin,c.allowedOrigins??[])})
+      if(url.pathname==='/v1/e2e'&&!url.search){if(!encrypted)fail('NOT_FOUND',404);encrypted.accept(req,socket,head);return}
+      desktopUpgrade(req,socket,head)
     }catch(e){const status=e instanceof AgentError?e.status:500;socket.end(`HTTP/1.1 ${status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`)}
   })
-  await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(c.port??9701,host,()=>resolve())})
-  return {server,address:server.address(),supportedMcpVersions:SUPPORTED_PROTOCOL_VERSIONS,close:async()=>{await agent.desktopSessions.close();for(const client of websocket.clients)client.terminate();await new Promise<void>(resolve=>websocket.close(()=>resolve()));await new Promise<void>((resolve,reject)=>server.close(e=>e?reject(e):resolve()))}}
+  try{await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(c.port??9701,host,()=>resolve())})}catch(error){await encrypted?.close();throw error}
+  return {server,address:server.address(),supportedMcpVersions:SUPPORTED_PROTOCOL_VERSIONS,close:async()=>{await agent.desktopSessions.close();for(const client of websocket.clients)client.terminate();await new Promise<void>(resolve=>websocket.close(()=>resolve()));await encrypted?.close();await new Promise<void>((resolve,reject)=>server.close(e=>e?reject(e):resolve()))}}
 }

@@ -5,11 +5,11 @@
 import { createElement as h, useEffect, useId, useRef, useState } from 'react'
 import { CheckIcon, CloseIcon, TrashIcon } from './icons.js'
 import { BotAvatar, BotMark } from './mark.js'
-import { contentText, currentPart } from './text.js'
+import { contentText } from './text.js'
 import { dateLocale, t } from './i18n.js'
 import { SPRING_POP, SPRING_SHAPE, spring } from './motion.js'
 import { useDockHold } from './card-hold.js'
-import { heldCardKey } from './sources.js'
+import { heldCardKey, isOwnChatOf } from './sources.js'
 import { CellEmpty } from './cell-empty.js'
 
 const MIN_VALUE = 4
@@ -178,7 +178,7 @@ export function SecretDock({ sessionId, useRoster, useCards, useHeldCards, actio
   const shown = useCards?.(state => state[sessionId]) ?? NONE
   const held = useHeldCards?.(state => state[sessionId]) ?? NONE
   const bot = roster.byId[sessionId]
-  if (!bot || currentPart(bot) !== sessionId) return null
+  if (!bot || !isOwnChatOf(bot, sessionId)) return null
   const drawn = entry => entry.callId && entry.sessionId === sessionId && shown[entry.callId] > 0 && !(held[heldCardKey('secret', entry.id)] > 0)
   const waiting = (roster.secretRequests?.[bot.id] ?? []).filter(entry => entry.status === 'pending' && !drawn(entry))
   if (waiting.length === 0) return null

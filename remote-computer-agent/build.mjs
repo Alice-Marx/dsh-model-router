@@ -25,6 +25,9 @@ const files = [...main.outputFiles, ...bridge.outputFiles]
 for (const helper of ['native-peer.ps1', 'native-peer.py']) {
   files.push({ path: join(output, helper), contents: await readFile(resolve(root, '../packages/cli-runtime/src', helper)) })
 }
+for (const [source, name] of [['vendor/LICENSE','OPENMAUSBOT_LICENSE'],['NOTICE','OPENMAUSBOT_NOTICE'],['SOURCE.json','OPENMAUSBOT_SOURCE.json']]) {
+  files.push({ path: join(output, name), contents: await readFile(resolve(root, '../modules/openmaus-protocol', source)) })
+}
 for (const file of files) assert.equal(dirname(resolve(file.path)), output, 'Agent build files must remain directly inside dist')
 await checkOutput()
 await mkdir(output, { recursive: true })

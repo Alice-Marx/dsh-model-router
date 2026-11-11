@@ -1,0 +1,477 @@
+/* The Bot conversation surface: contacts, transcript, composer.
+ *
+ * Scope. Every rule hangs off body[data-bot-product-ui], so the Harness
+ * workbench, other Sessions and the plain Agent view keep their own styling.
+ * The product islands (.bp-contact-*, .bp-conversation-tools) carry the product's
+ * own controls; the .bt-* rules restyle DS Bot 0.2.7's native conversation DOM
+ * without changing its structure, so sending, stopping, approvals and session
+ * switching stay exactly where the native components put them.
+ *
+ * Beating the vendor. DS Bot's SHELL_CSS/CONVERSATION_CSS land in <head> after
+ * this sheet (index.jsx appends ours, then applyDs installs the vendor's), and it
+ * pins a number of properties with !important. Two consequences, both deliberate:
+ *   - a rule that competes with a vendor rule needs more specificity than it, not
+ *     just a later position — hence the body[data-bot-product-ui] prefix on all
+ *     of them;
+ *   - where the vendor pins the very property this design changes (the header
+ *     band, the composer surface, the shell's own user bubble), this sheet uses
+ *     !important with a selector that outranks it. Layout and the submit/stop
+ *     controls are never overridden.
+ *
+ * Colour lives in the --bp-chat-* tokens below and is checked by
+ * chat-design.mjs: text 4.5:1, rings and borders 3:1, hairlines merely visible.
+ */
+
+html body[data-bot-product-ui],
+html body[data-bot-product-ui][data-bp-appearance],
+html body[data-bot-product-ui][data-ds-dark-theme] {
+  /* Light is the default; the dark block below only names what changes. */
+  --bp-chat-canvas: #fcfcfd;
+  --bp-chat-surface: #ffffff;
+  --bp-chat-sidebar: #f4f5f7;
+  --bp-chat-inset: #eef0f3;
+  --bp-chat-hover: #e6e9ee;
+  --bp-chat-line: #dde1e8;
+  --bp-chat-line-strong: #7f8691;
+  --bp-chat-ink: #252a33;
+  --bp-chat-muted: #5f6875;
+  --bp-chat-accent: #4a6484;
+  --bp-chat-accent-ink: #ffffff;
+  --bp-chat-focus: #4a6484;
+  --bp-chat-user: #2b3444;
+  --bp-chat-on-user: #ffffff;
+  --bp-chat-danger: #b3261e;
+  --bp-chat-danger-bg: #fbe9e7;
+  --bp-chat-warning: #8a5a12;
+  --bp-chat-warning-bg: #faf1de;
+  --bp-chat-shadow: 0 1px 2px #252a3308, 0 8px 24px -12px #252a3321;
+  --bp-chat-shadow-float: 0 2px 6px -2px #252a3314, 0 18px 40px -20px #252a332e;
+  /* A bubble keeps a readable measure and leaves the reply its own column. */
+  --bt-msg-w: .78;
+  --bt-flat-w: 1;
+  /* The vendor's tokens, read out of the chat palette so every native control
+     follows one appearance. */
+  --bt-main: var(--bp-chat-canvas);
+  --bt-sidebar: var(--bp-chat-sidebar);
+  --bt-card: var(--bp-chat-surface);
+  --bt-bubble: var(--bp-chat-surface);
+  --bt-hover: var(--bp-chat-hover);
+  --bt-active: color-mix(in srgb, var(--bp-chat-accent) 13%, var(--bp-chat-inset));
+  --bt-ink: var(--bp-chat-ink);
+  --bt-ink-2: var(--bp-chat-muted);
+  --bt-ink-3: var(--bp-chat-muted);
+  --bt-line: var(--bp-chat-line);
+  --bt-line-2: var(--bp-chat-line-strong);
+  --bt-line-weak: var(--bp-chat-line);
+  --bt-accent: var(--bp-chat-accent);
+  --bt-accent-ink: var(--bp-chat-accent-ink);
+  --bt-user: var(--bp-chat-user);
+  --bt-user-ink: var(--bp-chat-on-user);
+  --bt-tag-bg: var(--bp-chat-inset);
+  --bt-tag-ink: var(--bp-chat-muted);
+  --bt-danger: var(--bp-chat-danger);
+  /* Whatever still reaches for glass (reaction strip, the pill before this sheet
+     restyles it) reads as an opaque chat surface, not a blur. */
+  --bt-glass-bg: var(--bp-chat-surface);
+  --bt-glass-border: var(--bp-chat-line);
+  --bt-glass-rim: var(--bp-chat-line);
+  --bt-glass-shadow: var(--bp-chat-shadow);
+}
+
+html body[data-bot-product-ui][data-ds-dark-theme]:not([data-bp-appearance=light]),
+html body[data-bot-product-ui][data-bp-appearance=dark] {
+  --bp-chat-canvas: #131519;
+  --bp-chat-surface: #1c1f25;
+  --bp-chat-sidebar: #191c21;
+  --bp-chat-inset: #23262d;
+  --bp-chat-hover: #2b2f38;
+  --bp-chat-line: #333842;
+  --bp-chat-line-strong: #878f9b;
+  --bp-chat-ink: #eef1f6;
+  --bp-chat-muted: #a2abb9;
+  --bp-chat-accent: #a9c3e2;
+  --bp-chat-accent-ink: #1b2231;
+  --bp-chat-focus: #a9c3e2;
+  --bp-chat-user: #dfe7f2;
+  --bp-chat-on-user: #1e2635;
+  --bp-chat-danger: #f3b0a6;
+  --bp-chat-danger-bg: #3a2622;
+  --bp-chat-warning: #e6c188;
+  --bp-chat-warning-bg: #352c1e;
+  --bp-chat-shadow: 0 1px 2px #00000038, 0 10px 28px -14px #0000005c;
+  --bp-chat-shadow-float: 0 2px 8px -2px #00000047, 0 20px 44px -22px #00000073;
+}
+
+/* ---------------------------------------------------------------------------
+ * Product islands: the controls this plugin adds to the native surface.
+ * ------------------------------------------------------------------------- */
+
+/* OpenMausBot's standard/wide/full measures, applied through the pinned
+   conversation's existing width token. No composer state or DOM mutation.
+   The measure is a length, not a colour, so it lives in the --bt- sizing
+   namespace: the --bp-chat- namespace is the palette and every token in it is
+   read back by the contrast contract as a plain colour. */
+html body[data-bot-product-ui] { --bt-column-width: min(60rem, 100%); }
+html body[data-bot-product-ui][data-bp-chat-width=wide] { --bt-column-width: min(80rem, 100%); --bt-msg-w: .92; }
+html body[data-bot-product-ui][data-bp-chat-width=full] { --bt-column-width: 100%; --bt-msg-w: .96; }
+html body[data-bot-product-ui] [class*="_body"]:has(> [class*="_scrollBody"]) { --dsh-chat-content-width: var(--bt-column-width); }
+/* A plain user bubble repaints the vendor's own --bt-user pair, so the shell's
+   bubble and the product's bubble change together. The neutral pair is the ink
+   on the inset surface the palette already measures, so it names no new colour
+   and the palette tokens keep the plain values the contrast contract reads. */
+html body[data-bot-product-ui][data-bp-user-bubbles=neutral] { --bt-user: var(--bp-chat-inset); --bt-user-ink: var(--bp-chat-ink); }
+
+body[data-bot-product-ui] :is(.bp-contact-nav, .bp-contact-toolbar, .bp-conversation-tools) {
+  color: var(--bp-chat-ink, var(--bp-ink));
+  font-family: var(--bp-font, system-ui, sans-serif);
+  font-size: 12px;
+  line-height: 1.5;
+  /* The mac header strip is the window's drag area; nothing here may drag it. */
+  -webkit-app-region: no-drag;
+  --bp-ink: var(--bp-chat-ink);
+  --bp-muted: var(--bp-chat-muted);
+  --bp-surface: var(--bp-chat-surface);
+  --bp-subtle: var(--bp-chat-inset);
+  --bp-hover: var(--bp-chat-hover);
+  --bp-border: var(--bp-chat-line);
+  --bp-solid: var(--bp-chat-accent);
+  --bp-focus: var(--bp-chat-focus);
+}
+
+body[data-bot-product-ui] :is(.bp-contact-nav, .bp-contact-toolbar, .bp-conversation-tools) * { box-sizing: border-box; }
+body[data-bot-product-ui] :is(.bp-contact-nav, .bp-contact-toolbar, .bp-conversation-tools) :is(button, summary) { font-family: inherit; touch-action: manipulation; -webkit-app-region: no-drag; }
+body[data-bot-product-ui] :is(.bp-contact-nav, .bp-contact-toolbar, .bp-conversation-tools) :is(button, summary):focus-visible { outline: 2px solid var(--bp-chat-focus); outline-offset: 2px; border-radius: 9px; }
+body[data-bot-product-ui] :is(.bp-contact-nav, .bp-contact-toolbar, .bp-conversation-tools) button:disabled { opacity: .55; cursor: wait; }
+/* A long Bot name or a wrapped error must never push the column sideways. */
+body[data-bot-product-ui] :is(.bp-contact-nav, .bp-contact-toolbar, .bp-conversation-tools) :is(span, strong, div, p) { min-width: 0; overflow-wrap: anywhere; }
+body[data-bot-product-ui] :is(.bp-contact-resources, .bp-conversation-overflow) { position: relative; flex: none; }
+body[data-bot-product-ui] :is(.bp-contact-resources, .bp-conversation-overflow) > summary { list-style: none; cursor: pointer; }
+body[data-bot-product-ui] :is(.bp-contact-resources, .bp-conversation-overflow) > summary::-webkit-details-marker { display: none; }
+
+/* Contact navigation, under the native list. Destinations only change focus. */
+body[data-bot-product-ui] .bp-contact-nav { position: relative; flex: none; margin-top: 10px; padding: 11px 0 2px; border-top: 1px solid var(--bp-chat-line); }
+body[data-bot-product-ui] .bt-side > .bp-contact-nav { order: 3; }
+body[data-bot-product-ui] .bt-side > .bt-leftcol-foot { order: 4; }
+body[data-bot-product-ui] .bp-contact-nav-row { display: flex; align-items: center; gap: 2px; }
+body[data-bot-product-ui] .bp-contact-nav-row > .bp-appearance { margin-left: auto; }
+body[data-bot-product-ui] .bp-contact-nav-button,
+body[data-bot-product-ui] .bp-contact-resources > summary { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 35px; padding: 7px 6px; border: 0; border-radius: 10px; background: transparent; color: var(--bp-chat-muted); cursor: pointer; font-size: 11px; white-space: nowrap; }
+body[data-bot-product-ui] .bp-contact-nav-row svg { flex: none; }
+body[data-bot-product-ui] .bp-contact-nav-label { overflow: hidden; text-overflow: ellipsis; }
+body[data-bot-product-ui] :is(.bp-contact-nav-button:hover, .bp-contact-resources > summary:hover, .bp-contact-resources[open] > summary) { color: var(--bp-chat-ink); background: var(--bp-chat-hover); }
+body[data-bot-product-ui] :is(.bp-contact-nav-button[aria-current=page], .bp-contact-resources > summary[data-active]) { color: var(--bp-chat-accent); background: var(--bt-active); font-weight: 550; }
+/* The attention count is a real number on a real surface, so it stays AA. */
+body[data-bot-product-ui] .bp-contact-attention { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; padding: 0 5px; border-radius: 6px; font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--bp-chat-danger); background: var(--bp-chat-danger-bg); }
+body[data-bot-product-ui] .bp-contact-nav .bp-appearance > summary { width: 34px; height: 35px; border-radius: 10px; }
+
+/* Menus: the resource list, the conversation overflow and the appearance panel. */
+body[data-bot-product-ui] .bp-contact-resources-menu,
+body[data-bot-product-ui] .bp-conversation-menu { position: absolute; z-index: 65; display: flex; flex-direction: column; gap: 2px; width: 208px; max-height: min(380px, 60dvh); overflow: auto; overscroll-behavior: contain; padding: 6px; border: 1px solid var(--bp-chat-line); border-radius: 13px; background: var(--bp-chat-surface); color: var(--bp-chat-ink); box-shadow: var(--bp-chat-shadow-float); }
+body[data-bot-product-ui] .bp-contact-resources-menu { left: 0; bottom: calc(100% + 9px); }
+body[data-bot-product-ui] :is(.bp-contact-resources-menu, .bp-conversation-menu) > button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 8px 10px; border: 0; border-radius: 9px; color: inherit; background: transparent; cursor: pointer; font-size: 12px; text-align: left; }
+body[data-bot-product-ui] :is(.bp-contact-resources-menu, .bp-conversation-menu) > button:hover { background: var(--bp-chat-hover); }
+body[data-bot-product-ui] :is(.bp-contact-resources-menu, .bp-conversation-menu) > button[aria-current=page] { color: var(--bp-chat-accent); background: var(--bt-active); font-weight: 550; }
+body[data-bot-product-ui] :is(.bp-contact-resources-menu, .bp-conversation-menu) > button > :last-child { margin-left: auto; color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bp-contact-resources-menu > .bp-contact-advanced { margin-top: 4px; border-top: 1px solid var(--bp-chat-line); border-radius: 0 0 9px 9px; padding-top: 11px; color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bp-contact-nav .bp-appearance-menu { top: auto; right: 0; bottom: calc(100% + 9px); width: min(265px, calc(100vw - 24px)); max-height: 65dvh; overflow: auto; padding: 18px; box-shadow: var(--bp-chat-shadow-float); }
+body[data-bot-product-ui] .bp-contact-nav .bp-segmented > button { flex: 1; min-width: 0; min-height: 30px; padding: 5px 7px; border: 1px solid transparent; border-radius: 7px; color: var(--bp-chat-muted); background: transparent; font-size: 11px; cursor: pointer; }
+body[data-bot-product-ui] .bp-contact-nav .bp-segmented > button[aria-pressed=true] { border-color: var(--bp-chat-line); color: var(--bp-chat-ink); background: var(--bp-chat-surface); }
+
+/* Rail-width column: the nav collapses to icons, its menus open sideways. */
+body[data-bot-product-ui] .bp-contact-nav-compact { width: 100%; margin-top: 6px; padding-top: 8px; }
+body[data-bot-product-ui] .bp-contact-nav-compact .bp-contact-nav-row { flex-direction: column; gap: 4px; }
+body[data-bot-product-ui] .bp-contact-nav-compact .bp-contact-nav-row > .bp-appearance { margin-left: 0; }
+body[data-bot-product-ui] .bp-contact-nav-compact .bp-contact-nav-label { display: none; }
+body[data-bot-product-ui] .bp-contact-nav-compact :is(.bp-contact-nav-button, .bp-contact-resources > summary) { position: relative; width: 38px; min-height: 36px; padding: 7px; }
+body[data-bot-product-ui] .bp-contact-nav-compact .bp-contact-attention { position: absolute; right: -3px; top: -1px; min-width: 16px; }
+body[data-bot-product-ui] .bp-contact-nav-compact :is(.bp-contact-resources-menu, .bp-appearance-menu) { left: calc(100% + 12px); right: auto; bottom: 0; }
+
+/* The list header: who these contacts are, plus the native search and new chat. */
+body[data-bot-product-ui] .bp-contact-toolbar { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none; min-height: 44px; padding: 3px 2px 9px; }
+body[data-bot-product-ui] .bp-contact-toolbar > strong { font-size: 14px; font-weight: 620; letter-spacing: -.02em; }
+body[data-bot-product-ui] .bp-contact-toolbar-actions { display: flex; gap: 3px; }
+body[data-bot-product-ui] .bp-contact-toolbar-actions > button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 10px; color: var(--bp-chat-muted); background: transparent; cursor: pointer; }
+body[data-bot-product-ui] .bp-contact-toolbar-actions > button:hover { background: var(--bp-chat-hover); color: var(--bp-chat-ink); }
+body[data-bot-product-ui] .bp-contact-toolbar-compact { justify-content: center; }
+body[data-bot-product-ui] .bp-contact-toolbar-compact .bp-contact-toolbar-actions { flex-direction: column; }
+
+/* An action failure is stated once, in place, and dismissed by hand. */
+body[data-bot-product-ui] .bp-chat-action-error { position: absolute; z-index: 70; display: flex; align-items: flex-start; gap: 12px; width: max-content; max-width: min(340px, calc(100vw - 24px)); padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--bp-chat-danger) 30%, var(--bp-chat-line)); border-radius: 12px; color: var(--bp-chat-danger); background: var(--bp-chat-surface); box-shadow: var(--bp-chat-shadow-float); text-align: left; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+body[data-bot-product-ui] .bp-chat-action-error > span { flex: 1; min-width: 0; }
+body[data-bot-product-ui] .bp-chat-action-error > button { display: grid; place-items: center; flex: none; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: inherit; cursor: pointer; }
+body[data-bot-product-ui] .bp-chat-action-error > button:hover { background: var(--bp-chat-inset); }
+body[data-bot-product-ui] .bp-conversation-tools > .bp-chat-action-error { top: calc(100% + 12px); right: 0; }
+body[data-bot-product-ui] :is(.bp-contact-nav, .bp-contact-toolbar) > .bp-chat-action-error { bottom: calc(100% + 8px); left: 0; }
+body[data-bot-product-ui] .bp-contact-nav-compact > .bp-chat-action-error { left: calc(100% + 8px); bottom: 0; }
+
+/* ---------------------------------------------------------------------------
+ * Contact list. The native rows, tiles and marks keep their DOM; only the
+ * spacing, the type ladder and the active treatment are the design's.
+ * ------------------------------------------------------------------------- */
+
+body[data-bot-product-ui] .bt-side { background: var(--bp-chat-sidebar); }
+body[data-bot-product-ui] .bt-side:not(.bt-rail) { padding-right: 0; }
+body[data-bot-product-ui] .bt-side:not(.bt-rail) > .bt-list { gap: 4px; margin-right: -4px; padding-right: 4px; }
+body[data-bot-product-ui] .bt-side-top { gap: 4px; min-height: 43px; padding: 4px 0 12px; }
+body[data-bot-product-ui] .bt-brand { font-size: 14px; font-weight: 600; color: var(--bp-chat-accent); }
+body[data-bot-product-ui] .bt-side:not(.bt-rail) .bt-row { position: relative; gap: 11px; min-height: 56px; padding: 9px 10px; border-radius: 12px; overflow: hidden; }
+body[data-bot-product-ui] .bt-side:not(.bt-rail) .bt-row:hover { background: var(--bp-chat-hover); }
+body[data-bot-product-ui] .bt-side:not(.bt-rail) .bt-row[aria-current=page] { background: var(--bp-chat-surface); box-shadow: 0 1px 4px #252a3308, inset 0 0 0 1px var(--bp-chat-line); }
+/* The current contact carries an accent edge, the way a chat client marks the
+   open thread, so the list reads at a glance without relying on weight alone. */
+body[data-bot-product-ui] .bt-side:not(.bt-rail) .bt-row[aria-current=page]::before { content: ""; position: absolute; left: 0; top: 50%; translate: 0 -50%; width: 3px; height: 58%; border-radius: 0 3px 3px 0; background: var(--bp-chat-accent); }
+body[data-bot-product-ui] .bt-row-body { min-width: 0; }
+body[data-bot-product-ui] .bt-row-name { gap: 6px; font-size: 13px; line-height: 19px; font-weight: 550; }
+body[data-bot-product-ui] .bt-row-title { min-width: 0; }
+body[data-bot-product-ui] .bt-row-preview { margin-top: 2px; font-size: 12px; line-height: 17px; color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bt-row[aria-current=page] .bt-row-preview { color: var(--bp-chat-ink); }
+body[data-bot-product-ui] .bt-unread { width: 8px; height: 8px; border-radius: 50%; background: var(--bp-chat-accent); }
+body[data-bot-product-ui] .bt-unread-wait { background: var(--bp-chat-warning); }
+body[data-bot-product-ui] .bt-tag { max-width: 96px; padding: 1px 6px; border-radius: 6px; background: var(--bp-chat-inset); color: var(--bp-chat-muted); font-size: 11px; }
+body[data-bot-product-ui] .bt-leftcol-foot { padding-top: 8px; }
+body[data-bot-product-ui] .bt-urow { margin-block: 8px; color: var(--bp-chat-ink); }
+/* The Main Bot's tile is a contact card, not a button floating in space. */
+body[data-bot-product-ui] .bt-tile-wrap { padding: 6px 0 10px; }
+body[data-bot-product-ui] .bt-tile { gap: 11px; width: 100%; padding: 10px; border-radius: 12px; background: var(--bp-chat-inset); text-align: left; }
+body[data-bot-product-ui] .bt-tile[aria-current=page] { background: var(--bp-chat-surface); box-shadow: inset 0 0 0 1px var(--bp-chat-line); }
+body[data-bot-product-ui] .bt-tile-name { max-width: none; font-size: 13px; line-height: 19px; font-weight: 550; }
+body[data-bot-product-ui] .bt-tile > .bt-chip { max-width: 100%; padding: 0; border: 0; background: transparent; font-size: 11px; color: var(--bp-chat-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-bot-product-ui] .bt-chip { border-radius: 6px; background: var(--bp-chat-inset); color: var(--bp-chat-muted); }
+/* A read-only roster notice and the "return" row are part of the list, not modals. */
+body[data-bot-product-ui] .bt-side .bt-read-only { margin: 4px 2px 8px; padding: 9px 11px; border-radius: 10px; background: var(--bp-chat-inset); color: var(--bp-chat-muted); font-size: 11px; line-height: 1.6; }
+body[data-bot-product-ui] .bt-return .bt-row { min-height: 44px; border-radius: 10px; }
+body[data-bot-product-ui] .bt-return .bt-mark { color: var(--bp-chat-muted); }
+
+/* ---------------------------------------------------------------------------
+ * Conversation header. DS Bot floats a pill over the transcript; the product's
+ * tools ride the same band. The vendor pins this header's padding, background
+ * and border with !important, so the same properties are restated here with a
+ * selector that outranks it.
+ * ------------------------------------------------------------------------- */
+
+body[data-bot-product-ui] header[class*="_header"]:has(.bp-conversation-tools) { padding: 10px 16px 10px 48px !important; background: var(--bp-chat-canvas) !important; border-bottom: 1px solid var(--bp-chat-line) !important; box-shadow: none !important; container-name: bp-chat-header; container-type: inline-size; }
+body[data-bot-product-ui] header[class*="_header"]:has(.bp-conversation-tools)::before { background: none; }
+body[data-bot-product-ui] .bt-head:has(> .bp-conversation-tools) { min-width: 0; justify-content: space-between; gap: 12px; }
+body[data-bot-product-ui] .bt-head:has(> .bp-conversation-tools) > .bt-pill { flex: 0 1 auto; min-width: 0; max-width: min(45%, 400px); border: 1px solid var(--bp-chat-line); background: var(--bp-chat-surface); box-shadow: var(--bp-chat-shadow); }
+body[data-bot-product-ui] .bt-head:has(> .bp-conversation-tools) > .bt-island { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 140px); background: var(--bp-chat-surface); border-color: var(--bp-chat-line); box-shadow: var(--bp-chat-shadow-float); }
+body[data-bot-product-ui] .bt-pill { font-size: 13px; }
+body[data-bot-product-ui] .bt-pill-name { font-weight: 550; }
+body[data-bot-product-ui] .bt-pill-mem-in { color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bt-swap { color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bp-conversation-tools { position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 4px; flex: 0 0 auto; min-width: 0; margin-left: auto; pointer-events: auto; }
+body[data-bot-product-ui] .bp-conversation-tools > button,
+body[data-bot-product-ui] .bp-conversation-shortcuts > button,
+body[data-bot-product-ui] .bp-conversation-overflow > summary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; width: 32px; height: 32px; min-width: 32px; padding: 0; border: 1px solid transparent; border-radius: 10px; color: var(--bp-chat-muted); background: transparent; cursor: pointer; }
+/* Model and members read as chips beside the icons, so the header states what
+   the conversation is without opening anything. */
+body[data-bot-product-ui] .bp-conversation-tools > .bp-conversation-model,
+body[data-bot-product-ui] .bp-conversation-tools > .bp-conversation-members { width: auto; max-width: 180px; padding: 0 10px; border-color: var(--bp-chat-line); border-radius: 999px; background: var(--bp-chat-surface); font-size: 11px; white-space: nowrap; }
+body[data-bot-product-ui] .bp-conversation-tools > .bp-conversation-model:hover,
+body[data-bot-product-ui] .bp-conversation-tools > .bp-conversation-members:hover { color: var(--bp-chat-ink); background: var(--bp-chat-hover); }
+body[data-bot-product-ui] .bp-conversation-model-name { overflow: hidden; text-overflow: ellipsis; }
+body[data-bot-product-ui] .bp-conversation-model-different { flex: none; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .7; }
+body[data-bot-product-ui] .bp-conversation-model > svg,
+body[data-bot-product-ui] .bp-conversation-members > svg { flex: none; }
+body[data-bot-product-ui] .bp-conversation-tools > button:hover,
+body[data-bot-product-ui] .bp-conversation-shortcuts > button:hover,
+body[data-bot-product-ui] .bp-conversation-overflow > summary:hover,
+body[data-bot-product-ui] .bp-conversation-overflow[open] > summary { color: var(--bp-chat-ink); background: var(--bp-chat-inset); }
+body[data-bot-product-ui] .bp-conversation-shortcuts { display: flex; gap: 2px; }
+/* "Working" is one small dot with a label, never a banner over the transcript. */
+body[data-bot-product-ui] .bp-conversation-live { display: inline-flex; align-items: center; justify-content: center; width: 10px; height: 22px; margin: 0 3px 0 -1px; }
+body[data-bot-product-ui] .bp-conversation-live > span { width: 6px; height: 6px; border-radius: 50%; background: var(--bp-chat-accent); animation: bp-chat-live 1.6s ease-in-out infinite; }
+@keyframes bp-chat-live { 50% { opacity: .35; } }
+body[data-bot-product-ui] .bp-conversation-overflow { display: none; }
+body[data-bot-product-ui] .bp-conversation-menu { top: calc(100% + 10px); right: 0; width: 178px; }
+
+/* ---------------------------------------------------------------------------
+ * Transcript. Bot replies sit on the surface with a hairline; the user's own
+ * messages are the filled bubble; everything between them is quiet meta.
+ * ------------------------------------------------------------------------- */
+
+body[data-bot-product-ui] .bt-bubble { color: var(--bp-chat-ink); }
+body[data-bot-product-ui]:not([data-bt-layout=flat]) .bt-bubble { padding: 10px 14px; border: 1px solid var(--bp-chat-line); border-radius: 16px; background: var(--bp-chat-surface); line-height: 1.65; }
+body[data-bot-product-ui]:not([data-bt-layout=flat]) .bt-bubble:hover { border-color: color-mix(in srgb, var(--bp-chat-muted) 40%, var(--bp-chat-line)); }
+body[data-bot-product-ui] .bt-bubble p + p { margin-top: 6px; }
+body[data-bot-product-ui] .bt-bubble :is(ul, ol) { margin: 4px 0; padding-left: 20px; }
+/* Long code and long paths scroll inside the bubble; they never widen the page. */
+body[data-bot-product-ui] .bt-bubble :is(pre, .bt-fold-pre) { max-width: 100%; margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: var(--bp-chat-inset); overflow-x: auto; overscroll-behavior: contain; }
+body[data-bot-product-ui] .bt-bubble pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.6; }
+body[data-bot-product-ui] .bt-bubble pre code { padding: 0; background: none; font-size: inherit; white-space: pre; }
+body[data-bot-product-ui] .bt-bubble :not(pre) > code { padding: 1px 5px; border-radius: 5px; background: var(--bp-chat-inset); font-size: .92em; overflow-wrap: anywhere; }
+body[data-bot-product-ui] .bt-bubble :is(img, video) { max-width: 100%; height: auto; border-radius: 10px; }
+body[data-bot-product-ui] .bt-bubble table { display: block; max-width: 100%; overflow-x: auto; }
+/* The user's own words: one filled bubble per turn, in both renderers DS Bot
+   uses (.bt-urow for earlier parts and replies, .bt-umsg for the live column).
+   The fill and its ink come from the vendor's own --bt-user pair, so the plain
+   (neutral) preference repaints this bubble and the shell's bubble together. */
+body[data-bot-product-ui] .bt-ububble,
+body[data-bot-product-ui] .bt-ubody { padding: 9px 14px; border-radius: 16px 16px 5px 16px; background: var(--bt-user); color: var(--bt-user-ink); line-height: calc(var(--dsh-content-font-size, 14px) + 9px); overflow-wrap: anywhere; }
+body[data-bot-product-ui] .bt-ubody { border: 0; }
+body[data-bot-product-ui] .bt-ubody :not(pre) > code { background: color-mix(in srgb, currentColor 14%, transparent); }
+body[data-bot-product-ui] .bt-ubody pre { background: color-mix(in srgb, currentColor 10%, transparent); }
+body[data-bot-product-ui] .bt-ububble a { color: inherit; }
+/* The shell's own user bubble (older hosts, question replies, command input)
+   pins these three properties with !important; the colours come from the tokens
+   above, the geometry is restated to match the renderers beside it. */
+body[data-bot-product-ui] :is([class*="_userRow"], [data-chat-flow-kind=question-reply], [data-chat-flow-kind=command-input]) [class*="_bubble"] { border-radius: 16px !important; padding: 9px 14px !important; line-height: calc(var(--dsh-content-font-size, 14px) + 9px) !important; }
+body[data-bot-product-ui] .bt-utime { font-size: 11px; color: var(--bp-chat-muted); font-variant-numeric: tabular-nums; }
+body[data-bot-product-ui] .bt-uimages { font-size: 11px; opacity: .75; }
+body[data-bot-product-ui] .bt-ufile { border-radius: 14px; border-color: var(--bp-chat-line); background: var(--bp-chat-surface); }
+body[data-bot-product-ui] .bt-ufile-name { color: var(--bp-chat-ink); }
+body[data-bot-product-ui] .bt-urefs { font-size: 12px; color: var(--bp-chat-muted); }
+/* A group chat names its speaker once per run, quietly, above the run. */
+body[data-bot-product-ui] .bt-group-name { margin-left: 42px; font-size: 12.5px; line-height: 20px; font-weight: 600; }
+body[data-bot-product-ui] .bt-group-name:has(>.bt-lead) { margin: 0 0 3px; font-size: 13px; line-height: 22px; }
+body[data-bot-product-ui] .bt-group-time,
+body[data-bot-product-ui] .bt-group-took { margin-left: 6px; font-size: 11px; color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bt-group-role { margin-left: 6px; font-size: 10px; font-weight: 500; color: var(--bp-chat-muted); }
+/* Separators: a day, a part boundary, an unread line. Rules, not boxes. */
+body[data-bot-product-ui] .bt-time-sep { height: 28px; margin: 14px 0 8px; font-size: 11.5px; color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bt-part-line { gap: 10px; margin: 12px 0 8px; font-size: 11px; color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bt-part-line::before,
+body[data-bot-product-ui] .bt-part-line::after { height: 1px; background: var(--bp-chat-line); }
+body[data-bot-product-ui] .bt-new-sep { margin: 14px 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; color: var(--bp-chat-accent); }
+body[data-bot-product-ui] .bt-new-sep::before,
+body[data-bot-product-ui] .bt-new-sep::after { height: 1px; background: color-mix(in srgb, var(--bp-chat-accent) 28%, transparent); }
+/* Tool calls and lifecycle notes: one quiet centred line each. */
+body[data-bot-product-ui] .bt-event { gap: 2px; min-height: 24px; margin: 3px 0; font-size: 12px; color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bt-event button:not(.bt-soft) { height: 24px; padding: 4px 7px 4px 5px; border-radius: 999px; }
+body[data-bot-product-ui] .bt-event .bt-soft { margin-left: 6px; }
+body[data-bot-product-ui] .bt-event-error { color: var(--bp-chat-danger); }
+body[data-bot-product-ui] .bt-activity { gap: 10px; margin: 8px 0 4px 2px; font-size: 13px; color: var(--bp-chat-muted); }
+/* Reasoning folds shut to one line and opens into a ruled inset. */
+body[data-bot-product-ui] .bt-think { font-size: 12.5px; color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bt-think summary { gap: 6px; }
+body[data-bot-product-ui] .bt-think summary:hover { color: var(--bp-chat-ink); }
+body[data-bot-product-ui] .bt-think-text { margin-top: 6px; padding: 8px 11px; border-left: 2px solid var(--bp-chat-line-strong); border-radius: 0 8px 8px 0; background: var(--bp-chat-inset); font-size: 12.5px; line-height: 1.6; }
+/* The activity row: who is working, and for how long. */
+body[data-bot-product-ui] .bt-typing { height: 36px; gap: 12px; padding-inline-start: 8px; }
+body[data-bot-product-ui] .bt-typing-label > .bt-shimmer { font-size: 13.5px; }
+body[data-bot-product-ui] .bt-typing-time { color: var(--bp-chat-muted); }
+/* Message tools stay reachable by keyboard and touch, not hover only. */
+body[data-bot-product-ui] .bt-tool { width: 26px; height: 26px; border-radius: 8px; }
+body[data-bot-product-ui] .bt-react { border: 0; background: none; cursor: pointer; }
+/* A turn that failed states what happened and what to do next, in place. */
+body[data-bot-product-ui] .bt-fail { border-radius: 14px; background: var(--bp-chat-surface); box-shadow: inset 0 0 0 1px var(--bp-chat-line); }
+body[data-bot-product-ui] .bt-fail-dot { background: var(--bp-chat-danger); }
+body[data-bot-product-ui] .bt-fail-error { color: var(--bp-chat-danger); }
+
+/* ---------------------------------------------------------------------------
+ * Question and approval cards. These are the conversation's decisions, so they
+ * are the one surface allowed to look like a card — and nothing here hides a
+ * control or caps a height the answer needs.
+ * ------------------------------------------------------------------------- */
+
+body[data-bot-product-ui] .bt-q { gap: 12px; padding: 14px 16px; border-radius: 16px; background: var(--bp-chat-surface); box-shadow: 0 1px 3px #252a330a, inset 0 0 0 1px var(--bp-chat-line); }
+body[data-bot-product-ui] .bt-q-title { font-size: 14.5px; line-height: 21px; font-weight: 600; }
+body[data-bot-product-ui] .bt-q-detail { font-size: 12.5px; line-height: 18px; color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bt-q-opt { gap: 14px; min-height: 40px; padding: 9px 10px; border-radius: 11px; }
+body[data-bot-product-ui] .bt-q-label { font-size: 13.5px; line-height: 19px; }
+body[data-bot-product-ui] .bt-q-desc { font-size: 12px; line-height: 17px; color: var(--bp-chat-muted); }
+body[data-bot-product-ui] .bt-q-submit { height: 34px; padding: 0 16px; border-radius: 999px; background: var(--bp-chat-accent); color: var(--bp-chat-accent-ink); font-size: 13.5px; font-weight: 550; }
+body[data-bot-product-ui] .bt-q-submit:hover:not(:disabled) { opacity: .9; }
+body[data-bot-product-ui] .bt-q-btn { height: 34px; padding: 0 14px; border-radius: 999px; background: var(--bp-chat-inset); color: var(--bp-chat-ink); font-size: 13px; }
+body[data-bot-product-ui] .bt-q-field { min-height: 34px; border-radius: 9px; border-color: var(--bp-chat-line-strong); }
+body[data-bot-product-ui] .bt-q-badge { border-radius: 999px; color: var(--bp-chat-muted); }
+
+/* ---------------------------------------------------------------------------
+ * Composer. DS Bot pins the card's surface, radius and shadow with !important
+ * and owns the whole layout (tools, input, trailing controls, the send/stop
+ * swap). This sheet restates the surface in the chat palette and leaves every
+ * control where the native component put it.
+ * ------------------------------------------------------------------------- */
+
+body[data-bot-product-ui] [data-composer-card] { background: var(--bp-chat-surface) !important; border: 1px solid var(--bp-chat-line) !important; border-radius: 20px !important; box-shadow: var(--bp-chat-shadow) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+body[data-bot-product-ui] [data-composer-card]:hover { border-color: color-mix(in srgb, var(--bp-chat-muted) 45%, var(--bp-chat-line)) !important; }
+body[data-bot-product-ui] [data-composer-card]:focus-within { border-color: var(--bp-chat-accent) !important; box-shadow: var(--bp-chat-shadow), 0 0 0 3px color-mix(in srgb, var(--bp-chat-accent) 18%, transparent) !important; }
+/* Every control in the card keeps a visible focus ring; the native ones set
+   their own colours, the ones DS Bot adds get the chat palette. */
+body[data-bot-product-ui] [data-composer-card] :is(button, [role=button], [contenteditable=true]):focus-visible { outline: 2px solid var(--bp-chat-focus); outline-offset: 2px; }
+body[data-bot-product-ui] [data-composer-card] :is(.bt-mic, .bt-voice) { width: 30px; height: 30px; color: var(--bp-chat-muted); }
+body[data-bot-product-ui] [data-composer-card] :is(.bt-mic, .bt-voice):hover { color: var(--bp-chat-ink); background: var(--bp-chat-hover); }
+body[data-bot-product-ui] [data-composer-card] .bt-voice { background: var(--bp-chat-accent); color: var(--bp-chat-accent-ink); }
+body[data-bot-product-ui] .bt-mic-note { border-radius: 9px; background: var(--bt-user); color: var(--bt-user-ink); }
+/* The queued-message dock and the side-question card share the card language. */
+body[data-bot-product-ui] .bt-btw { border-radius: 13px; border-color: var(--bp-chat-line); background: var(--bp-chat-surface); }
+body[data-bot-product-ui] .bt-btw-q { font-size: 12.5px; }
+body[data-bot-product-ui] .bt-btw-note { color: var(--bp-chat-muted); }
+
+/* ---------------------------------------------------------------------------
+ * Responsive, density, touch and motion.
+ * ------------------------------------------------------------------------- */
+
+/* The open column gives the tile its row shape; the rail keeps the stacked one. */
+@container bot-sidebar (min-width: 180px) {
+  body[data-bot-product-ui] .bt-tile-wrap { padding: 4px 0 8px; }
+  body[data-bot-product-ui] .bt-tile { grid-template-columns: 36px minmax(0, 1fr); column-gap: 11px; row-gap: 2px; min-height: 60px; }
+  body[data-bot-product-ui] .bt-tile > .bt-mark { grid-row: 1 / span 2; }
+  body[data-bot-product-ui] .bt-tile-name { grid-column: 2; grid-row: 1; }
+  body[data-bot-product-ui] .bt-tile > .bt-chip { grid-column: 2; grid-row: 2; justify-self: start; }
+}
+
+/* The header sheds its shortcuts before the composer does: the overflow menu
+   carries the same commands, so nothing becomes unreachable. */
+@container bp-chat-header (max-width: 640px) {
+  body[data-bot-product-ui] .bp-conversation-shortcuts { display: none; }
+  body[data-bot-product-ui] .bp-conversation-overflow { display: block; }
+  body[data-bot-product-ui] .bp-conversation-tools > .bp-conversation-model { max-width: 140px; }
+}
+
+@container bp-chat-header (max-width: 420px) {
+  body[data-bot-product-ui] .bp-conversation-tools { gap: 2px; }
+  body[data-bot-product-ui] .bp-conversation-model-name,
+  body[data-bot-product-ui] .bp-conversation-model > svg:last-child,
+  body[data-bot-product-ui] .bp-conversation-members > span { display: none; }
+  body[data-bot-product-ui] .bp-conversation-tools > :is(.bp-conversation-model, .bp-conversation-members) { width: 32px; padding: 0; }
+  body[data-bot-product-ui] .bt-head:has(> .bp-conversation-tools) { gap: 6px; }
+  body[data-bot-product-ui] .bt-head:has(> .bp-conversation-tools) > .bt-pill { max-width: calc(100% - 110px); }
+  body[data-bot-product-ui] .bt-head:has(> .bp-conversation-tools) > .bt-island { max-width: calc(100% - 80px); }
+}
+
+/* A phone: the transcript and the composer take the whole width, the bubbles
+   keep their share of it, and the meta rows stay readable at 375px. */
+@media (max-width: 640px) {
+  body[data-bot-product-ui] .bt-msg { max-width: 100%; }
+  body[data-bot-product-ui] .bt-msg-line > .bt-bubble { max-width: 100%; }
+  body[data-bot-product-ui] .bt-bubble,
+  body[data-bot-product-ui] .bt-ububble,
+  body[data-bot-product-ui] .bt-ubody { max-width: calc(100% - 24px); }
+  body[data-bot-product-ui] .bt-group-name { margin-left: 30px; }
+  body[data-bot-product-ui] .bt-astack[data-lead]>.bt-msg:not(:last-child)>.bt-msg-line { margin-left: 26px; }
+  body[data-bot-product-ui] .bp-chat-action-error { max-width: calc(100vw - 32px); }
+  body[data-bot-product-ui] .bt-q { padding: 13px 14px; }
+}
+
+body[data-bot-product-ui][data-bp-density=compact] .bt-side:not(.bt-rail) .bt-row { min-height: 46px; padding: 7px 9px; }
+body[data-bot-product-ui][data-bp-density=compact] .bt-row-preview { font-size: 11.5px; }
+body[data-bot-product-ui][data-bp-density=compact] .bt-side-top { min-height: 38px; padding-bottom: 8px; }
+body[data-bot-product-ui][data-bp-density=compact] .bt-tile { min-height: 52px; padding: 8px; }
+body[data-bot-product-ui][data-bp-density=compact] .bt-time-sep { height: 22px; margin: 10px 0 6px; }
+body[data-bot-product-ui][data-bp-density=compact] .bp-contact-toolbar { min-height: 38px; }
+
+/* Touch: every target reaches 40px, and hover-only reveals become permanent. */
+@media (pointer: coarse) {
+  body[data-bot-product-ui] :is(.bp-contact-toolbar-actions > button, .bp-conversation-tools > button, .bp-conversation-shortcuts > button, .bp-conversation-overflow > summary) { min-width: 40px; width: 40px; height: 40px; }
+  body[data-bot-product-ui] :is(.bp-contact-nav-button, .bp-contact-resources > summary, .bp-contact-resources-menu > button, .bp-conversation-menu > button) { min-height: 44px; }
+  body[data-bot-product-ui] .bt-tool { width: 34px; height: 34px; border-radius: 10px; }
+  body[data-bot-product-ui] .bt-q-opt { min-height: 44px; }
+  body[data-bot-product-ui] .bt-event button:not(.bt-soft) { height: 32px; }
+}
+
+/* No hover means no hover reveals: the message tools and the card's own
+   controls are already always visible here, and nothing else depends on hover. */
+@media (hover: none) {
+  body[data-bot-product-ui] .bt-row:hover { background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-bot-product-ui] :is(.bp-contact-nav, .bp-contact-toolbar, .bp-conversation-tools) * { transition: none; animation: none; }
+  body[data-bot-product-ui] .bp-conversation-live > span { animation: none; }
+  body[data-bot-product-ui] .bt-bubble,
+  body[data-bot-product-ui] .bt-ububble,
+  body[data-bot-product-ui] .bt-ubody { transition: none; }
+}
+html body[data-bot-product-ui] .bp-contact-resources > summary { position: relative; }
+html body[data-bot-product-ui] .bp-contact-unread-dot { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--bp-chat-accent, #5174a0); }
+html body[data-bot-product-ui] .bp-contact-unread-count { margin-left: auto; font-size: 11px; font-weight: 650; }

@@ -3,6 +3,7 @@ import { TASK_STATES } from './api.mjs'
 import { botAttentionSummary, remoteUncertain } from './bot-attention.mjs'
 import { filterTasks, progressNote, taskProgress, taskIdOf, taskKey, taskTitle, TASK_FILTERS, TASK_EVENTS } from './task-progress.mjs'
 import { UiIcon } from './ui-icons.jsx'
+import { taskBoard } from './workspace-model.mjs'
 
 const Tag = ({ children }) => <span className="bp-tag">{children}</span>
 const date = value => value === null || value === undefined || !Number.isFinite(new Date(value).getTime()) ? '未取得' : new Date(value).toLocaleString('zh-CN')
@@ -33,7 +34,7 @@ function RemoteNotice({ row }) {
   return remote.possiblyApplied === true ? <small>操作已停止，文件可能已改变；重试不会撤销已有变更，请先核对产物。</small> : null
 }
 
-function TaskDetail({ task, inspect, busy, actions, dispatch, onClose, bot, openSession }) {
+function TaskDetail({ task, inspect, busy, actions, dispatch, onClose, bot, openSession, focusAttemptId }) {
   const [history, setHistory] = useState(null), [failure, setFailure] = useState(''), [loading, setLoading] = useState(false)
   const [reload, setReload] = useState(0)
   const ref = useRef(null)
@@ -54,11 +55,21 @@ function TaskDetail({ task, inspect, busy, actions, dispatch, onClose, bot, open
     return () => controller.abort()
   }, [key, task.updatedAt, inspect, actions.includes('task.inspect'), reload])
   const data = history?.task ?? task
+  const requestedAttempt = focusAttemptId && history?.attempts.find(item=>item.attemptId===focusAttemptId)
+  const missingAttempt = Boolean(history && focusAttemptId && !requestedAttempt)
+  const historical = Boolean(focusAttemptId && focusAttemptId!==data.attemptId)
+  const readOnlyDetail = Boolean(task.unloaded && !history || focusAttemptId && (!history || historical || missingAttempt))
+  useEffect(()=>{if(requestedAttempt)ref.current?.querySelector('[data-focused-attempt]')?.scrollIntoView?.({block:'nearest'})},[history,focusAttemptId])
   return <article className="bp-card bp-task-detail" aria-label="任务详情" ref={ref} tabIndex={-1}>
-    <div className="bp-card-title"><div><h2>任务详情</h2><p>{taskTitle(task)}</p></div><button type="button" onClick={onClose}>关闭</button></div>
+    <div className="bp-card-title"><div><h2>任务详情</h2><p>{taskTitle(data)}</p></div><button type="button" onClick={onClose}>关闭</button></div>
     <div className="bp-actions"><Tag>{TASK_STATES[data.state] ?? data.state}</Tag><span>{bot?.name ?? task.botId ?? '未取得归属'}</span>
       {bot?.sessionId && openSession && <button type="button" onClick={() => openSession(bot.sessionId)}>打开 Bot 私聊</button>}
-      <TaskActions row={data} actions={actions} dispatch={dispatch} busy={busy} /></div>
+      {!readOnlyDetail && <TaskActions row={data} actions={actions} dispatch={dispatch} busy={busy} />}</div>
+    {task.unloaded && <p className="bp-muted">原任务未包含在当前列表，详情通过原 Bot 与 Task 编号单独读取。</p>}
+    {missingAttempt && <p role="alert" className="bp-blocked">未找到所选的原执行尝试。请在原 Bot 会话核对执行记录。</p>}
+    {requestedAttempt && <section className="bp-blocked" aria-label="所选原执行尝试"><strong>第 {requestedAttempt.number} 次尝试 · {TASK_STATES[requestedAttempt.state]??requestedAttempt.state}</strong>
+      {historical && <p>此处定位历史尝试，当前任务已进入后续尝试。原记录只读。</p>}
+      <p>开始 {date(requestedAttempt.startedAt)} · 结束 {date(requestedAttempt.finishedAt)}</p><small className="bp-code">{requestedAttempt.attemptId} · {requestedAttempt.operationId}</small></section>}
     <RemoteNotice row={data} />
     <dl className="bp-facts"><Value label="创建">{date(data.createdAt)}</Value><Value label="最近更新">{date(data.updatedAt)}</Value><Value label="期限">{date(data.deadlineAt)}</Value>{data.attribution?.label && <Value label="执行进度">{data.attribution.label}</Value>}</dl>
     <h3>任务时间线</h3>
@@ -68,7 +79,7 @@ function TaskDetail({ task, inspect, busy, actions, dispatch, onClose, bot, open
     {!actions.includes('task.inspect') && <p className="bp-muted">此宿主尚未提供任务时间线，可在下方查看现有收据依据。</p>}
     {history && <>
       <p className="bp-muted">{history.attempts.length} 次执行尝试 · {history.timeline.total} 条日志{history.timeline.truncated ? `，显示最近 ${history.timeline.items.length} 条` : ''}。停止请求需等待原操作确认。</p>
-      <ol className="bp-task-timeline">{history.timeline.items.map(event => <li key={event.seq}>
+      <ol className="bp-task-timeline">{history.timeline.items.map(event => <li key={event.seq} data-focused-attempt={focusAttemptId&&event.attemptId===focusAttemptId?'':undefined}>
         <span className="bp-timeline-dot" aria-hidden="true" /><div><strong>{TASK_EVENTS[event.kind] ?? '任务状态更新'}</strong>
           <small><time>{date(event.at)}</time>{event.attemptNumber != null ? ` · 第 ${event.attemptNumber} 次尝试` : ''}{event.outcome ? ` · ${TASK_STATES[event.outcome] ?? (event.outcome === 'unknown' ? '结果未知' : event.outcome)}` : ''}</small>
           {event.code && <small className="bp-code">{event.code}</small>}</div>
@@ -83,18 +94,29 @@ function TaskDetail({ task, inspect, busy, actions, dispatch, onClose, bot, open
   </article>
 }
 
-export function TaskWorkspace({ snapshot, dispatch, busy, scope, inspect, openSession, routingCard }) {
+export function TaskWorkspace({ snapshot, dispatch, busy, scope, inspect, openSession, routingCard, focus }) {
   const progress = useMemo(() => taskProgress(snapshot), [snapshot])
   const [botId, setBotId] = useState(''), [status, setStatus] = useState('all'), [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState(false), [selection, setSelection] = useState(null)
-  useEffect(() => { setBotId(''); setStatus('all'); setQuery(''); setExpanded(false); setSelection(null) }, [scope])
+  const [view, setView] = useState('list'), [focusMissing, setFocusMissing] = useState(false)
+  useEffect(() => { setBotId(''); setStatus('all'); setQuery(''); setExpanded(false); setSelection(null); setFocusMissing(false) }, [scope])
+  useEffect(() => {
+    if (!focus) return
+    setQuery(''); setStatus(focus.filter ?? 'all'); setBotId(focus.taskId ? '' : focus.botId ?? '')
+    const target = focus.taskId ? progress.items.find(row => taskIdOf(row) === focus.taskId && row.botId === focus.botId) : null
+    const canReadMissing = focus.taskId && focus.botId && inspect && snapshot.availableActions?.includes('task.inspect') && snapshot.bots?.some(bot=>bot.id===focus.botId)
+    setSelection(target ? { scope, key: taskKey(target), attemptId:focus.attemptId } : canReadMissing ? {scope,key:taskKey(focus),attemptId:focus.attemptId,
+      lookup:{botId:focus.botId,taskId:focus.taskId,state:'unloaded',title:'原任务',unloaded:true,attempts:0}} : null)
+    setFocusMissing(Boolean(focus.taskId && !target && !canReadMissing))
+  }, [focus?.version, scope, Boolean(inspect), snapshot.availableActions?.includes('task.inspect')])
   const rows = filterTasks(progress, { botId, status, query })
-  const task = selection && selection.scope === scope ? progress.items.find(row => taskKey(row) === selection.key) : null
+  const task = selection && selection.scope === scope ? progress.items.find(row => taskKey(row) === selection.key) ?? selection.lookup : null
   const actions = snapshot.availableActions ?? []
   const select = row => setSelection({ scope, key: taskKey(row) })
   const attention = expanded ? progress.attention : progress.attention.slice(0, 6)
   const [showPlans, setShowPlans] = useState(false)
   return <>
+    {focusMissing && <p className="bp-blocked" role="status">所选任务不在当前已加载的记录中。请刷新记录，或返回原 Bot 会话核对。</p>}
     <section className="bp-card bp-task-overview" aria-label="多 Bot 任务总览">
       <div className="bp-card-title"><div><h2>团队任务</h2><p className="bp-muted">按 Bot 查看进展，优先处理需要你介入的任务。</p></div><Tag>{progress.items.length} 条已加载</Tag></div>
       {snapshot.tasks.truncated && <p role="status" className="bp-blocked">已加载 {progress.items.length} / {snapshot.tasks.total} 条任务，优先显示待处理与进行中的记录。下方数量与筛选仅针对已加载任务。</p>}
@@ -117,11 +139,11 @@ export function TaskWorkspace({ snapshot, dispatch, busy, scope, inspect, openSe
       })}</ul>
       {progress.attention.length > 6 && <button type="button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '收起待处理事项' : `查看全部 ${progress.attention.length} 项待处理`}</button>}
     </section>}
-    {task && <TaskDetail key={taskKey(task)} task={task} inspect={inspect} busy={busy} actions={actions} dispatch={dispatch} onClose={() => setSelection(null)} bot={snapshot.bots?.find(bot => bot.id === task.botId)} openSession={openSession} />}
-    <section className="bp-card" aria-label="任务记录"><div className="bp-card-title"><h2>任务记录</h2><span className="bp-muted" role="status">显示 {rows.length} / {progress.items.length} 条</span></div>
+    {task && <TaskDetail key={taskKey(task)} task={task} focusAttemptId={selection.attemptId} inspect={inspect} busy={busy} actions={actions} dispatch={dispatch} onClose={() => setSelection(null)} bot={snapshot.bots?.find(bot => bot.id === task.botId)} openSession={openSession} />}
+    <section className="bp-card bp-task-records" aria-label="任务记录"><div className="bp-card-title"><div><h2>任务记录</h2><span className="bp-muted" role="status">显示 {rows.length} / {progress.items.length} 条</span></div><div className="bp-segmented" role="group" aria-label="任务显示方式"><button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}><UiIcon name="list" size={15} />列表</button><button type="button" aria-pressed={view === 'board'} onClick={() => setView('board')}><UiIcon name="board" size={15} />看板</button></div></div>
       <div className="bp-task-search"><label>搜索任务<input type="search" value={query} placeholder="任务名称、Bot 或任务 / 计划 / 操作编号" onChange={event => setQuery(event.target.value)} /></label>
         {(query || botId || status !== 'all') && <button type="button" onClick={() => { setQuery(''); setBotId(''); setStatus('all') }}>清除筛选</button>}</div>
-      {!progress.items.length ? <p className="bp-empty">尚无持久任务。在 Main 私聊中提出目标后，可在这里查看工作包、执行尝试与收据。</p> : rows.length === 0 ? <p className="bp-empty">没有符合当前筛选的任务。可清除筛选查看其他记录。</p> : <div className="bp-table-wrap"><table>
+      {!progress.items.length ? <p className="bp-empty">尚无持久任务。在 Main 私聊中提出目标后，可在这里查看工作包、执行尝试与收据。</p> : rows.length === 0 ? <p className="bp-empty">没有符合当前筛选的任务。可清除筛选查看其他记录。</p> : view === 'board' ? <div className="bp-board" aria-label="任务看板">{taskBoard(progress, rows).map(lane => <section key={lane.id} className="bp-board-lane" aria-label={lane.title} data-lane={lane.id}><h3><UiIcon name={lane.icon} size={15} />{lane.title}<span>{lane.items.length}</span></h3><div className="bp-board-items">{lane.items.map(row => <article key={taskKey(row)} className="bp-board-card"><span className="bp-board-state">{TASK_STATES[row.state] ?? row.state}</span><button type="button" className="bp-text-button" onClick={() => select(row)}>{taskTitle(row)}</button><p>{snapshot.bots?.find(bot => bot.id === row.botId)?.name ?? row.botId ?? '归属未提供'}</p>{row.blockedReason && <small>{row.blockedReason}</small>}<RemoteNotice row={row} /><footer><time>{date(row.updatedAt)}</time><div className="bp-actions"><TaskActions row={row} actions={actions} dispatch={dispatch} busy={busy} /></div></footer></article>)}{!lane.items.length && <p className="bp-board-empty">暂无任务</p>}</div></section>)}</div> : <div className="bp-table-wrap"><table>
         <thead><tr><th>任务</th><th>Bot</th><th>状态</th><th>执行尝试</th><th>操作</th></tr></thead><tbody>{rows.map(row => <tr key={taskKey(row)}>
           <td><button className="bp-text-button" onClick={() => select(row)}>{taskTitle(row)}</button><small>更新 {date(row.updatedAt)}</small></td>
           <td>{snapshot.bots?.find(bot => bot.id === row.botId)?.name ?? row.botId ?? '未取得归属'}</td><td><Tag>{TASK_STATES[row.state] ?? row.state}</Tag>{progressNote(row, TASK_STATES[row.state] ?? row.state) && <small>{progressNote(row, TASK_STATES[row.state] ?? row.state)}</small>}{row.blockedReason && <small>{row.blockedReason}</small>}<RemoteNotice row={row} /></td>

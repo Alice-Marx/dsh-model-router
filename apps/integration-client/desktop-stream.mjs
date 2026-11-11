@@ -1,8 +1,14 @@
 /** The viewer never receives a pairing secret. Its ticket belongs to one authenticated desktop session. */
-export function connectDesktopStream({ ticket, onFrame, onState, onMetadata, onBeforeInput, onInputAcknowledged, onInputFailure,
+export function connectDesktopStream({ ticket, botId, transport, onFrame, onState, onMetadata, onBeforeInput, onInputAcknowledged, onInputFailure,onBeforeRelease,onReleaseAcknowledged,onReleaseFailure,
   WebSocketImpl = globalThis.WebSocket, ackTimeoutMs = 10000, now = Date.now }) {
-  if (!ticket?.websocketUrl || typeof WebSocketImpl !== 'function') throw new Error('桌面连接不可用。')
-  const socket = new WebSocketImpl(ticket.websocketUrl)
+  let websocketUrl=ticket?.websocketUrl
+  if(ticket?.websocketPath){
+    if(ticket.websocketPath!=='/bot-product/desktop/v1/socket'||!['http:','https:'].includes(globalThis.location?.protocol))throw new Error('此桌面连接需要已登录的网页宿主。')
+    const endpoint=new URL(ticket.websocketPath,globalThis.location.href);endpoint.protocol=endpoint.protocol==='https:'?'wss:':'ws:';websocketUrl=endpoint.href
+  }
+  if (ticket?.carrier!=='owner-http'&&(!websocketUrl || typeof WebSocketImpl !== 'function')) throw new Error('桌面连接不可用。')
+  if(ticket?.carrier==='owner-http'&&typeof transport!=='function')throw new Error('宿主桌面数据通道尚未就绪。')
+  const socket = ticket?.carrier==='owner-http'?createOwnerDesktopSocket({ticket,botId,dispatch:transport}):new WebSocketImpl(websocketUrl)
   socket.binaryType = 'arraybuffer'
   let closed = false, mode = 'watch', desiredMode = ticket.mode === 'control' ? 'control' : 'watch', nextId = 0
   let lastError = ''
@@ -20,6 +26,7 @@ export function connectDesktopStream({ ticket, onFrame, onState, onMetadata, onB
     if (!pending.delete(row.id)) return
     clearTimeout(row.timer)
     if (row.event) onInputFailure?.(row.event, { ...row.meta, failure })
+    else onReleaseFailure?.({...row.meta,failure})
     row.reject(Object.assign(new Error(failure.code), failure))
   }
   const failPending = code => { for (const row of [...pending.values()]) failed(row, { code, possiblyApplied: true }) }
@@ -36,6 +43,7 @@ export function connectDesktopStream({ ticket, onFrame, onState, onMetadata, onB
     pending.set(id, row)
     try {
       if (event) onBeforeInput?.(event, meta)
+      else onBeforeRelease?.(meta)
       if (!send({ type, id, ...(event ? { event } : {}) })) throw Object.assign(new Error('DESKTOP_DISCONNECTED'), { code: 'DESKTOP_DISCONNECTED' })
     } catch (error) { failed(row, { code: error.code ?? 'DESKTOP_DISCONNECTED', possiblyApplied: false }); return null }
     return promise
@@ -55,6 +63,7 @@ export function connectDesktopStream({ ticket, onFrame, onState, onMetadata, onB
       }
       pending.delete(row.id); clearTimeout(row.timer)
       if (row.event) onInputAcknowledged?.(row.event, { ...row.meta, acknowledgedAt: now() })
+      else onReleaseAcknowledged?.({...row.meta,acknowledgedAt:now(),ok:true})
       row.resolve({ ok: true, id: row.id }); return
     }
     if (value.type === 'ready') {
@@ -86,3 +95,4 @@ export function connectDesktopStream({ ticket, onFrame, onState, onMetadata, onB
     close() { if (closed) return; send({ type: 'close' }); closed = true; mode = 'watch'; failPending('DESKTOP_DISCONNECTED'); socket.close() },
   })
 }
+import { createOwnerDesktopSocket } from './desktop-http-socket.mjs'

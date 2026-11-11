@@ -2,6 +2,7 @@ import { randomUUID, createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { createDesktopSessionHost } from './desktop-sessions.mjs'
+import { connectSecureTransport, normalizeSecureTransport } from '../../../modules/openmaus-protocol/transport.mjs'
 
 export const REMOTE_TOOLS = Object.freeze(['machine_ping','fs_list','fs_read','fs_write','shell_exec','container_command_v1','cli_probe_v1','cli_task_v1',
   'operation_status','operation_cancel','artifact_stat','artifact_read','worktree_create','worktree_diff','worktree_integrate',
@@ -21,16 +22,18 @@ const references = (values, allowed) => {
   if (!Array.isArray(values) || !values.length || values.length > 64 || new Set(values).size !== values.length || values.some(v => !ref(v) || allowed && !allowed.includes(v))) fail('INVALID_MACHINE_SCOPE')
   return [...values].sort()
 }
-export function normalizeMachineEndpoint(value, protectedTunnel = false) {
+export function normalizeMachineEndpoint(value, protectedTunnel = false, transport) {
   let url; try { url = new URL(value) } catch { fail('INVALID_MACHINE_ENDPOINT') }
   if (!['https:','http:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== '/') fail('INVALID_MACHINE_ENDPOINT')
-  if (url.protocol === 'http:' && !['127.0.0.1','[::1]','localhost'].includes(url.hostname) && protectedTunnel !== true) fail('MACHINE_TLS_REQUIRED')
+  if (transport !== undefined) normalizeSecureTransport(transport)
+  if (url.protocol === 'http:' && !['127.0.0.1','[::1]','localhost'].includes(url.hostname) && protectedTunnel !== true && transport?.kind !== 'noise-v1') fail('MACHINE_TLS_REQUIRED')
   return url.origin
 }
 
 /** Host metadata only. Long-lived credentials stay in the existing DS secret UI. */
-export function openRemoteMachines({ Database, file, resolveSecret, botExists, authority, cliProfiles = [], onChanged = () => {}, now = Date.now, fetchImpl = fetch }) {
+export function openRemoteMachines({ Database, file, resolveSecret, botExists, mainBotIds = () => [], authority, desktopProxy, desktopHttp, cliProfiles = [], onChanged = () => {}, now = Date.now, fetchImpl = fetch }) {
   if (typeof Database !== 'function' || typeof resolveSecret !== 'function' || typeof botExists !== 'function') throw new TypeError('REMOTE_MACHINE_SERVICES_REQUIRED')
+  if (typeof mainBotIds !== 'function') throw new TypeError('REMOTE_MACHINE_MAIN_ROLE_REQUIRED')
   if (!Array.isArray(cliProfiles) || cliProfiles.length > 64 || new Set(cliProfiles.map(p=>`${p?.machineId}/${p?.rootId}`)).size !== cliProfiles.length
     || cliProfiles.some(p=>!p||!['machineId','rootId','profileId'].every(k=>ref(p[k]))||!Number.isSafeInteger(p.profileRevision)||p.profileRevision<1
       ||!/^[a-f0-9]{64}$/.test(p.entry?.sha256??'')||!/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(p.entry?.version??''))) throw new TypeError('REMOTE_CLI_PROFILES_INVALID')
@@ -41,6 +44,7 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
   db.exec(`CREATE TABLE IF NOT EXISTS remote_machine_component(component TEXT PRIMARY KEY,version INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS remote_machines(id TEXT PRIMARY KEY,revision INTEGER NOT NULL,config TEXT NOT NULL,revoked INTEGER NOT NULL,health TEXT);
     CREATE TABLE IF NOT EXISTS remote_machine_bindings(machine_id TEXT NOT NULL,bot_id TEXT NOT NULL,revision INTEGER NOT NULL,scope TEXT NOT NULL,revoked INTEGER NOT NULL,PRIMARY KEY(machine_id,bot_id));
+    CREATE TABLE IF NOT EXISTS remote_machine_grant_subjects(machine_id TEXT NOT NULL,bot_id TEXT NOT NULL,PRIMARY KEY(machine_id,bot_id));
     CREATE TABLE IF NOT EXISTS remote_machine_revocations(machine_id TEXT NOT NULL,bot_id TEXT NOT NULL,status TEXT NOT NULL,at_ms INTEGER NOT NULL,request_id TEXT NOT NULL,PRIMARY KEY(machine_id,bot_id));
     CREATE TABLE IF NOT EXISTS remote_machine_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,machine_id TEXT NOT NULL,bot_id TEXT,kind TEXT NOT NULL,time INTEGER NOT NULL);`)
   const version = db.prepare('SELECT version FROM remote_machine_component WHERE component=?').get('machines')
@@ -49,9 +53,28 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
   if(!db.pragma('table_info(remote_machine_revocations)').some(column=>column.name==='request_id'))db.exec("ALTER TABLE remote_machine_revocations ADD COLUMN request_id TEXT NOT NULL DEFAULT ''")
   let closed = false
   const active = new Set()
+  const channels = new Map()
   const alive = () => { if (closed) fail('MACHINE_DIRECTORY_CLOSED') }
   const machine = id => { alive(); if (!ref(id)) fail('INVALID_MACHINE_ID'); const r = db.prepare('SELECT * FROM remote_machines WHERE id=?').get(id); if (!r || r.revoked) fail('MACHINE_NOT_PAIRED'); return { ...r, config: JSON.parse(r.config), health: r.health ? JSON.parse(r.health) : null } }
-  const binding = (machineId,botId) => { const r = db.prepare('SELECT * FROM remote_machine_bindings WHERE machine_id=? AND bot_id=?').get(machineId,botId); if (!r || r.revoked || !botExists(botId)) fail('MACHINE_BOT_DENIED'); return { ...r, scope: JSON.parse(r.scope) } }
+  const binding = (machineId,botId) => {
+    const row = db.prepare('SELECT * FROM remote_machine_bindings WHERE machine_id=? AND bot_id=?').get(machineId,botId)
+    if (!botExists(botId) || row?.revoked) fail('MACHINE_BOT_DENIED')
+    if (mainBotIds().includes(botId)) {
+      const record = machine(machineId)
+      // Main inherits only this paired client's verified ceiling. The remote
+      // authority still authenticates the client, Bot and every issued grant.
+      return { machine_id: record.id, bot_id: botId, revision: record.revision,
+        scope: { roots: [...record.config.roots], tools: [...record.config.tools], mode: 'workspace-write' } }
+    }
+    if (!row) fail('MACHINE_BOT_DENIED')
+    return { ...row, scope: JSON.parse(row.scope) }
+  }
+  const mainScopes = botId => db.prepare('SELECT * FROM remote_machines WHERE revoked=0').all().flatMap(row => {
+    if (db.prepare('SELECT revoked FROM remote_machine_bindings WHERE machine_id=? AND bot_id=?').get(row.id,botId)?.revoked) return []
+    const config=JSON.parse(row.config)
+    return [{machineId:row.id,revision:row.revision,roots:[...config.roots],tools:[...config.tools],mode:'workspace-write',inheritedMain:true}]
+  })
+  const inheritedMainScopes = botId => botExists(botId)&&mainBotIds().includes(botId) ? mainScopes(botId) : null
   const event = (id,botId,kind) => db.prepare('INSERT INTO remote_machine_events(machine_id,bot_id,kind,time) VALUES(?,?,?,?)').run(id,botId,kind,now())
   const requestRevocation = (id,botId) => {
     const key=randomUUID()
@@ -75,7 +98,9 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
   }
   const request = async (config,path,token,body,signal) => {
     try {
-      return await responseJson(await fetchImpl(`${config.endpoint}${path}`, { method: 'POST', redirect: 'error',
+      const channel = config.transport ? await secureChannel(config,signal) : null
+      const send = channel ? (url,options) => channel.fetch(path,options) : fetchImpl
+      return await responseJson(await send(`${config.endpoint}${path}`, { method: 'POST', redirect: 'error',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': '2025-11-25' },
         body: JSON.stringify(body), signal: AbortSignal.any([AbortSignal.timeout(35000), ...(signal ? [signal] : [])]) }))
     } catch (error) { if (signal?.aborted) throw signal.reason; if (/^[A-Z][A-Z0-9_]{0,80}$/.test(error?.code)) throw error; fail('MACHINE_CONNECTION_FAILED') }
@@ -86,13 +111,36 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
     if (typeof secret !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(secret)) fail('MACHINE_SECRET_UNAVAILABLE')
     return secret
   }
+  const secureChannel = async (config,signal) => {
+    alive()
+    const token=await secretFor({config})
+    const key=JSON.stringify([config.endpoint,config.transport.publicKey,config.secretRef,createHash('sha256').update(token).digest('hex')])
+    let entry=channels.get(key)
+    if(!entry){
+      if(channels.size>=32)fail('MACHINE_CONNECTION_LIMIT')
+      const pending=connectSecureTransport({endpoint:config.endpoint,transport:config.transport,token,signal})
+      entry={config,pending};channels.set(key,entry)
+      void pending.then(channel=>{if(closed){channel.close();return};void channel.closed.then(()=>{if(channels.get(key)===entry)channels.delete(key)})},()=>{if(channels.get(key)===entry)channels.delete(key)})
+    }
+    const channel=await entry.pending
+    signal?.throwIfAborted();alive()
+    if(channel.state!=='open')fail('MACHINE_CONNECTION_FAILED')
+    return channel
+  }
+  const closeChannels = config => {
+    for(const [key,entry] of channels)if(!config||entry.config.secretRef===config.secretRef&&entry.config.endpoint===config.endpoint){channels.delete(key);void entry.pending.then(channel=>channel.close(),()=>{})}
+  }
   const versionUnsupported = (code,details) => { throw Object.assign(new Error(`${code}: require agentApiMajor=1 and MCP protocol 2025-11-25`), { code, details }) }
   const issue = async (record,botId,scope,identity,signal) => {
+    // Persist the identity before any network await, including pair probes and
+    // inherited Main grants that have no per-Bot binding row. Whole-machine
+    // revocation must reach every identity for which this Host requested tickets.
+    db.prepare('INSERT OR IGNORE INTO remote_machine_grant_subjects VALUES(?,?)').run(record.id,botId)
     const secret = await secretFor(record)
     signal?.throwIfAborted()
     const value = await request(record.config,'/control/v1/grants',secret,{ botId, taskId: identity.taskId, attemptId: identity.attemptId, roots: scope.roots, tools: scope.tools, ttlMs: 60000 },signal)
     if (value.agentApiMajor !== 1) versionUnsupported('MACHINE_VERSION_UNSUPPORTED', { requiredAgentApiMajor: 1, actualAgentApiMajor: value.agentApiMajor ?? null })
-    if (value.machineId !== record.id || value.botId !== botId || value.taskId !== identity.taskId || value.attemptId !== identity.attemptId || typeof value.grantToken !== 'string') fail('MACHINE_IDENTITY_MISMATCH')
+    if (value.machineId !== record.id || record.config.clientId && value.clientId !== record.config.clientId || value.botId !== botId || value.taskId !== identity.taskId || value.attemptId !== identity.attemptId || typeof value.grantToken !== 'string') fail('MACHINE_IDENTITY_MISMATCH')
     return value.grantToken
   }
   const invoke = async (record,token,name,args,operationId,signal) => {
@@ -115,24 +163,36 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
   const compare = (old, expectedRevision) => { if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || (old?.revision ?? 0) !== expectedRevision) fail('MACHINE_CONFIG_CONFLICT') }
   const publicMachine = row => ({ id: row.id, machineId: row.id, revision: row.revision, name: row.config.name, endpoint: row.config.endpoint,
     secretRef: row.config.secretRef, roots: row.config.roots, tools: row.config.tools, protectedTunnel: row.config.protectedTunnel,
+    ...(row.config.transport?{transport:row.config.transport}:{}),
     status: row.revoked ? 'revoked' : row.health && now()-row.health.lastSeenAt<90000 ? 'online' : 'unverified', lastSeenAt: row.health?.lastSeenAt ?? null,
     platform: row.health?.platform ?? null, version: row.health?.version ?? null, capabilities: row.health?.capabilities ?? [], desktop: row.health?.desktop ?? {status:'unverified'},
     revocations:db.prepare('SELECT bot_id,status,at_ms FROM remote_machine_revocations WHERE machine_id=?').all(row.id).map(r=>({botId:r.bot_id,status:r.status,at:r.at_ms})),
     bindings: db.prepare('SELECT bot_id,revision,scope,revoked FROM remote_machine_bindings WHERE machine_id=?').all(row.id).map(b => ({botId:b.bot_id,revision:b.revision,revoked:Boolean(b.revoked),...JSON.parse(b.scope)})) })
-  const desktopSessions = createDesktopSessionHost({ machine, binding, authority, issue, request, event, now })
+  const desktopSessions = createDesktopSessionHost({ machine, binding, authority, issue, request, event, now, desktopProxy, desktopHttp,
+    cleanupRequest:async(record,input,signal)=>request(record.config,'/control/v1/desktop/close',await secretFor(record),input,signal),
+    connectDesktop: async (record,signal,origin,options={}) => {
+      if(machine(record.id).revision!==record.revision)fail('MACHINE_GRANT_CHANGED')
+      const channel=await secureChannel(record.config,signal)
+      if(machine(record.id).revision!==record.revision)fail('MACHINE_GRANT_CHANGED')
+      return channel.openWebSocket('/desktop/v1/socket',{origin,...options})
+    },
+  })
   const store = {
     schemaVersion:1, file,
     desktopSession: (subject, input, context) => desktopSessions.open(subject, input, context),
+    routineDesktopSession: (subject,input,context) => desktopSessions.openInternal(subject,input,context),
     renewDesktopSession: (subject, input, context) => desktopSessions.renew(subject, input, context),
     closeDesktopSession: (subject, input, context) => desktopSessions.close(subject, input, context),
     closeDesktopSessions: () => desktopSessions.closeAll(),
     async pair(input,context) {
-      owner(context); alive(); keys(input,['machineId','name','endpoint','secretRef','protectedTunnel','roots','tools','probeBotId','expectedRevision'])
+      owner(context); alive(); keys(input,['machineId','clientId','name','endpoint','secretRef','protectedTunnel','transport','roots','tools','probeBotId','expectedRevision'])
       if (!ref(input.machineId) || !ref(input.probeBotId) || !botExists(input.probeBotId)) fail('INVALID_MACHINE_ID')
       if (typeof input.name !== 'string' || !input.name.trim() || input.name.length>128 || /[\x00-\x1f]/.test(input.name)) fail('INVALID_MACHINE_NAME')
       if (typeof input.secretRef !== 'string' || !/^ds-secret\/[A-Za-z][A-Za-z0-9_]{0,127}$/.test(input.secretRef)) fail('INVALID_MACHINE_SECRET_REF')
       if (input.protectedTunnel !== undefined && typeof input.protectedTunnel !== 'boolean') fail('INVALID_MACHINE_ENDPOINT')
-      const config = { name:input.name.trim(), endpoint:normalizeMachineEndpoint(input.endpoint,input.protectedTunnel), secretRef:input.secretRef, protectedTunnel:input.protectedTunnel===true, roots:references(input.roots), tools:references(input.tools,REMOTE_TOOLS) }
+      if (input.clientId !== undefined && !ref(input.clientId)) fail('INVALID_MACHINE_ID')
+      const transport = input.transport === undefined ? undefined : normalizeSecureTransport(input.transport)
+      const config = { name:input.name.trim(), endpoint:normalizeMachineEndpoint(input.endpoint,input.protectedTunnel,transport), secretRef:input.secretRef, protectedTunnel:input.protectedTunnel===true, roots:references(input.roots), tools:references(input.tools,REMOTE_TOOLS), ...(transport?{transport}:{}), ...(input.clientId?{clientId:input.clientId}:{}) }
       if (!config.tools.includes('machine_ping')) fail('MACHINE_PING_REQUIRED')
       compare(db.prepare('SELECT revision FROM remote_machines WHERE id=?').get(input.machineId),input.expectedRevision)
       const record = {id:input.machineId,config}, identity={taskId:`pair-${randomUUID()}`,attemptId:`attempt-${randomUUID()}`}
@@ -173,10 +233,15 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
       owner(context); alive(); keys(input,['machineId','botId','expectedRevision'])
       const record=machine(input.machineId), botId=input.botId??null
       if(botId!==null&&!ref(botId)) fail('INVALID_MACHINE_ID')
-      const affected=botId?[botId]:db.prepare('SELECT bot_id FROM remote_machine_bindings WHERE machine_id=? AND revoked=0').all(record.id).map(r=>r.bot_id)
+      const affected=botId?[botId]:db.prepare('SELECT bot_id FROM remote_machine_bindings WHERE machine_id=? UNION SELECT bot_id FROM remote_machine_grant_subjects WHERE machine_id=?').all(record.id,record.id).map(r=>r.bot_id)
       const requests=new Map()
       db.transaction(()=>{
-        if(botId){compare(db.prepare('SELECT revision FROM remote_machine_bindings WHERE machine_id=? AND bot_id=?').get(record.id,botId),input.expectedRevision);db.prepare('UPDATE remote_machine_bindings SET revoked=1,revision=revision+1 WHERE machine_id=? AND bot_id=?').run(record.id,botId)}
+        if(botId){
+          const previous=db.prepare('SELECT revision FROM remote_machine_bindings WHERE machine_id=? AND bot_id=?').get(record.id,botId)
+          compare(previous,input.expectedRevision)
+          if(previous)db.prepare('UPDATE remote_machine_bindings SET revoked=1,revision=revision+1 WHERE machine_id=? AND bot_id=?').run(record.id,botId)
+          else db.prepare('INSERT INTO remote_machine_bindings VALUES(?,?,1,?,1)').run(record.id,botId,JSON.stringify({roots:[],tools:[],mode:'read-only'}))
+        }
         else{compare(record,input.expectedRevision);db.prepare('UPDATE remote_machines SET revoked=1,revision=revision+1 WHERE id=?').run(record.id);db.prepare('UPDATE remote_machine_bindings SET revoked=1,revision=revision+1 WHERE machine_id=?').run(record.id)}
         event(record.id,botId,'revoked')
         for(const id of affected)requests.set(id,requestRevocation(record.id,id))
@@ -293,7 +358,7 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
         throw error
       }
     },
-    scopes(botId) { alive(); return db.prepare('SELECT machine_id,revision,scope FROM remote_machine_bindings WHERE bot_id=? AND revoked=0').all(botId).flatMap(r=>{try{machine(r.machine_id);return [{machineId:r.machine_id,revision:r.revision,...JSON.parse(r.scope)}]}catch{return []}}) },
+    scopes(botId) { alive(); return inheritedMainScopes(botId) ?? db.prepare('SELECT machine_id,revision,scope FROM remote_machine_bindings WHERE bot_id=? AND revoked=0').all(botId).flatMap(r=>{try{machine(r.machine_id);return [{machineId:r.machine_id,revision:r.revision,...JSON.parse(r.scope)}]}catch{return []}}) },
     /**
      * A Bot's grants, straight from committed state.
      *
@@ -301,16 +366,19 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
      * must not depend on `scopes()` (which needs the directory alive). This reads the same rows
      * without the availability check: what was authorised stays authorised across a restart.
      */
-    bindingsFor(botId) {
+    bindingsFor(botId,{main=mainBotIds().includes(botId)}={}) {
       alive()
       if (typeof botId !== 'string' || !botId) return []
+      // Only Host grant compilation supplies this override, from the saved role
+      // being adopted. The currently committed role may still be the old one.
+      if(main)return mainScopes(botId)
       return db.prepare('SELECT machine_id, revision, scope FROM remote_machine_bindings WHERE bot_id=? AND revoked=0').all(botId).flatMap(row => {
         try { const scope = JSON.parse(row.scope); return [{ machineId: row.machine_id, revision: row.revision, roots: scope.roots ?? [], tools: scope.tools ?? [], mode: scope.mode ?? 'read-only' }] } catch { return [] }
       })
     },
 
     readModel() { alive(); return {status:'available',items:db.prepare('SELECT * FROM remote_machines ORDER BY id').all().map(row=>publicMachine({...row,config:JSON.parse(row.config),health:row.health?JSON.parse(row.health):null}))} },
-    close() { if(!closed){for(const call of active)call.controller.abort(new Error('MACHINE_DIRECTORY_CLOSED'));closed=true;db.close()} },
+    close() { if(!closed){for(const call of active)call.controller.abort(new Error('MACHINE_DIRECTORY_CLOSED'));closed=true;closeChannels();db.close()} },
   }
   return Object.freeze(store)
 }

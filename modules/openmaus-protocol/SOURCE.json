@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "upstream": "https://github.com/milind-soni/OpenMausBot",
+  "commit": "1bc4749aa8307d7d6998bf86de4ef6478460dd93",
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "source": "companion/src/e2e/credentials.ts",
+      "target": "vendor/companion/src/e2e/credentials.ts",
+      "sha256": "1b576030c9e795eb64f5bee9fdc5918d6cfb92f2481b70259f7636991d6f5f6f",
+      "bytes": 6328
+    },
+    {
+      "source": "companion/src/e2e/noise.ts",
+      "target": "vendor/companion/src/e2e/noise.ts",
+      "sha256": "9269403237b43246142d5dd69bee0269d3b41f81c6bfe95520693320b6469250",
+      "bytes": 15871
+    },
+    {
+      "source": "companion/src/e2e/descriptor.ts",
+      "target": "vendor/companion/src/e2e/descriptor.ts",
+      "sha256": "5a7b39e4571e8b83fd85a3b6141cc09501918326afcc58c6ccb4a61344bbb2c8",
+      "bytes": 4570
+    },
+    {
+      "source": "companion/src/e2e/yamux.ts",
+      "target": "vendor/companion/src/e2e/yamux.ts",
+      "sha256": "1292b278d229d3ed8b92a32aec4137e04329d6fb2497d90ffee6f6d4bef20683",
+      "bytes": 13359
+    },
+    {
+      "source": "companion/src/e2e/session.ts",
+      "target": "vendor/companion/src/e2e/session.ts",
+      "sha256": "1ff7d26fe674ccab9f75026fec15f85bd791f99d75b888eaf24b7be744c4da0e",
+      "bytes": 14336
+    },
+    {
+      "source": "companion/src/e2e/phone.ts",
+      "target": "vendor/companion/src/e2e/phone.ts",
+      "sha256": "9fd5a069eecdea29afe5fb00ea2bfc5d42d8aae448927cd9ce3770a8cd2de5d0",
+      "bytes": 4083
+    },
+    {
+      "source": "companion/src/e2e/vectors/v1.json",
+      "target": "vendor/companion/src/e2e/vectors/v1.json",
+      "sha256": "5471a0070ddbb69dca34dee6da550de4581e8e1a40e22e0f97873d539793bf4e",
+      "bytes": 204553
+    },
+    {
+      "source": "companion/src/e2e/vectors/v1.sha256",
+      "target": "vendor/companion/src/e2e/vectors/v1.sha256",
+      "sha256": "99de21e9eef973a92e651517d88e977a1ef91fb441183648115b8a06b24796ee",
+      "bytes": 74
+    },
+    {
+      "source": "companion/src/e2e/README.md",
+      "target": "vendor/companion/src/e2e/README.md",
+      "sha256": "b752ee693e97c9674a207561be536105a34f90e99eaaead49b1f644f2b69589d",
+      "bytes": 29207
+    },
+    {
+      "source": "LICENSE",
+      "target": "vendor/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-route-bot",
-  "version": "0.66.4",
+  "version": "0.67.0",
   "type": "module",
   "description": "DSH Bot workspace with integrated model routing, official tools and remote computers",
   "repository": {
@@ -51,6 +51,7 @@
     "modules/bot-runtime/vendor/ds-bot/office.js",
     "modules/bot-runtime/vendor/ds-bot/test/harness-resolve.mjs",
     "modules/bot-runtime/web-search.mjs",
+    "modules/openmaus-protocol/",
     "packages/orchestration/src/bot-runtime-config.mjs",
     ".dsh-plugin/index.mjs",
     ".dsh-plugin/official-tools-remote-service.mjs",
@@ -256,6 +257,7 @@
     "packages/orchestration/src/sqlite-router-state.mjs",
     "packages/orchestration/src/task-contract.mjs",
     "packages/orchestration/src/bot-settings.mjs",
+    "packages/orchestration/src/main-model-routes.mjs",
     "packages/orchestration/src/funding-accounts.mjs",
     "packages/orchestration/src/model-accounting.mjs",
     "packages/capability-broker/src/cli-bootstrap.mjs",
@@ -323,6 +325,7 @@
     "packages/orchestration/src/machine-heartbeat.mjs",
     "remote-computer-agent/start.cmd",
     "remote-computer-agent/setup.ps1",
+    "remote-computer-agent/pair-device.ps1",
     "remote-computer-agent/launch-agent.ps1",
     "native/windows-desktop/",
     "remote-computer-agent/build.mjs",
@@ -338,11 +341,13 @@
     "check:client": "node scripts/build-client.mjs --check",
     "check:contracts": "node scripts/check-contracts.mjs",
     "contracts:write": "node scripts/check-contracts.mjs --write",
-    "build:agent": "node remote-computer-agent/build.mjs",
+    "build:agent": "node scripts/build-openmaus-protocol.mjs && node remote-computer-agent/build.mjs",
     "check:source": "node scripts/integration-product-source.mjs",
     "pretest": "node scripts/prepare-product-tests.mjs",
     "test": "node scripts/run-tests.mjs",
-    "prepack": "node remote-computer-agent/build.mjs && node scripts/prepack.mjs",
+    "verify:independent": "node scripts/verify-bot-independent.mjs",
+    "verify:independent-chat": "node scripts/verify-independent-chat-browser.mjs && node scripts/verify-independent-chat-rich-browser.mjs && node scripts/verify-independent-chat-native-browser.mjs",
+    "prepack": "node scripts/build-openmaus-protocol.mjs && node remote-computer-agent/build.mjs && node scripts/prepack.mjs",
     "prepare:native": "node scripts/prepare-native-driver.mjs",
     "check:github-math": "node scripts/check-github-math.mjs"
   },
@@ -356,12 +361,12 @@
     "@deepseek-ai/dsh-commands": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3",
     "@deepseek-ai/dsh-llm": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3",
     "@deepseek-ai/dsh-sandbox": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3",
+    "@deepseek-ai/dsh-scope": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3",
     "@deepseek-ai/dsh-settings": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3",
     "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3",
     "@deepseek-ai/dsh-web": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3",
-    "@deepseek-ai/schemastery": "~3.18.4",
-    "@deepseek-ai/dsh-scope": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3"
+    "@deepseek-ai/schemastery": "~3.18.4"
   },
   "optionalDependencies": {
     "@lydell/node-pty": "1.2.0-beta.15",
@@ -375,6 +380,7 @@
     "@deepseek-ai/cordis-plugin-timer": "1.1.7",
     "@deepseek-ai/dsh-agent": "0.2.1-rc.3 || 0.2.1-rc.4",
     "@deepseek-ai/dsh-agent-default-model": "0.2.1-rc.3 || 0.2.1-rc.4",
+    "@deepseek-ai/dsh-agent-loop": "0.2.1-rc.4",
     "@deepseek-ai/dsh-agent-preset-registry": "0.2.1-rc.3 || 0.2.1-rc.4",
     "@deepseek-ai/dsh-api-gateway": "0.2.1-rc.3 || 0.2.1-rc.4",
     "@deepseek-ai/dsh-api-remotes": "0.2.1-rc.3 || 0.2.1-rc.4",
@@ -439,6 +445,12 @@
   "dependencies": {
     "@modelcontextprotocol/server": "2.4.0",
     "better-sqlite3": "13.0.3",
-    "deep-view": "0.1.0"
+    "deep-view": "0.1.0",
+    "jsqr": "1.4.0",
+    "qrcode": "1.5.4",
+    "ws": "8.22.1"
+  },
+  "overrides": {
+    "zod": "4.6.6"
   }
 }

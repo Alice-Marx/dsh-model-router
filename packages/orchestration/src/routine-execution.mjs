@@ -8,6 +8,7 @@ const failureStatus = (failure, signal) => failure?.status === 'unknown' || fail
 /** Legacy five-action routines remain usable on the acknowledged desktop session. */
 export function routineStepInputs(step) {
   if (step.action === 'input') return [normalizeRoutineInput(step.event)]
+  if (step.action === 'release-input') return []
   if (step.action === 'wait') return []
   if (step.action === 'click') return ['down', 'up'].map(action => normalizeRoutineInput({ type: 'pointer', action, x: step.x, y: step.y, button: step.button ?? 'left' }))
   if (step.action === 'type') return [normalizeRoutineInput({ type: 'text', text: step.text })]
@@ -48,7 +49,7 @@ export function createRoutineExecutionService({ machines, store, botIdForSubject
       const completed = [], cleanup = { inputReleased: false, controlReleased: false, stopConfirmed: false }
       try {
         if (controller.signal.aborted) fail('ROUTINE_CANCELLED', { status: 'cancelled' })
-        ticket = await machines.desktopSession(subject, { machineId, rootId, mode: 'watch', fps: 5,
+        ticket = await (machines.routineDesktopSession??machines.desktopSession).call(machines,subject, { machineId, rootId, mode: 'watch', fps: 5,
           ...(routine.recording ? { displayId: routine.recording.display.displayId } : {}) }, runContext)
         store.updateRun(botId, row.runId, { sessionId: ticket.sessionId })
         session = createRoutineDesktopSession({ ticket, WebSocketImpl, signal: controller.signal, now, ackTimeoutMs, renewEveryMs,
@@ -66,10 +67,11 @@ export function createRoutineExecutionService({ machines, store, botIdForSubject
         await session.acquire()
         for (currentStep = 0; currentStep < routine.steps.length; currentStep++) {
           const step = routine.steps[currentStep]
-          await routineDelay(step.action === 'wait' ? step.ms : step.action === 'input' ? step.delayMs : 0, controller.signal)
+          await routineDelay(step.action === 'wait' ? step.ms : ['input','release-input'].includes(step.action) ? step.delayMs : 0, controller.signal)
           const currentDisplay = normalizeRoutineDisplay(session.metadata)
           if (['displayId', 'width', 'height', 'coordinateSpace'].some(field => currentDisplay[field] !== display[field])) fail('ROUTINE_DISPLAY_CHANGED')
-          for (const event of inputs[currentStep]) await session.input(event, { stepIndex: currentStep })
+          if (step.action === 'release-input') await session.releaseInput()
+          else for (const event of inputs[currentStep]) await session.input(event, { stepIndex: currentStep })
           completed.push(currentStep)
           store.updateRun(botId, row.runId, { steps: completed, stoppedAt: currentStep + 1 })
           await onStep?.(step, currentStep, { runId: row.runId, taskId: row.taskId, attemptId: row.attemptId })

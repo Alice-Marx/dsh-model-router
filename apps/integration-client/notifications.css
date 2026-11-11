@@ -1,0 +1,126 @@
+/*
+ * Notification centre styles. Colour lives in the --bp-notif-* tokens below and
+ * follows one appearance: light is the default, the dark block only names what
+ * changes. Body text stays on the high-contrast ink; the category tone paints
+ * the leading rail and icon only, so a status never trades readability for hue.
+ */
+html body[data-bot-product-ui] .bp-notifications {
+  --bp-notif-canvas: #f4f5f7;
+  --bp-notif-surface: #ffffff;
+  --bp-notif-inset: #eef0f3;
+  --bp-notif-hover: #e6e9ee;
+  --bp-notif-line: #dde1e8;
+  --bp-notif-ink: #252a33;
+  --bp-notif-muted: #5f6875;
+  --bp-notif-accent: #4a6484;
+  --bp-notif-accent-ink: #ffffff;
+  --bp-notif-focus: #4a6484;
+  --bp-notif-ok: #2e7d32;
+  --bp-notif-bad: #b3261e;
+  --bp-notif-urgent: #8a5a12;
+  --bp-notif-wait: #3f5d80;
+  --bp-notif-idle: #5f6875;
+  display: flex; flex-direction: column; min-height: 0; color: var(--bp-notif-ink);
+  background: var(--bp-notif-canvas);
+}
+html body[data-bot-product-ui][data-bp-appearance="dark"] .bp-notifications,
+html body[data-bot-product-ui][data-ds-dark-theme]:not([data-bp-appearance="light"]) .bp-notifications {
+  --bp-notif-canvas: #131519;
+  --bp-notif-surface: #1c1f24;
+  --bp-notif-inset: #232730;
+  --bp-notif-hover: #2a2f39;
+  --bp-notif-line: #333a45;
+  --bp-notif-ink: #e8eaee;
+  --bp-notif-muted: #aab2bd;
+  --bp-notif-accent: #a9c4e0;
+  --bp-notif-accent-ink: #131519;
+  --bp-notif-focus: #a9c4e0;
+  --bp-notif-ok: #7bd48a;
+  --bp-notif-bad: #f2b8b5;
+  --bp-notif-urgent: #f6c76b;
+  --bp-notif-wait: #a9c4e0;
+  --bp-notif-idle: #aab2bd;
+}
+
+html body[data-bot-product-ui] .bp-notifications-bar {
+  display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+  border-bottom: 1px solid var(--bp-notif-line); background: var(--bp-notif-surface);
+}
+html body[data-bot-product-ui] .bp-notifications-title { margin: 0; font-size: 15px; font-weight: 650; }
+html body[data-bot-product-ui] .bp-notifications-badge {
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: var(--bp-notif-bad); color: #ffffff; font-size: 12px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+html body[data-bot-product-ui][data-bp-appearance="dark"] .bp-notifications-badge,
+html body[data-bot-product-ui][data-ds-dark-theme]:not([data-bp-appearance="light"]) .bp-notifications-badge { color: #131519; }
+html body[data-bot-product-ui] .bp-notifications-bar-actions { margin-left: auto; }
+html body[data-bot-product-ui] .bp-notifications-markall {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px;
+  border: 1px solid var(--bp-notif-line); border-radius: 8px; background: var(--bp-notif-inset);
+  color: var(--bp-notif-ink); font-size: 13px; cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-notifications-markall:hover:not(:disabled) { background: var(--bp-notif-hover); }
+html body[data-bot-product-ui] .bp-notifications-markall:disabled { opacity: 0.5; cursor: default; }
+
+html body[data-bot-product-ui] .bp-notifications-note { margin: 0; padding: 20px 16px; color: var(--bp-notif-muted); font-size: 13px; }
+
+html body[data-bot-product-ui] .bp-notifications-list { list-style: none; margin: 0; padding: 8px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+html body[data-bot-product-ui] .bp-notification {
+  position: relative; display: flex; align-items: stretch; gap: 4px;
+  background: var(--bp-notif-surface); border: 1px solid var(--bp-notif-line); border-radius: 10px;
+  border-left: 3px solid var(--bp-notif-idle);
+}
+html body[data-bot-product-ui] .bp-notification-ok { border-left-color: var(--bp-notif-ok); }
+html body[data-bot-product-ui] .bp-notification-bad { border-left-color: var(--bp-notif-bad); }
+html body[data-bot-product-ui] .bp-notification-urgent { border-left-color: var(--bp-notif-urgent); }
+html body[data-bot-product-ui] .bp-notification-wait { border-left-color: var(--bp-notif-wait); }
+html body[data-bot-product-ui] .bp-notification-ok .bp-notification-icon { color: var(--bp-notif-ok); }
+html body[data-bot-product-ui] .bp-notification-bad .bp-notification-icon { color: var(--bp-notif-bad); }
+html body[data-bot-product-ui] .bp-notification-urgent .bp-notification-icon { color: var(--bp-notif-urgent); }
+html body[data-bot-product-ui] .bp-notification-wait .bp-notification-icon { color: var(--bp-notif-wait); }
+html body[data-bot-product-ui] .bp-notification-idle .bp-notification-icon { color: var(--bp-notif-idle); }
+
+html body[data-bot-product-ui] .bp-notification-open {
+  flex: 1; display: flex; align-items: flex-start; justify-content: flex-start; gap: 10px; padding: 12px; min-height: 40px;
+  background: none; border: 0; border-radius: 8px; text-align: left; color: inherit; cursor: pointer; font: inherit;
+}
+html body[data-bot-product-ui] .bp-notification-open:hover { background: var(--bp-notif-hover); }
+html body[data-bot-product-ui] .bp-notification-icon { display: inline-flex; padding-top: 1px; }
+html body[data-bot-product-ui] .bp-notification-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+html body[data-bot-product-ui] .bp-notification-text { font-size: 14px; line-height: 1.35; }
+html body[data-bot-product-ui] .bp-notification-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--bp-notif-muted); }
+html body[data-bot-product-ui] .bp-notification-new {
+  padding: 0 6px; border-radius: 999px; background: var(--bp-notif-accent); color: var(--bp-notif-accent-ink); font-size: 11px; font-weight: 700;
+}
+html body[data-bot-product-ui] .bp-notification-dot { width: 8px; height: 8px; margin-top: 14px; border-radius: 999px; background: var(--bp-notif-accent); flex: none; }
+html body[data-bot-product-ui] .bp-notification-read {
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; flex: none;
+  border: 0; border-left: 1px solid var(--bp-notif-line); border-radius: 0 8px 8px 0;
+  background: none; color: var(--bp-notif-muted); cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-notification-read:hover { background: var(--bp-notif-hover); color: var(--bp-notif-ink); }
+
+html body[data-bot-product-ui] .bp-notifications-more {
+  margin: 4px 8px 12px; min-height: 36px; border: 1px solid var(--bp-notif-line); border-radius: 8px;
+  background: var(--bp-notif-surface); color: var(--bp-notif-ink); font-size: 13px; cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-notifications-more:disabled { opacity: 0.6; cursor: default; }
+
+html body[data-bot-product-ui] .bp-notifications :is(button):focus-visible {
+  outline: 2px solid var(--bp-notif-focus); outline-offset: 1px;
+}
+
+/* A phone keeps every row full-width and comfortable at 375px. */
+@media (max-width: 640px) {
+  html body[data-bot-product-ui] .bp-notifications-bar { padding: 10px 12px; }
+  html body[data-bot-product-ui] .bp-notifications-list { padding: 6px; }
+  html body[data-bot-product-ui] .bp-notification-open { padding: 10px; }
+  html body[data-bot-product-ui] .bp-notifications-markall span { display: none; }
+}
+
+/* Touch: every control reaches a 40px target and nothing depends on hover. */
+@media (pointer: coarse) {
+  html body[data-bot-product-ui] .bp-notifications-markall { min-width: 40px; min-height: 40px; }
+  html body[data-bot-product-ui] .bp-notification-read { width: 44px; }
+}

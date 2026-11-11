@@ -1,0 +1,139 @@
+/*
+ * Pinned web panel styles. Colour lives in the --bp-wp-* tokens below and follows
+ * one appearance: light is the default, the dark block only names what changes.
+ *
+ * The frame itself is deliberately left to the page it shows: this file lays out
+ * the pins, the stage bar and the refusal state, and never paints inside the
+ * iframe, which is a cross-origin document the app has no reach into.
+ */
+html body[data-bot-product-ui] .bp-webpanel {
+  --bp-wp-canvas: #f4f5f7;
+  --bp-wp-surface: #ffffff;
+  --bp-wp-inset: #eef0f3;
+  --bp-wp-hover: #e6e9ee;
+  --bp-wp-line: #dde1e8;
+  --bp-wp-ink: #252a33;
+  --bp-wp-muted: #5f6875;
+  --bp-wp-accent: #4a6484;
+  --bp-wp-accent-ink: #ffffff;
+  --bp-wp-ok: #2e7d32;
+  --bp-wp-bad: #b3261e;
+  --bp-wp-urgent: #8a5a12;
+  display: flex; flex-direction: column; gap: 10px; min-height: 0; color: var(--bp-wp-ink);
+  background: var(--bp-wp-canvas);
+}
+html body[data-bot-product-ui][data-bp-appearance="dark"] .bp-webpanel,
+html body[data-bot-product-ui][data-ds-dark-theme]:not([data-bp-appearance="light"]) .bp-webpanel {
+  --bp-wp-canvas: #131519;
+  --bp-wp-surface: #1c1f24;
+  --bp-wp-inset: #232730;
+  --bp-wp-hover: #2a2f39;
+  --bp-wp-line: #333a45;
+  --bp-wp-ink: #e8eaee;
+  --bp-wp-muted: #aab2bd;
+  --bp-wp-accent: #a9c4e0;
+  --bp-wp-accent-ink: #131519;
+  --bp-wp-ok: #7bd48a;
+  --bp-wp-bad: #f2b8b5;
+  --bp-wp-urgent: #f6c76b;
+}
+
+html body[data-bot-product-ui] .bp-webpanel-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap }
+html body[data-bot-product-ui] .bp-webpanel-bar h2 { margin: 0; font-size: 14px; font-weight: 600 }
+html body[data-bot-product-ui] .bp-webpanel-count { font-size: 12px; color: var(--bp-wp-muted); font-variant-numeric: tabular-nums }
+html body[data-bot-product-ui] .bp-webpanel-bar .bp-webpanel-button { margin-left: auto }
+
+html body[data-bot-product-ui] .bp-webpanel-button,
+html body[data-bot-product-ui] .bp-webpanel-button-primary,
+html body[data-bot-product-ui] .bp-webpanel-button-danger {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px;
+  border: 1px solid var(--bp-wp-line); border-radius: 8px; background: var(--bp-wp-surface);
+  color: var(--bp-wp-ink); font: inherit; font-size: 13px; cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-webpanel-button-primary { border-color: transparent; background: var(--bp-wp-accent); color: var(--bp-wp-accent-ink) }
+html body[data-bot-product-ui] .bp-webpanel-button-danger { color: var(--bp-wp-bad) }
+html body[data-bot-product-ui] .bp-webpanel-button:hover:not(:disabled),
+html body[data-bot-product-ui] .bp-webpanel-button-primary:hover:not(:disabled),
+html body[data-bot-product-ui] .bp-webpanel-button-danger:hover:not(:disabled) { background: var(--bp-wp-hover) }
+html body[data-bot-product-ui] .bp-webpanel-button:disabled,
+html body[data-bot-product-ui] .bp-webpanel-button-primary:disabled,
+html body[data-bot-product-ui] .bp-webpanel-button-danger:disabled { opacity: .5; cursor: not-allowed }
+html body[data-bot-product-ui] .bp-webpanel :focus-visible { outline: 2px solid var(--bp-wp-accent); outline-offset: 2px }
+
+html body[data-bot-product-ui] .bp-webpanel-note { margin: 0; font-size: 12px; line-height: 1.6; color: var(--bp-wp-muted) }
+html body[data-bot-product-ui] .bp-webpanel-note-quiet { color: var(--bp-wp-muted); opacity: .85 }
+html body[data-bot-product-ui] .bp-webpanel-note-ok { color: var(--bp-wp-ok) }
+html body[data-bot-product-ui] .bp-webpanel-note-bad { color: var(--bp-wp-bad) }
+
+html body[data-bot-product-ui] .bp-webpanel-body { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 10px; align-items: start; min-height: 0 }
+html body[data-bot-product-ui] .bp-webpanel-list { background: var(--bp-wp-surface); border: 1px solid var(--bp-wp-line); border-radius: 10px; overflow: hidden }
+html body[data-bot-product-ui] .bp-webpanel-list ul { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none }
+html body[data-bot-product-ui] .bp-webpanel-list li { display: flex; align-items: center; gap: 4px; padding: 0 6px 0 0; border-bottom: 1px solid var(--bp-wp-line) }
+html body[data-bot-product-ui] .bp-webpanel-list li:last-child { border-bottom: 0 }
+html body[data-bot-product-ui] .bp-webpanel-list li.is-active { background: var(--bp-wp-inset) }
+html body[data-bot-product-ui] .bp-webpanel-pin {
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; min-height: 44px; padding: 6px 10px;
+  border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-webpanel-pin:hover { background: var(--bp-wp-hover) }
+html body[data-bot-product-ui] .bp-webpanel-pin[aria-current="page"] { font-weight: 600 }
+html body[data-bot-product-ui] .bp-webpanel-pin:disabled { opacity: .55; cursor: not-allowed }
+html body[data-bot-product-ui] .bp-webpanel-pin-text { display: flex; flex-direction: column; min-width: 0 }
+html body[data-bot-product-ui] .bp-webpanel-pin-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+html body[data-bot-product-ui] .bp-webpanel-pin-host { font-size: 11px; color: var(--bp-wp-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+html body[data-bot-product-ui] .bp-webpanel-pin-tools { display: flex; gap: 2px }
+html body[data-bot-product-ui] .bp-webpanel-pin-tools button {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  border: 0; border-radius: 6px; background: none; color: var(--bp-wp-muted); cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-webpanel-pin-tools button:hover:not(:disabled) { background: var(--bp-wp-hover); color: var(--bp-wp-ink) }
+html body[data-bot-product-ui] .bp-webpanel-pin-tools button:disabled { opacity: .35; cursor: not-allowed }
+html body[data-bot-product-ui] .bp-webpanel-chevron-up { transform: rotate(180deg) }
+html body[data-bot-product-ui] .bp-webpanel-chevron-down { transform: rotate(90deg) }
+
+html body[data-bot-product-ui] .bp-webpanel-stage { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0 }
+html body[data-bot-product-ui] .bp-webpanel-stage-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; background: var(--bp-wp-surface); border: 1px solid var(--bp-wp-line); border-radius: 10px }
+html body[data-bot-product-ui] .bp-webpanel-stage-name { font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+html body[data-bot-product-ui] .bp-webpanel-stage-host { font-size: 11px; color: var(--bp-wp-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+html body[data-bot-product-ui] .bp-webpanel-stage-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap }
+html body[data-bot-product-ui] .bp-webpanel-stage-tools button { min-height: 30px; padding: 0 8px; font-size: 12px }
+html body[data-bot-product-ui] .bp-webpanel-stage-tools button:first-child { width: 30px; padding: 0; justify-content: center }
+
+html body[data-bot-product-ui] .bp-webpanel-verdict { margin: 0; font-size: 12px; line-height: 1.5; color: var(--bp-wp-muted) }
+html body[data-bot-product-ui] .bp-webpanel-verdict[data-tone="blocked"] { color: var(--bp-wp-urgent) }
+html body[data-bot-product-ui] .bp-webpanel-verdict[data-tone="ok"] { color: var(--bp-wp-ok) }
+html body[data-bot-product-ui] .bp-webpanel-verdict[data-tone="unknown"] { color: var(--bp-wp-muted) }
+
+html body[data-bot-product-ui] .bp-webpanel-refused,
+html body[data-bot-product-ui] .bp-webpanel-editor {
+  display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--bp-wp-surface);
+  border: 1px solid var(--bp-wp-line); border-radius: 10px;
+}
+html body[data-bot-product-ui] .bp-webpanel-refused { align-items: flex-start }
+html body[data-bot-product-ui] .bp-webpanel-refused-title { margin: 0; font-size: 14px; font-weight: 600 }
+html body[data-bot-product-ui] .bp-webpanel-refused-body { margin: 0; font-size: 12px; line-height: 1.6; color: var(--bp-wp-muted); max-width: 46em }
+
+html body[data-bot-product-ui] .bp-webpanel-frame { width: 100%; min-height: 60vh; flex: 1; border: 1px solid var(--bp-wp-line); border-radius: 10px; background: var(--bp-wp-surface) }
+
+html body[data-bot-product-ui] .bp-webpanel-editor h3 { margin: 0; font-size: 13px; font-weight: 600 }
+html body[data-bot-product-ui] .bp-webpanel-editor label { font-size: 12px; color: var(--bp-wp-muted) }
+html body[data-bot-product-ui] .bp-webpanel-editor input {
+  min-height: 34px; padding: 0 10px; border: 1px solid var(--bp-wp-line); border-radius: 8px;
+  background: var(--bp-wp-inset); color: var(--bp-wp-ink); font: inherit; font-size: 13px;
+}
+html body[data-bot-product-ui] .bp-webpanel-editor-tools { display: flex; gap: 8px }
+
+/* The sidebar's compact pin list: one row per page, no tools, nothing to mis-tap. */
+html body[data-bot-product-ui] .bp-webpanel-pins { display: flex; flex-direction: column; gap: 2px; margin-top: auto }
+html body[data-bot-product-ui] .bp-webpanel-pins-label { margin: 0 0 2px; padding: 0 12px; font-size: 11px; color: var(--bp-muted, #76767e) }
+html body[data-bot-product-ui] .bp-webpanel-pins ul { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none }
+html body[data-bot-product-ui] .bp-webpanel-pins .bp-webpanel-pin { min-height: 34px; padding: 4px 12px; border-radius: 8px }
+html body[data-bot-product-ui] .bp-webpanel-pins .bp-webpanel-pin[aria-current="page"] { background: var(--bp-hover, #ededf0) }
+
+@media (max-width: 900px) {
+  html body[data-bot-product-ui] .bp-webpanel-body { grid-template-columns: minmax(0, 1fr) }
+  html body[data-bot-product-ui] .bp-webpanel-list ul { flex-direction: row; overflow-x: auto }
+  html body[data-bot-product-ui] .bp-webpanel-list li { border-bottom: 0; border-right: 1px solid var(--bp-wp-line) }
+  html body[data-bot-product-ui] .bp-webpanel-list li:last-child { border-right: 0 }
+  html body[data-bot-product-ui] .bp-webpanel-frame { min-height: 70vh }
+}

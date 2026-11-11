@@ -11,7 +11,7 @@
  *    never mistaken for a finished one.
  */
 
-export const ROUTINE_ACTIONS = Object.freeze(['click', 'type', 'key', 'scroll', 'wait', 'input'])
+export const ROUTINE_ACTIONS = Object.freeze(['click', 'type', 'key', 'scroll', 'wait', 'input', 'release-input'])
 export const MAX_ROUTINE_STEPS = 200
 export const MAX_TYPE_LENGTH = 2000
 export const MAX_RECORDED_TEXT_LENGTH = 8192
@@ -70,10 +70,10 @@ export function normalizeStep(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) fail('ROUTINE_STEP_INVALID', '步骤必须是对象。')
   const action = input.action
   if (!ROUTINE_ACTIONS.includes(action)) fail('ROUTINE_ACTION_UNKNOWN', `未知动作：${String(action)}`)
-  if (action === 'input') {
+  if (action === 'input' || action === 'release-input') {
     const delayMs = input.delayMs ?? 0
     if (!finiteInt(delayMs) || delayMs < 0 || delayMs > 60_000) fail('ROUTINE_STEP_INVALID')
-    return { action, event: normalizeRoutineInput(input.event), delayMs }
+    return action === 'release-input' ? { action, delayMs } : { action, event: normalizeRoutineInput(input.event), delayMs }
   }
   if (action === 'click') {
     if (!finiteInt(input.x) || !finiteInt(input.y) || input.x < 0 || input.y < 0) fail('ROUTINE_STEP_INVALID', 'click 需要非负整数坐标。')
@@ -119,7 +119,7 @@ export function normalizeRoutine(input) {
     recordedAt: recorded.recordedAt, durationMs: recorded.durationMs, acknowledgedInputs: recorded.acknowledgedInputs,
     ...(recorded.observedInputs !== undefined ? { observedInputs: recorded.observedInputs, pointerSampleMs: recorded.pointerSampleMs } : {}) }
   return {
-    schemaVersion: recording || input.steps.some(step => step.action === 'input') ? 2 : 1,
+    schemaVersion: recording || input.steps.some(step => ['input','release-input'].includes(step.action)) ? 2 : 1,
     name,
     ...(typeof input.description === 'string' && input.description.trim() ? { description: input.description.trim().slice(0, 500) } : {}),
     steps: input.steps.map(normalizeStep),

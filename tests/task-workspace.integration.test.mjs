@@ -1,3 +1,4 @@
+import './helpers/ui-dom-bootstrap.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
@@ -9,7 +10,7 @@ import { build } from 'esbuild'
 
 const parent = resolve('tmp/integration/task-workspace'); await mkdir(parent, { recursive: true })
 const dir = await mkdtemp(join(parent, 'ui-')), file = join(dir, 'panels.mjs')
-const compiled = await build({ entryPoints: ['apps/integration-client/panels.jsx'], bundle: true, format: 'esm', platform: 'node', external: ['react', 'react-dom', 'react-dom/*'], write: false })
+const compiled = await build({ entryPoints: ['apps/integration-client/panels.jsx'], bundle: true, format: 'esm', platform: 'node', external: ['react', 'react-dom', 'react-dom/*'], write: false , loader: { '.css': 'text' } })
 await writeFile(file, compiled.outputFiles[0].contents)
 const { Tasks, ProductPage } = await import(pathToFileURL(file))
 const snapshot = items => ({ schemaVersion: 1, observedAt: '2026-11-07T00:00:00Z', readOnly: null,
@@ -117,5 +118,39 @@ test('product page reads history without refreshing or mutating and discards it 
     await renderPage(replacement); await settle(() => pending.resolve(detail(a)))
     assert.equal(container.querySelector('[aria-label="任务详情"]'), null)
     assert.doesNotMatch(container.textContent, /original-operation/); assert.equal(calls.length, 1)
+  })
+})
+
+test('a notification can read an older task outside the loaded list and locate the original attempt without offering current-attempt actions',async()=>{
+  await domFixture(async({render,container})=>{
+    const value=snapshot([task('other','running')]);value.tasks.total=700;value.tasks.truncated=true;value.availableActions=['task.inspect','task.retry','task.cancel']
+    const original={...task('older'),attemptId:'latest-attempt'},calls=[]
+    const history={task:original,attempts:[{attemptId:'original-attempt',number:1,state:'failed',operationId:'original-operation'},{attemptId:'latest-attempt',number:2,state:'failed',operationId:'latest-operation'}],
+      timeline:{total:2,truncated:false,items:[{seq:1,kind:'settled',attemptId:'original-attempt',at:100},{seq:2,kind:'settled',attemptId:'latest-attempt',at:200}]}}
+    await render({snapshot:value,submissionScope:{},focus:{version:1,botId:'a',taskId:'older',attemptId:'original-attempt'},inspect:async payload=>{calls.push(payload);return history},dispatch:async()=>assert.fail('opening history cannot execute an action')})
+    assert.deepEqual(calls,[{botId:'a',taskId:'older'}])
+    const shown=container.querySelector('[aria-label="任务详情"]');assert.match(shown.textContent,/工作 older/);assert.match(shown.textContent,/当前任务已进入后续尝试/)
+    assert.match(shown.querySelector('[aria-label="所选原执行尝试"]').textContent,/original-attempt.*original-operation/)
+    assert.equal(shown.querySelectorAll('li[data-focused-attempt]').length,1)
+    assert.equal([...shown.querySelectorAll('button')].some(button=>['重试','停止'].includes(button.textContent)),false)
+    assert.equal(container.querySelectorAll('tbody tr').length,1);assert.match(container.querySelector('tbody').textContent,/other/)
+  })
+})
+
+test('an unknown attempt remains unresolved instead of silently switching to the current attempt',async()=>{
+  await domFixture(async({render,container})=>{
+    const row={...task('one'),attemptId:'original-attempt'},value=snapshot([row]);value.availableActions=['task.inspect','task.retry']
+    await render({snapshot:value,submissionScope:{},focus:{version:1,botId:'a',taskId:'one',attemptId:'missing-attempt'},inspect:async()=>detail(row)})
+    const shown=container.querySelector('[aria-label="任务详情"]');assert.match(shown.textContent,/未找到所选的原执行尝试/)
+    assert.equal(shown.querySelector('[aria-label="所选原执行尝试"]'),null);assert.equal([...shown.querySelectorAll('button')].some(button=>button.textContent==='重试'),false)
+  })
+})
+
+test('a late lookup outside the loaded list cannot cross a Host replacement',async()=>{
+  await domFixture(async({render,container,settle})=>{
+    const value=snapshot([]),pending=deferred(),signals=[];value.availableActions=['task.inspect']
+    await render({snapshot:value,submissionScope:{},focus:{version:1,botId:'a',taskId:'older'},inspect:(_payload,signal)=>{signals.push(signal);return pending.promise}})
+    await render({snapshot:snapshot([task('new-host')]),submissionScope:{}});assert.equal(signals[0].aborted,true)
+    await settle(()=>pending.resolve(detail(task('older'))));assert.equal(container.querySelector('[aria-label="任务详情"]'),null);assert.doesNotMatch(container.textContent,/original-operation/)
   })
 })

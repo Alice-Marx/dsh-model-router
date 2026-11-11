@@ -244,6 +244,13 @@ export function install(rt) {
       await selectSessionModel(sessionId, route)
         .catch(error => rt.warn('ds-bot: model for %s in a group not applied: %s', bot.name, error))
     }
+    // A thread follows its Bot's model, as a group Session does.
+    for (const sessionId of rt.threadsOf(bot.id).map(thread => thread.sessionId)) {
+      const applied = sessionSelections.get(sessionId)
+      if (!force && applied !== undefined && sameSelection(applied, route)) continue
+      await selectSessionModel(sessionId, route)
+        .catch(error => rt.warn('ds-bot: model for a thread of %s not applied: %s', bot.name, error))
+    }
     if (!ownChanged) return ref
     bot.appliedModel = ref
     if (effort === undefined) delete bot.appliedEffort

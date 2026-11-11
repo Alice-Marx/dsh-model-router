@@ -7,7 +7,7 @@ import { openTaskJournal } from '../packages/orchestration/src/task-journal.mjs'
 import { createTaskService } from '../packages/orchestration/src/task-service.mjs'
 import { createAuthority } from '../packages/capability-broker/src/authority.mjs'
 import { createPrincipalDirectory } from '../packages/orchestration/src/principals.mjs'
-import { inspectProductTask } from '../packages/orchestration/src/task-product.mjs'
+import { inspectProductTask, readProductAttention } from '../packages/orchestration/src/task-product.mjs'
 import { createProductReadModel } from '../modules/bot-runtime/read-model.mjs'
 
 const payload = { backend: 'fixture', input: { task: '核对结果', private: 'input-sentinel' }, target: { location: 'local' } }
@@ -17,6 +17,25 @@ async function fixture(t) {
   t.after(() => j.close())
   return { j, path, f: j.claimRunner('test-runner', 60_000, 0) }
 }
+
+test('contact attention is owner-only, bounded to committed Bot owners and carries no task input or funding data', async t => {
+  const {j,f}=await fixture(t)
+  j.submit(f,'bot-a','a','a',payload,50000,1)
+  j.submit(f,'bot-b','b','b',payload,50000,2)
+  j.submit(f,'deleted-bot','c','c',payload,50000,3)
+  let loads=0
+  const runtime={load:async()=>{loads++},state:{bots:{'bot-a':{id:'bot-a'},'bot-b':{id:'bot-b'}}},readOnly:()=>undefined}
+  const model=createProductReadModel({runtime,actions:{'task.attention':body=>readProductAttention({runtime,journal:j,limit:1},body)}})
+  const request={action:'task.attention',payload:{}}
+  await assert.rejects(model.dispatch(request,{kind:'bot'}),{code:'REMOTE_OWNER_REQUIRED'});assert.equal(loads,0)
+  const view=await model.dispatch(request,{kind:'owner'})
+  assert.equal(view.schemaVersion,1);assert.equal(view.tasks.total,2);assert.equal(view.tasks.items.length,1);assert.equal(view.tasks.truncated,true)
+  assert.ok(['bot-a','bot-b'].includes(view.tasks.items[0].botId))
+  assert.deepEqual(Object.keys(view.tasks.items[0]).sort(),['botId','state','taskId'])
+  assert.doesNotMatch(JSON.stringify(view),/input-sentinel|核对结果|funding|deleted-bot/)
+  await assert.rejects(model.dispatch({...request,payload:{botIds:['deleted-bot'],limit:99999}},{kind:'owner'}),{code:'INVALID_ATTENTION_REQUEST'})
+  assert.equal(j.productList(['bot-a','bot-b','deleted-bot']).total,3)
+})
 
 test('product tasks include new records after 128 old successes and prioritize another Bot before truncating', async t => {
   const { j, f } = await fixture(t)

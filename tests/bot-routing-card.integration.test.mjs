@@ -1,3 +1,4 @@
+import './helpers/ui-dom-bootstrap.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
@@ -10,7 +11,7 @@ import { build } from 'esbuild'
 const parent = resolve('tmp/integration/bot-routing-card'); await mkdir(parent, { recursive: true })
 const directory = await mkdtemp(join(parent, 'components-')), file = join(directory, 'panels.mjs')
 const bundle = await build({ entryPoints: ['apps/integration-client/panels.jsx'], bundle: true, platform: 'node', format: 'esm',
-  external: ['react', 'react-dom', 'react-dom/*'], write: false })
+  external: ['react', 'react-dom', 'react-dom/*'], write: false , loader: { '.css': 'text' } })
 await writeFile(file, bundle.outputFiles[0].contents)
 const { Tasks, ProductPage } = await import(pathToFileURL(file))
 

@@ -1,12 +1,69 @@
 import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { StringDecoder } from 'node:string_decoder'
-import { access, realpath } from 'node:fs/promises'
-import { isAbsolute, join } from 'node:path'
+import { access, lstat, readFile, readdir, realpath, rmdir, unlink } from 'node:fs/promises'
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
+import { tmpdir } from 'node:os'
+import { basename, dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { NativeCliOutput } from './native-cli-output.mjs'
 
 const HERE = fileURLToPath(new URL('.', import.meta.url))
 const MAX_FRAME = 262_144
+const COMPILER_ROOT = 'DSH_NATIVE_COMPILER_ROOT'
+const COMPILER_SCRATCH = 'DSH_NATIVE_COMPILER_SCRATCH'
+// Capture only the trusted Host launch environment, never a model's spec or an
+// env argument. A packaged bridge inherits this one non-secret root hint so its
+// compiler does not start a new root beneath an ever-deeper private TEMP.
+const inheritedCompilerRoot = process.platform === 'win32' ? process.env[COMPILER_ROOT] : undefined
+const hostTemp = process.platform === 'win32' ? tmpdir() : null
+let compilerRoot = null
+const compilerFailure = () => Object.assign(new Error('NATIVE_COMPILER_SCRATCH_UNAVAILABLE'), { code: 'NATIVE_COMPILER_SCRATCH_UNAVAILABLE' })
+const sameDirectory = (info, expected) => info.isDirectory() && !info.isSymbolicLink() && info.dev === expected.dev && info.ino === expected.ino
+const rootStamp = path => `dsh-native-compiler-v1:${basename(path)}\n`
+
+function compilerDirectory() {
+  try {
+    if (!compilerRoot) {
+      if (inheritedCompilerRoot !== undefined) {
+        if (!isAbsolute(inheritedCompilerRoot) || inheritedCompilerRoot.length > 140 || !/^dshc-[a-f0-9]{16}$/.test(basename(inheritedCompilerRoot))) throw compilerFailure()
+        const info = lstatSync(inheritedCompilerRoot, { bigint: true })
+        if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(inheritedCompilerRoot) !== inheritedCompilerRoot || readFileSync(join(inheritedCompilerRoot, '.dsh-root'), 'utf8') !== rootStamp(inheritedCompilerRoot)) throw compilerFailure()
+        compilerRoot = { path: inheritedCompilerRoot, info }
+      } else {
+        const parent = realpathSync(hostTemp)
+        const path = join(parent, `dshc-${randomBytes(8).toString('hex')}`)
+        if (path.length > 140) throw compilerFailure()
+        mkdirSync(path)
+        writeFileSync(join(path, '.dsh-root'), rootStamp(path), { flag: 'wx' })
+        compilerRoot = { path, info: lstatSync(path, { bigint: true }) }
+      }
+    }
+    if (!sameDirectory(lstatSync(compilerRoot.path, { bigint: true }), compilerRoot.info) || realpathSync(compilerRoot.path) !== compilerRoot.path) throw compilerFailure()
+    const path = mkdtempSync(join(compilerRoot.path, 'c-'))
+    const info = lstatSync(path, { bigint: true }), owner = randomBytes(16).toString('hex')
+    writeFileSync(join(path, '.dsh-owner'), owner, { flag: 'wx' })
+    const root = compilerRoot
+    // Never recursively remove a path obtained from the environment. Only this
+    // allocated child, after confirmed helper exit, with unchanged filesystem
+    // identity and no links/subdirectories, is eligible for flat cleanup.
+    const cleanup = async () => {
+      try {
+        if (dirname(path) !== root.path || !/^c-[A-Za-z0-9]{6}$/.test(basename(path))) return false
+        if (!sameDirectory(await lstat(root.path, { bigint: true }), root.info) || await realpath(root.path) !== root.path) return false
+        if (!sameDirectory(await lstat(path, { bigint: true }), info) || await realpath(path) !== path || await readFile(join(path, '.dsh-owner'), 'utf8') !== owner) return false
+        const names = await readdir(path)
+        if (names.length > 128) return false
+        for (const name of names) { const entry = await lstat(join(path, name)); if (!entry.isFile() || entry.isSymbolicLink()) return false }
+        for (const name of names) await unlink(join(path, name))
+        await rmdir(path)
+        return true
+      } catch { return false } // Busy, replaced or unknown resources remain.
+    }
+    return { root: root.path, path, cleanup }
+  } catch { throw compilerFailure() }
+}
 
 /** Deliberately small environment: profiles, credentials and proxy secrets are never inherited. */
 export function privateEnvironment(home, source = process.env) {
@@ -17,6 +74,7 @@ export function privateEnvironment(home, source = process.env) {
   for (const key of ['SystemRoot', 'windir', 'ComSpec', 'LANG', 'LC_ALL']) if (source[key]) env[key] = source[key]
   // Fixed executable paths remove PATH lookup from both supervisor and bridge.
   env.PATH = process.platform === 'win32' ? join(source.SystemRoot ?? 'C:\\Windows', 'System32') : '/usr/bin:/bin'
+  if (process.platform === 'win32' && (compilerRoot?.path ?? inheritedCompilerRoot)) env[COMPILER_ROOT] = compilerRoot?.path ?? inheritedCompilerRoot
   return env
 }
 
@@ -35,30 +93,35 @@ export async function resolveNativeHelper({ python = '/usr/bin/python3' } = {}) 
 export function nativeProcess(helper, mode, spec, { home, env = privateEnvironment(home) } = {}) {
   const events = new EventEmitter()
   const args = helper.platform === 'win32' ? [...helper.prefix, '-Mode', mode] : [...helper.prefix, mode]
-  const child = spawn(helper.executable, args, { cwd: home, env, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] })
-  let tail = '', buffer = '', bytes = 0, closed = false
+  const compiler = helper.platform === 'win32' ? compilerDirectory() : null
+  const helperEnv = compiler ? Object.fromEntries(Object.entries(env).filter(([key]) => ![COMPILER_ROOT, COMPILER_SCRATCH].includes(key.toUpperCase()))) : env
+  if (compiler) { helperEnv[COMPILER_ROOT] = compiler.root; helperEnv[COMPILER_SCRATCH] = compiler.path }
+  const child = spawn(helper.executable, args, { cwd: home, env: helperEnv, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] })
+  let tail = '', buffer = '', bytes = 0, closed = false, treeStopped = false
   const decoder = new StringDecoder('utf8'), cliDecoder = new StringDecoder('utf8')
-  let cliBuffer = ''
+  const cliOutput = new NativeCliOutput()
   const frame = value => {
+    if (mode === 'supervise' && value.control === 'stopped' && value.treeStopped === true) treeStopped = true
     if (mode === 'supervise' && value.type === 'cli-output') {
       if (typeof value.data !== 'string' || value.data.length > MAX_FRAME * 2) throw new Error('INVALID_CLI_FRAME')
-      cliBuffer += cliDecoder.write(Buffer.from(value.data, 'base64'))
-      if (Buffer.byteLength(cliBuffer) > MAX_FRAME) throw new Error('CLI_FRAME_LIMIT')
-      let end
-      while ((end = cliBuffer.indexOf('\n')) >= 0) {
-        const line = cliBuffer.slice(0, end); cliBuffer = cliBuffer.slice(end + 1)
-        if (line.trim()) events.emit('message', JSON.parse(line))
-      }
+      for (const message of cliOutput.push(cliDecoder.write(Buffer.from(value.data, 'base64')))) events.emit('message', message)
     } else events.emit(value.control ? 'control' : 'message', value)
   }
-  const exit = new Promise(resolve => child.once('close', (code, signal) => { closed = true; events.emit('closed', { code, signal }); resolve({ code, signal }) }))
+  const exit = new Promise(resolve => child.once('close', async (code, signal) => {
+    closed = true
+    if (compiler && code === 0 && signal === null && (mode !== 'supervise' || treeStopped)) await compiler.cleanup()
+    events.emit('closed', { code, signal }); resolve({ code, signal })
+  }))
   child.on('error', error => events.emit('failure', error))
   child.stdin.on('error', () => {})
   child.stderr.on('data', data => { tail = (tail + data.toString('utf8')).slice(-4096) })
   child.stdout.on('data', chunk => {
     bytes += chunk.length
     buffer += decoder.write(chunk)
-    if (bytes > 8 * 1024 * 1024 || Buffer.byteLength(buffer) > MAX_FRAME) { events.emit('failure', new Error('OUTPUT_LIMIT')); child.stdin.end(); return }
+    // MCP responses and CLI image echoes have their own bounded readers. Their
+    // retained connections can carry several screenshots without a raw lifetime cap.
+    const boundedStream = mode === 'client' || mode === 'server' || mode === 'supervise'
+    if (!boundedStream && bytes > 8 * 1024 * 1024 || Buffer.byteLength(buffer) > MAX_FRAME) { events.emit('failure', new Error('OUTPUT_LIMIT')); child.stdin.end(); return }
     let end
     while ((end = buffer.indexOf('\n')) >= 0) {
       const line = buffer.slice(0, end); buffer = buffer.slice(end + 1)

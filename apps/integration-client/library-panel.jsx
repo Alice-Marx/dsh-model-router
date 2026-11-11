@@ -11,7 +11,7 @@ const fileBase64 = file => new Promise((resolve, reject) => {
   reader.readAsDataURL(file)
 })
 
-export function LibraryPanel({ snapshot, dispatch, busy }) {
+export function LibraryPanel({ snapshot, dispatch, busy, focus }) {
   const bots = snapshot.bots ?? []
   const [botId, setBotId] = useState(bots[0]?.id ?? '')
   const [path, setPath] = useState('')
@@ -45,6 +45,9 @@ export function LibraryPanel({ snapshot, dispatch, busy }) {
   }, [botId, path, call])
   useEffect(() => { setEditor(null); setDeleteName(null); setEntries([]); setSearchResults(null); void load(); return () => { sequence.current++ } }, [load])
   useEffect(() => { if (!botId && bots[0]) setBotId(bots[0].id) }, [botId, bots])
+  useEffect(() => {
+    if (focus?.botId && bots.some(bot => bot.id === focus.botId)) { setBotId(focus.botId); setPath(''); setEditor(null); setSearchResults(null) }
+  }, [focus?.version, focus?.botId])
   useEffect(() => {
     if (!editor?.line || !editorRef.current) return
     const textarea = editorRef.current, lines = textarea.value.split('\n')

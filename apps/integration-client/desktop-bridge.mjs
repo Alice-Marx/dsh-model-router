@@ -14,6 +14,7 @@ export function installDesktopBridge(api, renderPane) {
     open: async (botId, machineId, options) => api.dispatch('machine.desktop.open', { botId, ...await target(machineId), ...options }),
     renew: (botId, sessionId) => api.dispatch('machine.desktop.renew', { botId, sessionId }),
     close: (botId, sessionId) => api.dispatch('machine.desktop.close', { botId, sessionId }),
+    transport: (action,payload,signal) => api.dispatch(action,payload,signal),
     saveRoutine: (botId, routine) => api.dispatch('routine.save', { botId, routine }),
     view: async (botId, machineId) => api.dispatch('machine.desktop.view', { botId, ...await target(machineId) }),
     act: async (botId, machineId, screenshotId, action) => api.dispatch('machine.desktop.act', { botId, ...await target(machineId), screenshotId, action }),

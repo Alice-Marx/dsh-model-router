@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 // not through model tools. A UI test with a stub dispatch cannot see the difference, so this reads
 // the composition source and checks that every action the panels call is registered there.
 const source = readFileSync(new URL('../packages/orchestration/src/product-composition.mjs', import.meta.url), 'utf8')
-const panel = ['panels.jsx', 'tasks-panel.jsx'].map(name => readFileSync(new URL(`../apps/integration-client/${name}`, import.meta.url), 'utf8')).join('\n')
+const panel = ['panels.jsx', 'tasks-panel.jsx', 'notifications-panel.jsx'].map(name => readFileSync(new URL(`../apps/integration-client/${name}`, import.meta.url), 'utf8')).join('\n')
 
 /** Action names the panels dispatch, in call order, de-duplicated. */
 const dispatched = [...new Set([...panel.matchAll(/dispatch\('([a-zA-Z][\w.]*)'/g)].map(match => match[1]))]
@@ -31,7 +31,7 @@ test('product channel: a task action declares that it belongs to the owner conso
   // These six move, stop or re-open somebody's work. Each one names its caller
   // class at its own entry rather than inheriting whatever the authorization
   // seam defaults to, so a change there cannot quietly widen them.
-  const actions = ['task.inspect', 'task.plan.submit', 'task.plan.cancel', 'task.cancel', 'task.retry', 'task.reconcile']
+  const actions = ['ui.namespace', 'botProfile.inspect', 'botProfile.save', 'task.inspect', 'task.plan.submit', 'task.plan.cancel', 'task.cancel', 'task.retry', 'task.reconcile', 'notifications.list', 'notifications.readModel', 'notifications.read', 'notifications.markAll']
   for (const action of actions) {
     const registered = new RegExp(`'${action.replace('.', '\\.')}':\\s*ownerOnly\\(`)
     assert.match(source, registered, `${action} must be wrapped in ownerOnly`)

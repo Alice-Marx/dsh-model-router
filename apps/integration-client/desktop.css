@@ -1,0 +1,41 @@
+.bp-desktop-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 9px; border: 1px solid var(--bp-border); border-radius: 12px; background: var(--bp-subtle); }
+.bp-desktop-toolbar > .bp-actions { margin: 0; gap: 7px; flex: 1; }
+.bp-desktop-view-tools { display: flex; flex: none; gap: 4px; }
+.bp-desktop-viewer .bp-desktop-view-tools button { width: 36px; min-width: 36px; height: 36px; padding: 7px; }
+.bp-desktop-view-tools button[aria-pressed=true],.bp-desktop-view-tools button[aria-expanded=true] { border-color: var(--bp-solid); color: var(--bp-solid); background: var(--bp-hover); }
+.bp-desktop-control-status { display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; font-size: 11px; color: var(--bp-muted); }
+.bp-desktop-control-status[data-mode=control] { color: var(--bp-solid); }
+.bp-desktop-control-status[data-mode=control]::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.bp-desktop-touch-hint { display: none; margin: 0; color: var(--bp-muted); font-size: 11px; }
+@media(pointer:coarse) { .bp-desktop-touch-hint { display: block; } }
+.bp-stream-canvas { touch-action: pan-y; }
+.bp-stream-canvas[data-control=true] { touch-action: none; }
+.bp-stream-screen[data-fit=false],.bp-desktop-expanded-stage[data-fit=false] { overflow: auto; align-items: flex-start; justify-content: flex-start; }
+.bp-stream-screen[data-fit=false] .bp-stream-canvas { flex: none; }
+.bp-desktop-tools-panel { min-width: 0; padding: 16px; border: 1px solid var(--bp-border); border-radius: 14px; background: var(--bp-surface); box-shadow: 0 12px 32px #00000014; }
+.bp-desktop-tools-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.bp-desktop-tools-panel strong { display: flex; align-items: center; gap: 8px; }
+.bp-desktop-tools-panel > label { display: grid; gap: 8px; margin-bottom: 12px; font-size: 12px; color: var(--bp-muted); }
+.bp-desktop-viewer .bp-desktop-tools-panel textarea { width: 100%; min-height: 100px; max-height: 220px; min-width: 0; padding: 10px; resize: vertical; border: 1px solid var(--bp-border); border-radius: 9px; background: var(--bp-subtle); color: var(--bp-ink); font: inherit; }
+.bp-desktop-shortcuts { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--bp-border); }
+.bp-desktop-shortcuts button { overflow-wrap: anywhere; }
+.bp-stream-overlay { padding: 16px; background: #101714; }
+.bp-desktop-viewer :is(button,input,textarea,select,canvas) { -webkit-app-region: no-drag; }
+.bp-stream-dialog { height: calc(100dvh - 32px); width: 100%; max-width: 1500px; min-height: 0; --bp-subtle: #1b2420; --bp-surface: #242e28; --bp-ink: #eef4ee; --bp-muted: #abb8ad; --bp-border: #425147; --bp-hover: #35483b; --bp-solid: #9acda7; --bp-on-solid: #142319; }
+.bp-desktop-expanded-header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 40px; }
+.bp-desktop-expanded-header > strong { display: flex; align-items: center; gap: 9px; min-width: 0; margin-right: auto; }
+.bp-desktop-expanded-stage { position: relative; flex: 1; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--bp-border); border-radius: 12px; background: #101612; }
+.bp-desktop-expanded-stage .bp-stream-large { width: 100%; height: 100%; max-height: none; object-fit: contain; flex: none; }
+.bp-desktop-expanded-stage > .bp-desktop-tools-panel { position: absolute; z-index: 1; left: 16px; top: 16px; width: min(420px,calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; }
+.bp-stream-overlay:fullscreen { padding: 12px; }
+.bp-stream-overlay:fullscreen .bp-stream-dialog { height: calc(100dvh - 24px); max-width: none; }
+@media(max-width:600px){
+  .bp-desktop-toolbar { gap: 7px; }
+  .bp-desktop-toolbar > .bp-actions { flex-wrap: wrap; }
+  .bp-desktop-control-status { width: 100%; margin: 2px 4px; }
+  .bp-desktop-shortcuts { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .bp-stream-overlay { padding: 8px; }
+  .bp-stream-dialog { height: calc(100dvh - 16px); max-width: 100%; gap: 8px; }
+  .bp-desktop-viewer button { min-height: 40px; }
+  .bp-desktop-expanded-stage > .bp-desktop-tools-panel { left: 8px; top: 8px; width: calc(100% - 16px); max-height: calc(100% - 16px); }
+}

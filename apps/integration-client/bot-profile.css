@@ -1,0 +1,57 @@
+/* Identity and personality inside the Bot settings side window. The panel owns
+   no colour of its own: every surface, border, ink and focus ring is a product
+   token, so light, dark and the DS theme all follow the window around it. */
+html body[data-bot-product-ui] .bp-profile { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--bp-border); border-radius: 12px; background: var(--bp-surface); color: var(--bp-ink); font-family: var(--bp-font, system-ui); }
+html body[data-bot-product-ui] .bp-profile-head { display: flex; align-items: center; gap: 11px; }
+html body[data-bot-product-ui] .bp-profile-badge { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--bp-subtle); color: var(--bp-ink); }
+html body[data-bot-product-ui] .bp-profile-title { min-width: 0; }
+html body[data-bot-product-ui] .bp-profile-title h3 { margin: 0; font-size: 14px; font-weight: 600; }
+html body[data-bot-product-ui] .bp-profile-title p { margin: 3px 0 0; font-size: 12px; line-height: 1.5; color: var(--bp-muted); }
+html body[data-bot-product-ui] .bp-profile-revision { flex: none; margin-left: auto; padding: 4px 9px; border: 1px solid var(--bp-border); border-radius: 999px; font-size: 11px; color: var(--bp-muted); white-space: nowrap; }
+html body[data-bot-product-ui] .bp-profile-search { display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--bp-border); border-radius: 9px; background: var(--bp-bg); color: var(--bp-muted); }
+html body[data-bot-product-ui] .bp-profile-search:focus-within { border-color: var(--bp-focus); }
+html body[data-bot-product-ui] .bp-profile-search input { flex: 1; min-width: 0; height: 34px; border: 0; outline: none; background: transparent; color: var(--bp-ink); font: inherit; font-size: 13px; }
+html body[data-bot-product-ui] .bp-profile-search input::placeholder { color: var(--bp-quiet); }
+html body[data-bot-product-ui] .bp-profile-search button { display: grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--bp-muted); cursor: pointer; }
+html body[data-bot-product-ui] .bp-profile-search button:hover { background: var(--bp-hover); color: var(--bp-ink); }
+html body[data-bot-product-ui] .bp-profile-status { margin: 0; font-size: 12px; }
+html body[data-bot-product-ui] .bp-profile-error { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--bp-border); border-radius: 9px; background: var(--bp-danger-bg); color: var(--bp-danger); font-size: 12px; }
+html body[data-bot-product-ui] .bp-profile-error p { margin: 0; flex: 1; min-width: 0; }
+html body[data-bot-product-ui] .bp-profile-error button { flex: none; padding: 5px 10px; border: 1px solid currentcolor; border-radius: 7px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+html body[data-bot-product-ui] .bp-profile-group { border: 1px solid var(--bp-border); border-radius: 10px; background: var(--bp-bg); overflow: hidden; }
+html body[data-bot-product-ui] .bp-profile-group[data-open="false"] { background: var(--bp-surface); }
+html body[data-bot-product-ui] .bp-profile-group-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border: 0; background: transparent; color: var(--bp-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+html body[data-bot-product-ui] .bp-profile-group-head:hover { background: var(--bp-hover); }
+html body[data-bot-product-ui] .bp-profile-group-head svg:first-child { flex: none; color: var(--bp-muted); }
+html body[data-bot-product-ui] .bp-profile-group-label { font-weight: 600; }
+html body[data-bot-product-ui] .bp-profile-group-hint { margin-left: auto; font-size: 11px; color: var(--bp-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body[data-bot-product-ui] .bp-profile-group-head svg:last-child { flex: none; color: var(--bp-muted); transition: rotate .15s ease; }
+html body[data-bot-product-ui] .bp-profile-group[data-open="true"] .bp-profile-group-head svg:last-child { rotate: 180deg; }
+html body[data-bot-product-ui] .bp-profile-group-body { display: flex; flex-direction: column; gap: 12px; padding: 2px 12px 12px; }
+html body[data-bot-product-ui] .bp-profile-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+html body[data-bot-product-ui] .bp-profile-field-head { display: flex; align-items: baseline; gap: 8px; }
+html body[data-bot-product-ui] .bp-profile-field-label { font-size: 12px; font-weight: 600; color: var(--bp-ink); }
+html body[data-bot-product-ui] .bp-profile-field-count { margin-left: auto; font-size: 11px; color: var(--bp-quiet); font-variant-numeric: tabular-nums; }
+html body[data-bot-product-ui] .bp-profile-field input, html body[data-bot-product-ui] .bp-profile-field textarea { width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--bp-border); border-radius: 8px; background: var(--bp-surface); color: var(--bp-ink); font: inherit; font-size: 13px; line-height: 1.55; resize: vertical; }
+html body[data-bot-product-ui] .bp-profile-field input::placeholder, html body[data-bot-product-ui] .bp-profile-field textarea::placeholder { color: var(--bp-quiet); }
+html body[data-bot-product-ui] .bp-profile-field input:focus-visible, html body[data-bot-product-ui] .bp-profile-field textarea:focus-visible { outline: 2px solid var(--bp-focus); outline-offset: -1px; border-color: var(--bp-focus); }
+html body[data-bot-product-ui] .bp-profile-field textarea { min-height: 92px; }
+html body[data-bot-product-ui] .bp-profile-field-help { font-size: 11px; line-height: 1.55; color: var(--bp-muted); }
+html body[data-bot-product-ui] .bp-profile-field-problem { font-size: 11px; line-height: 1.5; color: var(--bp-danger); }
+html body[data-bot-product-ui] .bp-profile-save { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 2px; }
+html body[data-bot-product-ui] .bp-profile-pill { flex: none; padding: 4px 9px; border: 1px solid var(--bp-border); border-radius: 999px; background: var(--bp-subtle); font-size: 11px; color: var(--bp-muted); }
+html body[data-bot-product-ui] .bp-profile-pill[data-tone="warn"] { border-color: var(--bp-warning); background: var(--bp-warning-bg); color: var(--bp-warning); }
+html body[data-bot-product-ui] .bp-profile-save button { flex: none; margin-left: auto; }
+html body[data-bot-product-ui] .bp-profile-feedback { margin: 0; font-size: 12px; line-height: 1.55; color: var(--bp-muted); }
+html body[data-bot-product-ui] .bp-profile-feedback[data-kind="saved"] { color: var(--bp-solid); }
+html body[data-bot-product-ui] .bp-profile-feedback[data-kind="error"] { color: var(--bp-danger); }
+html body[data-bot-product-ui] .bp-profile-feedback[data-kind="notice"] { color: var(--bp-warning); }
+html body[data-bot-product-ui] .bp-profile button:focus-visible, html body[data-bot-product-ui] .bp-profile input:focus-visible, html body[data-bot-product-ui] .bp-profile textarea:focus-visible { outline: 2px solid var(--bp-focus); outline-offset: 1px; }
+/* A phone-width settings window keeps every control reachable without sideways scroll. */
+@media (max-width: 520px) {
+  html body[data-bot-product-ui] .bp-profile { padding: 12px; gap: 10px; }
+  html body[data-bot-product-ui] .bp-profile-revision { width: 100%; margin-left: 0; align-self: flex-start; text-align: left; }
+  html body[data-bot-product-ui] .bp-profile-head { flex-wrap: wrap; }
+  html body[data-bot-product-ui] .bp-profile-group-hint { display: none; }
+  html body[data-bot-product-ui] .bp-profile-save button { margin-left: 0; width: 100%; }
+}

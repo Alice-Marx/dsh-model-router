@@ -15,6 +15,23 @@ export function rememberWorkbenchView(value) {
   try { globalThis.localStorage?.setItem(VIEW_KEY, validWorkbenchView(value)) } catch { /* storage may be disabled */ }
 }
 
+// A display address only. It carries no Bot, task, command or execution grant.
+let pendingView = null
+const viewListeners = new Set()
+export function requestWorkbenchView(view) {
+  if (!WORKSPACE_VIEWS.some(row => row.id === view)) throw new TypeError('Unknown workbench view')
+  rememberWorkbenchView(view)
+  pendingView = view
+  for (const listener of viewListeners) listener(view)
+  if (viewListeners.size) pendingView = null
+}
+export function takeWorkbenchView() { const value = pendingView; pendingView = null; return value }
+export function subscribeWorkbenchView(listener) {
+  viewListeners.add(listener)
+  if (pendingView) { const value = takeWorkbenchView(); listener(value) }
+  return () => viewListeners.delete(listener)
+}
+
 // Draft text stays in this window's memory, never in localStorage or a run record.
 // Decisions, previews, permissions and execution identities are not restored.
 let draft = { task: '', mode: 'single', directKey: '', budget: undefined }

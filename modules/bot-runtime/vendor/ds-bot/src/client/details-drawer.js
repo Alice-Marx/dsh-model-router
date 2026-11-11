@@ -195,13 +195,20 @@ function GroupOverview({ room, roster, actions, usage, useWork, openSettings }) 
 
 export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, roster, actions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages }) {
   const owner = roster.byId[sessionId]
-  const part = owner ? currentPart(owner) : sessionId
+  // A thread Session is its own part: the drawer shows that thread's
+  // transcript, stats, questions and usage, while everything Bot-scoped
+  // (settings, model, folder, memory, computer) stays the Bot's — a thread has
+  // no authority of its own.
+  const thread = roster.threadsById?.[sessionId]
+  const threadName = typeof thread?.name === 'string' ? thread.name.trim() : ''
+  const part = thread ? (thread.sessionId ?? sessionId) : (owner ? currentPart(owner) : sessionId)
   const isMainBot = isMainOf(roster, owner?.id)
   const [tab, setTab] = useState('details')
   const room = roster.roomsById[sessionId]
   // The info pane swaps its overview for the Bot or group settings view in place.
   const [view, setView] = useState(startTab === 'settings' && (owner || room) ? 'settings' : 'overview')
-  const [editing, setEditing] = useState(Boolean(startRenaming && (roster.byId[sessionId] || roster.roomsById[sessionId])))
+  // A thread is named in the thread directory, never by renaming its Bot here.
+  const [editing, setEditing] = useState(Boolean(startRenaming && thread === undefined && (roster.byId[sessionId] || roster.roomsById[sessionId])))
   const [draftName, setDraftName] = useState(roster.byId[sessionId]?.name ?? (roster.roomsById[sessionId]?.named ? roster.roomsById[sessionId].name : ''))
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
@@ -219,7 +226,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, ro
   const running = useSessionStatus(map => map.get(part)?.running === true)
   const doing = useActivity(map => map[bot?.id ?? sessionId])
   const transcript = useSessions(list => transcriptOf(list, part, bot?.name ?? room?.name ?? t('Bot'), roster.exchangeTurns[part]))
-  const usage = useSessions(list => usageOf(list, [part, ...(bot?.parts ?? room?.parts ?? [])]))
+  const usage = useSessions(list => usageOf(list, [part, ...(thread === undefined ? (bot?.parts ?? room?.parts ?? []) : [])]))
   const run = promise => Promise.resolve(promise)
     .then(() => { setError(''); return true })
     .catch(failure => { setError(failure?.message ?? String(failure)); return false })
@@ -281,8 +288,11 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, ro
             onChange: event => setDraftName(event.target.value), onBlur: saveName,
             onKeyDown: (event) => { if (event.key === 'Enter') void saveName(); if (event.key === 'Escape') { event.stopPropagation(); setEditing(false) } },
           })
-        : h('button', { type: 'button', className: 'bt-drawer-name', 'aria-label': t('Rename {name}', { name: current }), title: t('Rename'), onClick: () => { setDraftName(room && !room.named ? '' : current); setEditing(true) } }, current),
-      subtitle ? h('span', { className: 'bt-drawer-role' }, subtitle) : null),
+        : thread !== undefined
+          ? h('span', { className: 'bt-drawer-name', 'data-thread': '' }, current)
+          : h('button', { type: 'button', className: 'bt-drawer-name', 'aria-label': t('Rename {name}', { name: current }), title: t('Rename'), onClick: () => { setDraftName(room && !room.named ? '' : current); setEditing(true) } }, current),
+      subtitle ? h('span', { className: 'bt-drawer-role' }, subtitle) : null,
+      threadName ? h('span', { className: 'bt-drawer-role', 'data-thread': threadName }, threadName) : null),
     tabs.length > 1 ? h('div', { key: 'tabs', ref: glide.box, className: 'bt-tabs', role: 'tablist', 'data-move': side },
       h('span', { ref: glide.thumb, className: 'bt-thumb', 'aria-hidden': true }),
       tabs.map(key => h('button', { key, type: 'button', role: 'tab', className: 'bt-tab', 'aria-selected': tab === key, onClick: () => setTab(key) }, t(TAB_LABELS[key])))) : null,

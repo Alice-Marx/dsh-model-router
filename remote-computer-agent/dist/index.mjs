@@ -1,13 +1,13 @@
 // src/agent.ts
-import { readFile as readFile8, writeFile as writeFile5, mkdir as mkdir6, rename, unlink as unlink4, stat as stat7, realpath as realpath7 } from "node:fs/promises";
-import { join as join8, dirname, resolve as resolve3 } from "node:path";
-import { randomUUID as randomUUID6 } from "node:crypto";
+import { readFile as readFile9, writeFile as writeFile5, mkdir as mkdir6, rename, unlink as unlink5, stat as stat7, realpath as realpath7 } from "node:fs/promises";
+import { join as join8, dirname as dirname2, resolve as resolve3 } from "node:path";
+import { randomUUID as randomUUID7 } from "node:crypto";
 import { spawn as spawn4, execFile as execFile2 } from "node:child_process";
 import { promisify as promisify2 } from "node:util";
 
 // src/protocol.ts
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-var AGENT_VERSION = "0.1.1";
+var AGENT_VERSION = "0.1.2";
 var AGENT_API_MAJOR = 1;
 var AgentError = class extends Error {
   constructor(code, status = 400) {
@@ -80,7 +80,1042 @@ var isMutating = (name) => CATALOG.find((x) => x.name === name)?.mutating ?? fal
 import { mkdirSync, openSync, readFileSync, writeFileSync, closeSync, unlinkSync, chmodSync, fstatSync, lstatSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
-import { randomUUID } from "node:crypto";
+import { randomUUID as randomUUID2 } from "node:crypto";
+
+// src/secure-pairing.ts
+import { randomInt, randomUUID, timingSafeEqual as timingSafeEqual3 } from "node:crypto";
+
+// ../modules/openmaus-protocol/dist/protocol.mjs
+import { createCipheriv, createDecipheriv, createECDH, hkdfSync, randomBytes as randomBytes2 } from "node:crypto";
+import { createHash as createHash2, createHmac, createPrivateKey, createPublicKey, sign, timingSafeEqual as timingSafeEqual2, verify } from "node:crypto";
+import { Duplex } from "node:stream";
+var B64U = /^[A-Za-z0-9_-]*$/;
+var b64u = (bytes) => Buffer.from(bytes).toString("base64url");
+function fromB64u(text) {
+  if (!B64U.test(text) || text.length % 4 === 1) return null;
+  const bytes = Buffer.from(text, "base64url");
+  return bytes.toString("base64url") === text ? bytes : null;
+}
+var sha256 = (bytes) => createHash2("sha256").update(bytes).digest();
+var hmacSha256 = (key2, message) => createHmac("sha256", key2).update(message).digest();
+var KEY_ID_BYTES = 16;
+var PSK_LABEL = Buffer.from("omb-e2e psk v1", "utf8");
+var ADMISSION_LABEL = Buffer.from("omb-relay admission v1", "utf8");
+function credentialHashFromHex(hex) {
+  return /^[0-9a-f]{64}$/.test(hex) ? Buffer.from(hex, "hex") : null;
+}
+var keyId = (transportPublicKey) => sha256(transportPublicKey).subarray(0, KEY_ID_BYTES);
+var psk = (credHash, transportKeyId) => hmacSha256(credHash, Buffer.concat([PSK_LABEL, transportKeyId]));
+var RELAY_TOKEN_TTL_S = 12 * 60 * 60;
+var PROTOCOL_NAME = "Noise_NKpsk0_P256_AESGCM_SHA256";
+var PUBLIC_KEY_BYTES = 65;
+var TAG_BYTES = 16;
+var MAX_RECORD_BYTES = 65535;
+var MAX_RECORD_PLAINTEXT = MAX_RECORD_BYTES - TAG_BYTES;
+var MAX_HANDSHAKE_PAYLOAD = 512;
+var MAX_HANDSHAKE_MESSAGE = PUBLIC_KEY_BYTES + MAX_HANDSHAKE_PAYLOAD + TAG_BYTES;
+var CONN_BYTES = 16;
+var MAX_APP_CHARS = 40;
+var NONCE_LIMIT = 2 ** 32;
+var HANDSHAKE_DEADLINE_MS = 1e4;
+var TRANSPORT_DIRECT = 2;
+var CLOSE = {
+  normal: 1e3,
+  goingAway: 1001,
+  protocol: 4e3,
+  rejected: 4001,
+  deadline: 4002
+};
+var NoiseError = class extends Error {
+  reason;
+  constructor(reason) {
+    super(`e2e: ${reason}`);
+    this.reason = reason;
+  }
+};
+function prologue(transport) {
+  return Buffer.concat([Buffer.from("omb-e2e/1", "utf8"), Buffer.from([0, transport])]);
+}
+var ecdh = (privateKey) => {
+  const curve = createECDH("prime256v1");
+  if (privateKey) curve.setPrivateKey(privateKey);
+  else curve.generateKeys();
+  return curve;
+};
+function keyPairFromPrivate(privateKey) {
+  if (privateKey.length !== 32) throw new NoiseError("bad_private_key");
+  return { privateKey: Buffer.from(privateKey), publicKey: ecdh(privateKey).getPublicKey(null, "uncompressed") };
+}
+function generateKeyPair() {
+  const curve = ecdh();
+  const raw = curve.getPrivateKey();
+  return { privateKey: Buffer.concat([Buffer.alloc(32 - raw.length), raw]), publicKey: curve.getPublicKey(null, "uncompressed") };
+}
+function dh(privateKey, publicKey) {
+  if (publicKey.length !== PUBLIC_KEY_BYTES || publicKey[0] !== 4) throw new NoiseError("bad_point");
+  try {
+    return ecdh(privateKey).computeSecret(publicKey);
+  } catch {
+    throw new NoiseError("bad_point");
+  }
+}
+var CHECK_SCALAR = Buffer.alloc(32, 1);
+function isPublicKey(bytes) {
+  try {
+    dh(CHECK_SCALAR, bytes);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function hkdf(chainingKey, ikm, outputs) {
+  const out = Buffer.from(hkdfSync("sha256", ikm, chainingKey, Buffer.alloc(0), 32 * outputs));
+  return Array.from({ length: outputs }, (_, index) => out.subarray(index * 32, index * 32 + 32));
+}
+function nonceBytes(n) {
+  const nonce = Buffer.alloc(12);
+  nonce.writeBigUInt64BE(BigInt(n), 4);
+  return nonce;
+}
+function aeadSeal(key2, n, ad, plaintext) {
+  const cipher = createCipheriv("aes-256-gcm", key2, nonceBytes(n), { authTagLength: TAG_BYTES });
+  cipher.setAAD(ad);
+  return Buffer.concat([cipher.update(plaintext), cipher.final(), cipher.getAuthTag()]);
+}
+function aeadOpen(key2, n, ad, ciphertext) {
+  if (ciphertext.length < TAG_BYTES) throw new NoiseError("short_ciphertext");
+  const decipher = createDecipheriv("aes-256-gcm", key2, nonceBytes(n), { authTagLength: TAG_BYTES });
+  decipher.setAAD(ad);
+  decipher.setAuthTag(ciphertext.subarray(ciphertext.length - TAG_BYTES));
+  try {
+    return Buffer.concat([decipher.update(ciphertext.subarray(0, ciphertext.length - TAG_BYTES)), decipher.final()]);
+  } catch {
+    throw new NoiseError("aead");
+  }
+}
+var CipherState = class {
+  #key;
+  #n;
+  /** `n` other than 0 is for tests of the counter limit. */
+  constructor(key2 = null, n = 0) {
+    this.#key = key2;
+    this.#n = n;
+  }
+  get hasKey() {
+    return this.#key !== null;
+  }
+  get nonce() {
+    return this.#n;
+  }
+  /** Test-only view of the key, for the vectors. */
+  get keyBytes() {
+    return this.#key;
+  }
+  encryptWithAd(ad, plaintext) {
+    if (!this.#key) return Buffer.from(plaintext);
+    if (this.#n >= NONCE_LIMIT) throw new NoiseError("nonce_exhausted");
+    const out = aeadSeal(this.#key, this.#n, ad, plaintext);
+    this.#n += 1;
+    return out;
+  }
+  /** The counter moves only on success; any failure ends the session anyway. */
+  decryptWithAd(ad, ciphertext) {
+    if (!this.#key) return Buffer.from(ciphertext);
+    if (this.#n >= NONCE_LIMIT) throw new NoiseError("nonce_exhausted");
+    const out = aeadOpen(this.#key, this.#n, ad, ciphertext);
+    this.#n += 1;
+    return out;
+  }
+};
+var SymmetricState = class _SymmetricState {
+  ck;
+  h;
+  cipher = new CipherState();
+  trace;
+  constructor(h, ck, trace) {
+    this.h = h;
+    this.ck = ck;
+    this.trace = trace;
+  }
+  static initialize(trace = null) {
+    const name = Buffer.from(PROTOCOL_NAME, "utf8");
+    const h = name.length <= 32 ? Buffer.concat([name, Buffer.alloc(32 - name.length)]) : sha256(name);
+    return new _SymmetricState(h, Buffer.from(h), trace);
+  }
+  clone() {
+    const copy = new _SymmetricState(Buffer.from(this.h), Buffer.from(this.ck), this.trace ? [...this.trace] : null);
+    copy.cipher = this.cipher;
+    return copy;
+  }
+  mark(step) {
+    this.trace?.push({ step, h: this.h.toString("hex"), ck: this.ck.toString("hex"), k: this.cipher.keyBytes?.toString("hex") ?? null });
+  }
+  mixHash(data) {
+    this.h = sha256(Buffer.concat([this.h, data]));
+  }
+  mixKey(ikm) {
+    const [ck, key2] = hkdf(this.ck, ikm, 2);
+    this.ck = ck;
+    this.cipher = new CipherState(key2);
+  }
+  mixKeyAndHash(ikm) {
+    const [ck, tempH, key2] = hkdf(this.ck, ikm, 3);
+    this.ck = ck;
+    this.mixHash(tempH);
+    this.cipher = new CipherState(key2);
+  }
+  encryptAndHash(plaintext) {
+    const out = this.cipher.encryptWithAd(this.h, plaintext);
+    this.mixHash(out);
+    return out;
+  }
+  decryptAndHash(ciphertext) {
+    const out = this.cipher.decryptWithAd(this.h, ciphertext);
+    this.mixHash(ciphertext);
+    return out;
+  }
+  /** k_pc then k_cp. */
+  split() {
+    const [first, second] = hkdf(this.ck, Buffer.alloc(0), 2);
+    return [new CipherState(first), new CipherState(second)];
+  }
+};
+function initialized(transport, responderStatic, trace) {
+  const state = SymmetricState.initialize(trace);
+  state.mark("init");
+  state.mixHash(prologue(transport));
+  state.mark("prologue");
+  state.mixHash(responderStatic);
+  state.mark("s");
+  return state;
+}
+var RecordCipher = class {
+  #state;
+  constructor(state) {
+    this.#state = state;
+  }
+  get nonce() {
+    return this.#state.nonce;
+  }
+  seal(plaintext) {
+    if (plaintext.length > MAX_RECORD_PLAINTEXT) throw new NoiseError("record_too_large");
+    return this.#state.encryptWithAd(Buffer.alloc(0), plaintext);
+  }
+  open(record) {
+    if (record.length > MAX_RECORD_BYTES) throw new NoiseError("record_too_large");
+    return this.#state.decryptWithAd(Buffer.alloc(0), record);
+  }
+};
+function sessionKeys(state, side) {
+  const [pc, cp] = state.split();
+  const kPc = pc.keyBytes;
+  const kCp = cp.keyBytes;
+  return side === "phone" ? { send: new RecordCipher(pc), receive: new RecordCipher(cp), handshakeHash: state.h, kPc, kCp } : { send: new RecordCipher(cp), receive: new RecordCipher(pc), handshakeHash: state.h, kPc, kCp };
+}
+function encodePayload1(conn, app) {
+  return Buffer.from(JSON.stringify({ v: 1, conn: b64u(conn), app }), "utf8");
+}
+function encodePayload2(conn) {
+  return Buffer.from(JSON.stringify({ v: 1, conn }), "utf8");
+}
+function jsonObject(bytes) {
+  try {
+    const value = JSON.parse(Buffer.from(bytes).toString("utf8"));
+    return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+var isConn = (value) => typeof value === "string" && fromB64u(value)?.length === CONN_BYTES;
+function parsePayload1(bytes) {
+  if (bytes.length > MAX_HANDSHAKE_PAYLOAD) return null;
+  const value = jsonObject(bytes);
+  if (!value || value.v !== 1 || !isConn(value.conn)) return null;
+  if (value.app !== void 0 && (typeof value.app !== "string" || value.app.length > MAX_APP_CHARS)) return null;
+  return { v: 1, conn: value.conn, ...typeof value.app === "string" ? { app: value.app } : {} };
+}
+function checkPayload2(bytes, conn) {
+  const value = bytes.length <= MAX_HANDSHAKE_PAYLOAD ? jsonObject(bytes) : null;
+  if (!value || value.v !== 1) return "version";
+  return value.conn === conn ? "ok" : "conn";
+}
+function phoneHello(options, payload1, conn) {
+  if (!isPublicKey(options.remoteStatic)) throw new NoiseError("bad_point");
+  if (options.psk.length !== 32) throw new NoiseError("bad_psk");
+  if (payload1.length > MAX_HANDSHAKE_PAYLOAD) throw new NoiseError("payload_too_large");
+  const state = initialized(options.transport, options.remoteStatic, options.trace ?? null);
+  state.mixKeyAndHash(options.psk);
+  state.mark("msg1.psk");
+  const e = options.ephemeral ?? generateKeyPair();
+  state.mixHash(e.publicKey);
+  state.mixKey(e.publicKey);
+  state.mark("msg1.e");
+  state.mixKey(dh(e.privateKey, options.remoteStatic));
+  state.mark("msg1.es");
+  const message1 = Buffer.concat([e.publicKey, state.encryptAndHash(payload1)]);
+  state.mark("msg1.payload");
+  let done = false;
+  return {
+    message1,
+    finish(message2) {
+      if (done) throw new NoiseError("finished");
+      done = true;
+      if (message2.length < PUBLIC_KEY_BYTES + TAG_BYTES || message2.length > MAX_HANDSHAKE_MESSAGE) throw new NoiseError("message2_size");
+      const re = message2.subarray(0, PUBLIC_KEY_BYTES);
+      const ee = dh(e.privateKey, re);
+      state.mixHash(re);
+      state.mixKey(re);
+      state.mark("msg2.e");
+      state.mixKey(ee);
+      state.mark("msg2.ee");
+      const payload2 = state.decryptAndHash(message2.subarray(PUBLIC_KEY_BYTES));
+      state.mark("msg2.payload");
+      const check = checkPayload2(payload2, conn);
+      if (check !== "ok") throw new NoiseError(`payload2_${check}`);
+      return sessionKeys(state, "phone");
+    }
+  };
+}
+function computerAccept(options, message1) {
+  if (message1.length < PUBLIC_KEY_BYTES + TAG_BYTES || message1.length > MAX_HANDSHAKE_MESSAGE) return null;
+  const re = message1.subarray(0, PUBLIC_KEY_BYTES);
+  let es;
+  try {
+    es = dh(options.staticKey.privateKey, re);
+  } catch {
+    return null;
+  }
+  const base = initialized(options.transport, options.staticKey.publicKey, options.trace ?? null);
+  let match = null;
+  for (const candidate of options.candidates) {
+    if (candidate.psk.length !== 32) continue;
+    const state2 = base.clone();
+    state2.mixKeyAndHash(candidate.psk);
+    state2.mark("msg1.psk");
+    state2.mixHash(re);
+    state2.mixKey(re);
+    state2.mark("msg1.e");
+    state2.mixKey(es);
+    state2.mark("msg1.es");
+    try {
+      const payload = state2.decryptAndHash(message1.subarray(PUBLIC_KEY_BYTES));
+      state2.mark("msg1.payload");
+      match ??= { id: candidate.id, state: state2, payload };
+    } catch {
+    }
+  }
+  if (!match) return null;
+  const payload1 = parsePayload1(match.payload);
+  if (!payload1) return null;
+  const { state } = match;
+  const e = options.ephemeral ?? generateKeyPair();
+  state.mixHash(e.publicKey);
+  state.mixKey(e.publicKey);
+  state.mark("msg2.e");
+  state.mixKey(dh(e.privateKey, re));
+  state.mark("msg2.ee");
+  const payload2 = options.payload2 ? options.payload2(payload1) : encodePayload2(payload1.conn);
+  const message2 = Buffer.concat([e.publicKey, state.encryptAndHash(payload2)]);
+  state.mark("msg2.payload");
+  if (options.trace && state.trace) options.trace.splice(0, options.trace.length, ...state.trace);
+  return { id: match.id, payload1, message2, keys: sessionKeys(state, "computer") };
+}
+var newConn = () => randomBytes2(CONN_BYTES);
+var VERSION = 0;
+var TYPE = { data: 0, windowUpdate: 1, ping: 2, goAway: 3 };
+var FLAG = { syn: 1, ack: 2, fin: 4, rst: 8 };
+var KNOWN_FLAGS = 15;
+var GO_AWAY = { normal: 0, protocol: 1, internal: 2, removed: 3 };
+var HEADER_BYTES = 12;
+var MAX_DATA_PAYLOAD = 65507;
+var INITIAL_WINDOW = 256 * 1024;
+var STREAM_WINDOW = 2 * 1024 * 1024;
+var OPEN_WINDOW_DELTA = STREAM_WINDOW - INITIAL_WINDOW;
+var WINDOW_UPDATE_AFTER = 1024 * 1024;
+var MAX_STREAMS = 64;
+var MAX_STREAM_ID = 2 ** 31 - 1;
+var PING_INTERVAL_MS = 2e4;
+var PING_TIMEOUT_MS = 1e4;
+var YamuxError = class extends Error {
+  reason;
+  constructor(reason) {
+    super(`yamux: ${reason}`);
+    this.reason = reason;
+  }
+};
+function encodeFrame(frame) {
+  const payload = frame.type === TYPE.data ? frame.data ?? new Uint8Array(0) : new Uint8Array(0);
+  if (frame.type === TYPE.data && payload.length !== frame.length) throw new YamuxError("data_length");
+  if (payload.length > MAX_DATA_PAYLOAD) throw new YamuxError("data_too_large");
+  const out = Buffer.alloc(HEADER_BYTES + payload.length);
+  out.writeUInt8(VERSION, 0);
+  out.writeUInt8(frame.type, 1);
+  out.writeUInt16BE(frame.flags, 2);
+  out.writeUInt32BE(frame.streamId, 4);
+  out.writeUInt32BE(frame.length, 8);
+  out.set(payload, HEADER_BYTES);
+  return out;
+}
+function decodeFrame(bytes) {
+  if (bytes.length < HEADER_BYTES) throw new YamuxError("short_frame");
+  const view = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.readUInt8(0) !== VERSION) throw new YamuxError("version");
+  const type = view.readUInt8(1);
+  if (type > TYPE.goAway) throw new YamuxError("type");
+  const flags = view.readUInt16BE(2);
+  if ((flags & ~KNOWN_FLAGS) !== 0) throw new YamuxError("flags");
+  const streamId = view.readUInt32BE(4);
+  const length = view.readUInt32BE(8);
+  if (type === TYPE.data) {
+    if (length > MAX_DATA_PAYLOAD) throw new YamuxError("data_too_large");
+    if (bytes.length !== HEADER_BYTES + length) throw new YamuxError("data_length");
+    if (streamId === 0) throw new YamuxError("stream_zero");
+    return { type, flags, streamId, length, data: view.subarray(HEADER_BYTES) };
+  }
+  if (bytes.length !== HEADER_BYTES) throw new YamuxError("trailing_bytes");
+  if (type === TYPE.windowUpdate) {
+    if (streamId === 0) throw new YamuxError("stream_zero");
+  } else {
+    if (streamId !== 0) throw new YamuxError("session_frame_stream");
+    if (type === TYPE.ping && flags !== FLAG.syn && flags !== FLAG.ack) throw new YamuxError("ping_flags");
+    if (type === TYPE.goAway && flags !== 0) throw new YamuxError("goaway_flags");
+  }
+  return { type, flags, streamId, length };
+}
+var openFrame = (streamId) => ({ type: TYPE.windowUpdate, flags: FLAG.syn, streamId, length: OPEN_WINDOW_DELTA });
+var acceptFrame = (streamId) => ({ type: TYPE.windowUpdate, flags: FLAG.ack, streamId, length: OPEN_WINDOW_DELTA });
+var resetFrame = (streamId) => ({ type: TYPE.windowUpdate, flags: FLAG.rst, streamId, length: 0 });
+var finFrame = (streamId) => ({ type: TYPE.windowUpdate, flags: FLAG.fin, streamId, length: 0 });
+var windowFrame = (streamId, delta) => ({ type: TYPE.windowUpdate, flags: 0, streamId, length: delta });
+var dataFrame = (streamId, data, flags = 0) => ({ type: TYPE.data, flags, streamId, length: data.length, data });
+var pingFrame = (value, flags = FLAG.syn) => ({ type: TYPE.ping, flags, streamId: 0, length: value >>> 0 });
+var goAwayFrame = (code) => ({ type: TYPE.goAway, flags: 0, streamId: 0, length: code });
+var Mux = class {
+  role;
+  #events;
+  #streams = /* @__PURE__ */ new Map();
+  /** The highest ID the phone has opened. */
+  #highestId = 0;
+  #peerGoneAway = false;
+  #localGoneAway = false;
+  constructor(role, events) {
+    this.role = role;
+    this.#events = events;
+  }
+  get activeStreams() {
+    return this.#streams.size;
+  }
+  get peerGoneAway() {
+    return this.#peerGoneAway;
+  }
+  has(streamId) {
+    return this.#streams.has(streamId);
+  }
+  sendWindow(streamId) {
+    return this.#streams.get(streamId)?.sendWindow ?? 0;
+  }
+  /** The phone side. Data may follow at once, within the first 256 KiB. */
+  open() {
+    if (this.role !== "phone") throw new YamuxError("computer_open");
+    if (this.#localGoneAway || this.#peerGoneAway) throw new YamuxError("gone_away");
+    if (this.#streams.size >= MAX_STREAMS) throw new YamuxError("too_many_streams");
+    const streamId = this.#highestId === 0 ? 1 : this.#highestId + 2;
+    if (streamId > MAX_STREAM_ID) throw new YamuxError("ids_exhausted");
+    this.#highestId = streamId;
+    this.#streams.set(streamId, {
+      established: false,
+      receiveWindow: INITIAL_WINDOW + OPEN_WINDOW_DELTA,
+      sendWindow: INITIAL_WINDOW,
+      uncredited: 0,
+      localFin: false,
+      remoteFin: false
+    });
+    this.#events.send(openFrame(streamId));
+    return streamId;
+  }
+  /** The computer side, once the origin socket is connected. */
+  accept(streamId) {
+    const stream = this.#streams.get(streamId);
+    if (!stream || stream.established || this.role !== "computer") return;
+    stream.established = true;
+    stream.receiveWindow += OPEN_WINDOW_DELTA;
+    this.#events.send(acceptFrame(streamId));
+  }
+  /** Sends up to the window and the frame cap; returns the bytes taken. */
+  write(streamId, data) {
+    const stream = this.#streams.get(streamId);
+    if (!stream || stream.localFin || this.role === "computer" && !stream.established) return 0;
+    const size = Math.min(data.length, stream.sendWindow, MAX_DATA_PAYLOAD);
+    if (size === 0) return 0;
+    stream.sendWindow -= size;
+    this.#events.send(dataFrame(streamId, data.subarray(0, size)));
+    return size;
+  }
+  finish(streamId) {
+    const stream = this.#streams.get(streamId);
+    if (!stream || stream.localFin) return;
+    stream.localFin = true;
+    this.#events.send(finFrame(streamId));
+    this.#closeIfDone(streamId, stream);
+  }
+  reset(streamId) {
+    if (!this.#streams.delete(streamId)) return;
+    this.#events.send(resetFrame(streamId));
+    this.#events.reset(streamId);
+  }
+  /** The receiver handed `bytes` on (to the origin socket, or the HTTP stack). Grants them back in 1 MiB steps. */
+  consumed(streamId, bytes) {
+    const stream = this.#streams.get(streamId);
+    if (!stream || stream.remoteFin) return;
+    stream.uncredited += bytes;
+    if (stream.uncredited < WINDOW_UPDATE_AFTER) return;
+    const delta = stream.uncredited;
+    stream.uncredited = 0;
+    stream.receiveWindow += delta;
+    this.#events.send(windowFrame(streamId, delta));
+  }
+  ping(value) {
+    this.#events.send(pingFrame(value));
+  }
+  goAway(code = GO_AWAY.normal) {
+    this.#localGoneAway = true;
+    this.#events.send(goAwayFrame(code));
+  }
+  /** Sends GoAway(1); the caller closes with 4000. */
+  protocolError() {
+    this.goAway(GO_AWAY.protocol);
+    this.closeAll();
+  }
+  closeAll() {
+    const ids = [...this.#streams.keys()];
+    this.#streams.clear();
+    for (const id2 of ids) this.#events.reset(id2);
+  }
+  receive(frame) {
+    if (frame.type === TYPE.ping) {
+      if (frame.flags === FLAG.syn) this.#events.send(pingFrame(frame.length, FLAG.ack));
+      else this.#events.pong?.(frame.length);
+      return;
+    }
+    if (frame.type === TYPE.goAway) {
+      this.#peerGoneAway = true;
+      this.#events.goAway?.(frame.length);
+      return;
+    }
+    if (frame.flags & FLAG.syn) {
+      this.#receiveOpen(frame);
+      return;
+    }
+    if (frame.flags & FLAG.ack) {
+      this.#receiveAck(frame);
+      return;
+    }
+    const stream = this.#known(frame.streamId);
+    if (!stream) return;
+    this.#receiveOnStream(frame.streamId, stream, frame);
+  }
+  /** A stream that ended is ignored: an RST and the peer's last frames cross. An ID never opened is an error. */
+  #known(streamId) {
+    if (streamId % 2 === 0 || streamId > this.#highestId) throw new YamuxError("unknown_stream");
+    return this.#streams.get(streamId) ?? null;
+  }
+  #receiveOpen(frame) {
+    if (this.role === "phone") throw new YamuxError("computer_opened_stream");
+    if (frame.type !== TYPE.windowUpdate || frame.flags !== FLAG.syn) throw new YamuxError("open_flags");
+    if (frame.streamId % 2 === 0) throw new YamuxError("even_stream");
+    if (frame.streamId <= this.#highestId) throw new YamuxError("stream_reused");
+    this.#highestId = frame.streamId;
+    if (this.#localGoneAway || this.#streams.size >= MAX_STREAMS) {
+      this.#events.send(resetFrame(frame.streamId));
+      return;
+    }
+    this.#streams.set(frame.streamId, {
+      established: false,
+      receiveWindow: INITIAL_WINDOW,
+      sendWindow: INITIAL_WINDOW + frame.length,
+      uncredited: 0,
+      localFin: false,
+      remoteFin: false
+    });
+    this.#events.opened?.(frame.streamId);
+  }
+  #receiveAck(frame) {
+    if (this.role === "computer") throw new YamuxError("phone_ack");
+    if (frame.type !== TYPE.windowUpdate || (frame.flags & ~(FLAG.ack | FLAG.fin | FLAG.rst)) !== 0) throw new YamuxError("ack_flags");
+    const stream = this.#known(frame.streamId);
+    if (!stream) return;
+    if (stream.established) throw new YamuxError("duplicate_ack");
+    stream.established = true;
+    this.#events.accepted?.(frame.streamId);
+    this.#receiveOnStream(frame.streamId, stream, { ...frame, flags: frame.flags & ~FLAG.ack });
+  }
+  #receiveOnStream(streamId, stream, frame) {
+    if (frame.flags & FLAG.rst) {
+      this.#streams.delete(streamId);
+      this.#events.reset(streamId);
+      return;
+    }
+    if (frame.type === TYPE.data) {
+      if (stream.remoteFin && (frame.length > 0 || frame.flags & FLAG.fin)) throw new YamuxError("data_after_fin");
+      if (frame.length > stream.receiveWindow) throw new YamuxError("window_exceeded");
+      stream.receiveWindow -= frame.length;
+      if (frame.length > 0) this.#events.data(streamId, frame.data);
+    } else if (frame.length > 0) {
+      stream.sendWindow += frame.length;
+      this.#events.writable(streamId);
+    }
+    if (frame.flags & FLAG.fin) {
+      if (stream.remoteFin) throw new YamuxError("data_after_fin");
+      stream.remoteFin = true;
+      this.#events.ended(streamId);
+      this.#closeIfDone(streamId, stream);
+    }
+  }
+  #closeIfDone(streamId, stream) {
+    if (stream.localFin && stream.remoteFin) this.#streams.delete(streamId);
+  }
+};
+var SEND_BUFFER_HIGH = 1024 * 1024;
+var SessionClosed = class extends Error {
+  code;
+  constructor(code) {
+    super(`e2e session closed (${code})`);
+    this.code = code;
+  }
+};
+var noop = () => {
+};
+var MuxStream = class extends Duplex {
+  streamId;
+  #session;
+  #pending = null;
+  #pendingDone = null;
+  #ungranted = 0;
+  constructor(session, streamId) {
+    super({ allowHalfOpen: true, readableHighWaterMark: 256 * 1024 });
+    this.#session = session;
+    this.streamId = streamId;
+    this.on("error", noop);
+  }
+  _write(chunk, _encoding, done) {
+    this.#pending = chunk;
+    this.#pendingDone = done;
+    this.flush();
+  }
+  _final(done) {
+    this.#session.mux?.finish(this.streamId);
+    done();
+  }
+  _read() {
+    if (this.#ungranted === 0) return;
+    const bytes = this.#ungranted;
+    this.#ungranted = 0;
+    this.#session.mux?.consumed(this.streamId, bytes);
+  }
+  _destroy(error2, done) {
+    const mux = this.#session.mux;
+    if (mux?.has(this.streamId)) mux.reset(this.streamId);
+    this.#session.forget(this.streamId);
+    const pendingDone = this.#pendingDone;
+    this.#pending = null;
+    this.#pendingDone = null;
+    pendingDone?.(error2 ?? new Error("stream reset"));
+    done(error2);
+  }
+  /** Granted back as the reader takes it, so a slow reader slows the sender. */
+  deliver(data) {
+    if (this.push(data)) this.#session.mux?.consumed(this.streamId, data.length);
+    else this.#ungranted += data.length;
+  }
+  remoteEnded() {
+    this.push(null);
+  }
+  remoteReset() {
+    if (!this.destroyed) this.destroy(new Error("stream reset"));
+  }
+  flush() {
+    const mux = this.#session.mux;
+    while (this.#pending && this.#pending.length > 0) {
+      if (!mux || !mux.has(this.streamId)) return void this.destroy(new Error("stream reset"));
+      if (this.#session.congested) return this.#session.whenDrained(() => this.flush());
+      const taken = mux.write(this.streamId, this.#pending);
+      if (taken === 0) return;
+      this.#pending = this.#pending.subarray(taken);
+    }
+    const done = this.#pendingDone;
+    this.#pending = null;
+    this.#pendingDone = null;
+    done?.();
+  }
+};
+var E2ESession = class _E2ESession {
+  role;
+  #transport;
+  #streams = /* @__PURE__ */ new Map();
+  #timers;
+  #state = "handshake";
+  #keys = null;
+  #mux = null;
+  #accept = null;
+  #deadline = null;
+  #pingTimer = null;
+  #pongTimer = null;
+  #awaitingPong = null;
+  #pingCounter = 0;
+  #drainWaiters = [];
+  #settleReady;
+  #settleClosed;
+  #connectOrigin = null;
+  #removed = false;
+  /** The computer side: which device (or pairing window) this is. */
+  peer = null;
+  ready;
+  closed;
+  constructor(role, transport, timers) {
+    this.role = role;
+    this.#transport = transport;
+    this.#timers = {
+      pingIntervalMs: timers.pingIntervalMs ?? PING_INTERVAL_MS,
+      pingTimeoutMs: timers.pingTimeoutMs ?? PING_TIMEOUT_MS,
+      handshakeDeadlineMs: timers.handshakeDeadlineMs ?? HANDSHAKE_DEADLINE_MS
+    };
+    this.ready = new Promise((resolve4, reject) => {
+      this.#settleReady = (error2) => error2 ? reject(error2) : resolve4();
+    });
+    this.ready.catch(noop);
+    this.closed = new Promise((resolve4) => {
+      this.#settleClosed = resolve4;
+    });
+    this.#deadline = setTimeout(() => this.close(CLOSE.deadline), this.#timers.handshakeDeadlineMs);
+    this.#deadline.unref?.();
+  }
+  /** Waits for message 1. Anything wrong with it closes 4001 and nothing else is sent. */
+  static computer(options) {
+    const session = new _E2ESession("computer", options.transport, options);
+    session.#connectOrigin = options.connectOrigin;
+    session.#accept = (message) => {
+      const accepted = computerAccept({ staticKey: options.staticKey, transport: options.transportByte, candidates: options.candidates() }, message);
+      if (!accepted) return session.close(CLOSE.rejected);
+      options.transport.send(accepted.message2);
+      session.peer = accepted.id;
+      session.#start(accepted.keys);
+      options.opened?.(accepted.id, accepted.payload1);
+    };
+    return session;
+  }
+  /** Sends message 1 now. `ready` rejects with a NoiseError when the computer can't be verified: a hard stop. */
+  static phone(options) {
+    const session = new _E2ESession("phone", options.transport, options);
+    const conn = newConn();
+    const hello = phoneHello(
+      { remoteStatic: options.remoteStatic, psk: options.psk, transport: options.transportByte, ephemeral: options.ephemeral },
+      encodePayload1(conn, options.app),
+      b64u(conn)
+    );
+    session.#accept = (message) => {
+      let keys;
+      try {
+        keys = hello.finish(message);
+      } catch (error2) {
+        session.#settleReady(error2);
+        return session.close(CLOSE.protocol);
+      }
+      session.#start(keys);
+    };
+    options.transport.send(hello.message1);
+    return session;
+  }
+  get mux() {
+    return this.#mux;
+  }
+  /** The phone side: the computer said, inside the encryption, that this device was removed. Only this, or a 4001 on
+   * a direct route, means "pair again"; a bare 4001 through the relay may be the relay's own and means "keep trying". */
+  get removed() {
+    return this.#removed;
+  }
+  get state() {
+    return this.#state;
+  }
+  /** Records each way so far, for diagnostics. */
+  get records() {
+    return { sent: this.#keys?.send.nonce ?? 0, received: this.#keys?.receive.nonce ?? 0 };
+  }
+  get congested() {
+    return this.#transport.bufferedAmount > SEND_BUFFER_HIGH;
+  }
+  get activeStreams() {
+    return this.#streams.size;
+  }
+  whenDrained(listener) {
+    this.#drainWaiters.push(listener);
+    if (this.#drainWaiters.length > 1) return;
+    this.#transport.onceDrained(() => {
+      const waiters = this.#drainWaiters;
+      this.#drainWaiters = [];
+      for (const waiter of waiters) waiter();
+    });
+  }
+  forget(streamId) {
+    this.#streams.delete(streamId);
+  }
+  /** Every message the transport receives, in order. */
+  receive(message, binary) {
+    if (this.#state === "closed") return;
+    if (this.#state === "handshake") {
+      const accept = this.#accept;
+      this.#accept = null;
+      if (!binary || !accept) return this.close(this.role === "computer" ? CLOSE.rejected : CLOSE.protocol);
+      return accept(Buffer.from(message));
+    }
+    if (!binary) return this.close(CLOSE.protocol);
+    let plaintext;
+    try {
+      plaintext = this.#keys.receive.open(message);
+    } catch {
+      return this.close(CLOSE.protocol);
+    }
+    try {
+      this.#mux.receive(decodeFrame(plaintext));
+    } catch (error2) {
+      if (!(error2 instanceof YamuxError)) throw error2;
+      this.#mux?.protocolError();
+      this.close(CLOSE.protocol);
+    }
+  }
+  /** The phone side. */
+  openStream() {
+    if (this.#state !== "open" || !this.#mux) throw new SessionClosed(CLOSE.normal);
+    const streamId = this.#mux.open();
+    const stream = new MuxStream(this, streamId);
+    this.#streams.set(streamId, stream);
+    return stream;
+  }
+  /** The computer side: the device was removed. The phone hears it authenticated, then the 4001 close. */
+  remove() {
+    if (this.#state === "open") this.#mux?.goAway(GO_AWAY.removed);
+    this.close(CLOSE.rejected);
+  }
+  /** A planned close (quit, sleep, restart): GoAway first, so the peer knows it isn't an error. */
+  shutdown() {
+    if (this.#state === "open") this.#mux?.goAway(GO_AWAY.normal);
+    this.close(CLOSE.normal);
+  }
+  close(code, reason) {
+    if (this.#state === "closed") return;
+    this.#transport.close(code, reason);
+    this.#end(code);
+  }
+  /** The transport closed under us. */
+  transportClosed(code) {
+    this.#end(code);
+  }
+  #end(code) {
+    if (this.#state === "closed") return;
+    const wasHandshake = this.#state === "handshake";
+    this.#state = "closed";
+    for (const timer of [this.#deadline, this.#pongTimer]) if (timer) clearTimeout(timer);
+    if (this.#pingTimer) clearInterval(this.#pingTimer);
+    this.#mux?.closeAll();
+    for (const stream of this.#streams.values()) stream.remoteReset();
+    this.#streams.clear();
+    const waiters = this.#drainWaiters;
+    this.#drainWaiters = [];
+    for (const waiter of waiters) waiter();
+    if (wasHandshake) this.#settleReady(new SessionClosed(code));
+    this.#settleClosed(code);
+  }
+  #start(keys) {
+    if (this.#deadline) clearTimeout(this.#deadline);
+    this.#keys = keys;
+    this.#state = "open";
+    this.#mux = new Mux(this.role, {
+      send: (frame) => this.#send(frame),
+      opened: (streamId) => this.#openOrigin(streamId),
+      data: (streamId, data) => this.#streams.get(streamId)?.deliver(Buffer.from(data.buffer, data.byteOffset, data.byteLength)),
+      ended: (streamId) => this.#streams.get(streamId)?.remoteEnded(),
+      reset: (streamId) => {
+        const stream = this.#streams.get(streamId);
+        this.#streams.delete(streamId);
+        stream?.remoteReset();
+      },
+      writable: (streamId) => this.#streams.get(streamId)?.flush(),
+      goAway: (code) => {
+        if (code === GO_AWAY.removed && this.role === "phone") this.#removed = true;
+        else if (code !== GO_AWAY.normal) this.close(CLOSE.protocol);
+      },
+      pong: (value) => {
+        if (value !== this.#awaitingPong) return;
+        this.#awaitingPong = null;
+        if (this.#pongTimer) clearTimeout(this.#pongTimer);
+      }
+    });
+    this.#pingTimer = setInterval(() => this.#ping(), this.#timers.pingIntervalMs);
+    this.#pingTimer.unref?.();
+    this.#settleReady();
+  }
+  #ping() {
+    if (this.#awaitingPong !== null || !this.#mux) return;
+    this.#pingCounter = this.#pingCounter + 1 >>> 0;
+    this.#awaitingPong = this.#pingCounter;
+    this.#mux.ping(this.#pingCounter);
+    this.#pongTimer = setTimeout(() => this.close(CLOSE.goingAway), this.#timers.pingTimeoutMs);
+    this.#pongTimer.unref?.();
+  }
+  #send(frame) {
+    if (this.#state !== "open" || !this.#keys) return;
+    let record;
+    try {
+      record = this.#keys.send.seal(encodeFrame(frame));
+    } catch (error2) {
+      if (error2 instanceof NoiseError) return this.close(CLOSE.normal);
+      throw error2;
+    }
+    this.#transport.send(record);
+    if (this.#keys.send.nonce >= NONCE_LIMIT - 1024) queueMicrotask(() => this.close(CLOSE.normal));
+  }
+  #openOrigin(streamId) {
+    const stream = new MuxStream(this, streamId);
+    this.#streams.set(streamId, stream);
+    const connect = this.#connectOrigin;
+    if (!connect) return void stream.destroy();
+    connect().then(
+      (socket) => {
+        if (stream.destroyed || this.#state !== "open") return void socket.destroy();
+        this.#mux?.accept(streamId);
+        socket.on("error", () => stream.destroy());
+        socket.on("close", () => {
+          if (!socket.readableEnded) stream.destroy();
+        });
+        stream.on("close", () => socket.destroy());
+        stream.pipe(socket);
+        socket.pipe(stream);
+      },
+      () => stream.destroy()
+    );
+  }
+};
+var DIRECT_PROTOCOL = "omb-e2e.v1";
+
+// src/secure-pairing.ts
+var PAIRING_TTL_MS = 12e4;
+var PAIRING_ATTEMPTS = 5;
+var MAX_PAIRED_CLIENTS = 128;
+var MAX_INVITES = 20;
+var digestEqual = (a, b) => /^[0-9a-f]{64}$/.test(a) && /^[0-9a-f]{64}$/.test(b) && timingSafeEqual3(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+var nameOf = (value) => String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 60) || "DSH Host";
+var SecurePairing = class {
+  constructor(db, machineId, commitClient, now = Date.now) {
+    this.db = db;
+    this.machineId = machineId;
+    this.commitClient = commitClient;
+    this.now = now;
+    db.exec(`CREATE TABLE IF NOT EXISTS pairing_invites (
+      id TEXT PRIMARY KEY, client_id TEXT NOT NULL, token_digest TEXT NOT NULL, code_digest TEXT NOT NULL,
+      expires_at INTEGER NOT NULL, attempts_left INTEGER NOT NULL, ceiling TEXT NOT NULL, name TEXT NOT NULL,
+      consumed_request TEXT, consumed_at INTEGER
+    ); CREATE INDEX IF NOT EXISTS pairing_invite_expiry ON pairing_invites(expires_at);`);
+    const generated = generateKeyPair();
+    db.prepare("INSERT OR IGNORE INTO meta VALUES (?,?)").run("e2eTransportPrivateKey", b64u(generated.privateKey));
+    const stored = db.prepare("SELECT value FROM meta WHERE key=?").get("e2eTransportPrivateKey")?.value;
+    if (typeof stored !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(stored)) fail("PAIRING_IDENTITY_INVALID");
+    try {
+      this.transportKey = keyPairFromPrivate(Buffer.from(stored, "base64url"));
+    } catch {
+      fail("PAIRING_IDENTITY_INVALID");
+    }
+  }
+  db;
+  machineId;
+  commitClient;
+  now;
+  replay = /* @__PURE__ */ new Map();
+  transportKey;
+  identity() {
+    return { kind: "noise-v1", publicKey: b64u(this.transportKey.publicKey), fingerprint: sha(this.transportKey.publicKey) };
+  }
+  create(clientId, ceiling, options) {
+    identifier(clientId);
+    let endpoint;
+    try {
+      endpoint = new URL(options.endpoint);
+    } catch {
+      fail("PAIRING_ENDPOINT_INVALID");
+    }
+    if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.pathname !== "/" || endpoint.search || endpoint.hash || endpoint.href.length > 1024) fail("PAIRING_ENDPOINT_INVALID");
+    const now = this.now(), token = `dsh_pair_${secret()}`, code = String(randomInt(1e6)).padStart(6, "0"), id2 = `invite-${randomUUID()}`;
+    return this.db.transaction(() => {
+      this.db.prepare("DELETE FROM pairing_invites WHERE expires_at<=?").run(now - PAIRING_TTL_MS);
+      if (this.db.prepare("SELECT 1 FROM clients WHERE id=? AND revoked=0").get(clientId)) fail("CLIENT_ALREADY_PAIRED", 409);
+      if (this.db.prepare("SELECT count(*) AS n FROM clients WHERE revoked=0").get().n >= MAX_PAIRED_CLIENTS) fail("PAIRING_DEVICE_LIMIT", 429);
+      this.db.prepare("UPDATE pairing_invites SET attempts_left=0 WHERE client_id=? AND consumed_request IS NULL").run(clientId);
+      if (this.db.prepare("SELECT count(*) AS n FROM pairing_invites WHERE expires_at>? AND attempts_left>0 AND consumed_request IS NULL").get(now).n >= MAX_INVITES) fail("PAIRING_WINDOW_LIMIT", 429);
+      this.db.prepare("INSERT INTO pairing_invites VALUES (?,?,?,?,?,?,?,?,NULL,NULL)").run(id2, clientId, sha(token), sha(code), now + PAIRING_TTL_MS, PAIRING_ATTEMPTS, canonical(ceiling), nameOf(options.name));
+      return {
+        format: "dsh-pairing-invite",
+        version: 2,
+        inviteId: id2,
+        machineId: this.machineId,
+        clientId,
+        name: nameOf(options.name),
+        endpoint: endpoint.origin,
+        expiresAt: now + PAIRING_TTL_MS,
+        token,
+        code,
+        transport: this.identity(),
+        ceiling: structuredClone(ceiling)
+      };
+    }).immediate();
+  }
+  candidates() {
+    const now = this.now(), transportId = keyId(this.transportKey.publicKey);
+    for (const [id2, row] of this.replay) if (row.expiresAt <= now) this.replay.delete(id2);
+    const invites = this.db.prepare("SELECT id,token_digest FROM pairing_invites WHERE expires_at>? AND attempts_left>0").all(now).map((row) => ({ id: { kind: "invite", id: row.id, digest: row.token_digest }, hash: row.token_digest }));
+    const clients = this.db.prepare("SELECT id,digest,revision FROM clients WHERE revoked=0").all().map((row) => ({ id: { kind: "client", id: row.id, digest: row.digest, revision: row.revision }, hash: row.digest }));
+    if (clients.length > MAX_PAIRED_CLIENTS) fail("PAIRING_DEVICE_LIMIT", 429);
+    return [...invites, ...clients].map((row) => ({ id: row.id, psk: psk(credentialHashFromHex(row.hash), transportId) }));
+  }
+  validPeer(peer) {
+    if (peer.kind === "client") {
+      const client = this.db.prepare("SELECT digest,revision,revoked FROM clients WHERE id=?").get(peer.id);
+      return Boolean(client && !client.revoked && client.revision === peer.revision && digestEqual(client.digest, peer.digest));
+    }
+    const invite = this.db.prepare("SELECT token_digest,expires_at,attempts_left FROM pairing_invites WHERE id=?").get(peer.id);
+    return Boolean(invite && invite.expires_at > this.now() && invite.attempts_left > 0 && digestEqual(invite.token_digest, peer.digest));
+  }
+  redeem(peer, input) {
+    if (peer.kind !== "invite" || !input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key2) => !["requestId", "code"].includes(key2)) || typeof input.requestId !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(input.requestId) || typeof input.code !== "string" || !/^\d{6}$/.test(input.code)) fail("PAIRING_REQUEST_INVALID");
+    const now = this.now();
+    const decision = this.db.transaction(() => {
+      const row = this.db.prepare("SELECT * FROM pairing_invites WHERE id=?").get(peer.id);
+      if (!row || !digestEqual(row.token_digest, peer.digest) || row.expires_at <= now || row.attempts_left <= 0) return { error: "PAIRING_WINDOW_CLOSED" };
+      if (!digestEqual(row.code_digest, sha(input.code))) {
+        this.db.prepare("UPDATE pairing_invites SET attempts_left=attempts_left-1 WHERE id=?").run(peer.id);
+        return { error: "PAIRING_CODE_INVALID" };
+      }
+      if (row.consumed_request !== null) {
+        const cached = this.replay.get(row.id), client = this.db.prepare("SELECT digest,revoked FROM clients WHERE id=?").get(row.client_id);
+        if (row.consumed_request !== input.requestId || !cached || cached.expiresAt <= now || cached.proof !== peer.digest || cached.requestId !== input.requestId) return { error: "PAIRING_ALREADY_REDEEMED" };
+        if (!client || client.revoked || !digestEqual(client.digest, sha(cached.result.token))) return { error: "PAIRING_DEVICE_CHANGED" };
+        return { result: structuredClone(cached.result), ceiling: JSON.parse(row.ceiling), recovered: true };
+      }
+      const result = this.commitClient(row.client_id, JSON.parse(row.ceiling));
+      this.db.prepare("UPDATE pairing_invites SET consumed_request=?,consumed_at=? WHERE id=?").run(input.requestId, now, row.id);
+      this.replay.set(row.id, { proof: peer.digest, requestId: input.requestId, expiresAt: row.expires_at, result: structuredClone(result) });
+      return { result, ceiling: JSON.parse(row.ceiling), recovered: false };
+    }).immediate();
+    if (decision.error) fail(decision.error, 403);
+    return { ...decision.result, transport: this.identity(), ceiling: decision.ceiling, recovered: decision.recovered };
+  }
+  invalidate(clientId) {
+    this.db.prepare("UPDATE pairing_invites SET attempts_left=0 WHERE client_id=?").run(clientId);
+    for (const [id2, row] of this.replay) if (row.result.clientId === clientId) this.replay.delete(id2);
+  }
+  close() {
+    this.replay.clear();
+  }
+};
+
+// src/store.ts
 var Store = class {
   constructor(dataDir, Database, options = {}) {
     this.dataDir = dataDir;
@@ -125,7 +1160,7 @@ var Store = class {
           unlinkSync(this.lockPath);
           this.lockFd = openSync(this.lockPath, "wx", 384);
         }
-        writeFileSync(this.lockFd, JSON.stringify({ pid: process.pid, instanceId: randomUUID() }));
+        writeFileSync(this.lockFd, JSON.stringify({ pid: process.pid, instanceId: randomUUID2() }));
       }
       this.db = new Driver(join(dataDir, "agent.sqlite"));
       this.db.pragma("journal_mode = WAL");
@@ -139,8 +1174,9 @@ var Store = class {
         CREATE TABLE IF NOT EXISTS artifacts(id TEXT PRIMARY KEY,context TEXT NOT NULL,hash TEXT NOT NULL,size INTEGER NOT NULL,media TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS worktrees(id TEXT PRIMARY KEY,context TEXT NOT NULL,root TEXT NOT NULL,path TEXT NOT NULL,head TEXT NOT NULL,source TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,time INTEGER NOT NULL,code TEXT NOT NULL,actor TEXT,operation TEXT);`);
-      this.db.prepare("INSERT OR IGNORE INTO meta VALUES (?,?)").run("machineId", `machine-${randomUUID()}`);
+      this.db.prepare("INSERT OR IGNORE INTO meta VALUES (?,?)").run("machineId", `machine-${randomUUID2()}`);
       this.machineId = this.db.prepare("SELECT value FROM meta WHERE key=?").get("machineId").value;
+      this.pairing = new SecurePairing(this.db, this.machineId, (id2, ceiling) => this.commitClient(id2, ceiling));
       if (!options.admin) this.db.prepare("UPDATE operations SET status='unknown',error='OUTCOME_UNKNOWN' WHERE status IN ('admitted','running','cancel_pending')").run();
       if (!options.admin) this.db.prepare("DELETE FROM grants").run();
     } catch (e) {
@@ -154,6 +1190,7 @@ var Store = class {
     }
   }
   dataDir;
+  pairing;
   db;
   machineId;
   lockFd;
@@ -190,7 +1227,7 @@ var Store = class {
       }
     }
   }
-  pair(id2, ceiling) {
+  approvedCeiling(id2, ceiling) {
     identifier(id2);
     if (!ceiling || ceiling.hostManagedBots !== void 0 && typeof ceiling.hostManagedBots !== "boolean" || !Array.isArray(ceiling.botIds ?? []) || !Array.isArray(ceiling.roots) || !ceiling.roots.length || !Array.isArray(ceiling.tools) || !ceiling.tools.length || ceiling.tools.some((x) => !TOOL_NAMES.includes(x))) fail("INVALID_CEILING");
     const managed = ceiling.hostManagedBots === true, botIds = ceiling.botIds ?? [];
@@ -199,9 +1236,25 @@ var Store = class {
     botIds.forEach(identifier);
     ceiling.roots.forEach(identifier);
     const saved = { botIds, roots: ceiling.roots, tools: ceiling.tools, ...managed ? { hostManagedBots: true } : {} };
-    const token = secret();
-    this.db.prepare("INSERT INTO clients VALUES (?,?,1,0,?)").run(id2, sha(token), canonical(saved));
-    return { clientId: id2, token, machineId: this.machineId, secretRef: `remote-agent/${this.machineId}/${id2}`, hostManagedBots: managed };
+    return saved;
+  }
+  commitClient(id2, ceiling) {
+    return this.db.transaction(() => {
+      const previous = this.db.prepare("SELECT revoked FROM clients WHERE id=?").get(id2);
+      if (previous && !previous.revoked) fail("CLIENT_ALREADY_PAIRED", 409);
+      if (this.db.prepare("SELECT count(*) AS n FROM clients WHERE revoked=0").get().n >= MAX_PAIRED_CLIENTS) fail("PAIRING_DEVICE_LIMIT", 429);
+      const token = secret();
+      if (previous) this.db.prepare("UPDATE clients SET digest=?,revision=revision+1,revoked=0,ceiling=? WHERE id=? AND revoked=1").run(sha(token), canonical(ceiling), id2);
+      else this.db.prepare("INSERT INTO clients VALUES (?,?,1,0,?)").run(id2, sha(token), canonical(ceiling));
+      return { clientId: id2, token, machineId: this.machineId, secretRef: `remote-agent/${this.machineId}/${id2}`, hostManagedBots: ceiling.hostManagedBots === true };
+    }).immediate();
+  }
+  pair(id2, ceiling) {
+    return this.commitClient(id2, this.approvedCeiling(id2, ceiling));
+  }
+  invite(id2, ceiling, options) {
+    if (!this.admin) fail("ADMIN_REQUIRED", 403);
+    return this.pairing.create(id2, this.approvedCeiling(id2, ceiling), options);
   }
   client(token) {
     if (typeof token !== "string" || token.length > 256) fail("AUTH_INVALID", 401);
@@ -211,12 +1264,20 @@ var Store = class {
     return row;
   }
   rotate(id2) {
-    const token = secret();
-    if (!this.db.prepare("UPDATE clients SET digest=?,revision=revision+1,revoked=0 WHERE id=?").run(sha(token), identifier(id2)).changes) fail("AUTH_INVALID", 401);
-    return { clientId: id2, token };
+    return this.db.transaction(() => {
+      identifier(id2);
+      const row = this.db.prepare("SELECT revoked FROM clients WHERE id=?").get(id2);
+      if (!row) fail("AUTH_INVALID", 401);
+      if (row.revoked && this.db.prepare("SELECT count(*) AS n FROM clients WHERE revoked=0").get().n >= MAX_PAIRED_CLIENTS) fail("PAIRING_DEVICE_LIMIT", 429);
+      const token = secret();
+      this.db.prepare("UPDATE clients SET digest=?,revision=revision+1,revoked=0 WHERE id=?").run(sha(token), id2);
+      this.pairing.invalidate(id2);
+      return { clientId: id2, token };
+    }).immediate();
   }
   revoke(id2) {
     this.db.prepare("UPDATE clients SET revoked=1,revision=revision+1 WHERE id=?").run(identifier(id2));
+    this.pairing.invalidate(id2);
   }
   currentClient(client) {
     const row = this.db.prepare("SELECT * FROM clients WHERE id=?").get(client?.id);
@@ -232,7 +1293,7 @@ var Store = class {
     if (!Number.isSafeInteger(ttl) || ttl < 1e3 || ttl > 3e5) fail("INVALID_ARGUMENT");
     this.db.prepare("DELETE FROM grants WHERE json_extract(context,'$.expiresAt')<=?").run(Date.now());
     if (this.db.prepare("SELECT count(*) AS count FROM grants").get().count >= 4096) fail("GRANT_LIMIT", 429);
-    const context = { clientId: client.id, botId: request.botId, taskId: request.taskId, attemptId: request.attemptId, roots: request.roots, tools: request.tools, expiresAt: Date.now() + ttl, revision: client.revision, grantId: randomUUID() };
+    const context = { clientId: client.id, botId: request.botId, taskId: request.taskId, attemptId: request.attemptId, roots: request.roots, tools: request.tools, expiresAt: Date.now() + ttl, revision: client.revision, grantId: randomUUID2() };
     const token = secret();
     this.db.prepare("INSERT INTO grants VALUES (?,?)").run(sha(token), canonical(context));
     return { grantToken: token, machineId: this.machineId, agentApiMajor: 1, ...context };
@@ -297,6 +1358,7 @@ var Store = class {
   close() {
     if (this.closed) return;
     this.closed = true;
+    this.pairing?.close();
     try {
       this.db.close();
     } finally {
@@ -460,7 +1522,7 @@ var Roots = class {
 };
 
 // src/browser.ts
-import { randomUUID as randomUUID2, createHash as createHash2 } from "node:crypto";
+import { randomUUID as randomUUID3, createHash as createHash3 } from "node:crypto";
 import { access, mkdir, readFile, stat as stat2, unlink } from "node:fs/promises";
 import { join as join2 } from "node:path";
 var BrowserTools = class {
@@ -509,7 +1571,7 @@ var BrowserTools = class {
       if (a.profileId !== void 0) {
         const root = this.profileRoots[a.profileId];
         if (!root) fail("BROWSER_PROFILE_DENIED", 403);
-        const owner = JSON.stringify([c.clientId, c.botId, a.profileId]), key2 = createHash2("sha256").update(owner).digest("hex");
+        const owner = JSON.stringify([c.clientId, c.botId, a.profileId]), key2 = createHash3("sha256").update(owner).digest("hex");
         try {
           context = this.profiles.get(key2);
           if (!context) {
@@ -541,9 +1603,9 @@ var BrowserTools = class {
       });
       const page = await context.newPage();
       page.on("popup", (p) => void p.close());
-      const id2 = `browser-${randomUUID2()}`, downloads = /* @__PURE__ */ new Map();
+      const id2 = `browser-${randomUUID3()}`, downloads = /* @__PURE__ */ new Map();
       page.on("download", (download2) => {
-        const downloadId2 = `download-${randomUUID2()}`;
+        const downloadId2 = `download-${randomUUID3()}`;
         downloads.set(downloadId2, { download: download2, path: download2.path(), suggestedFilename: download2.suggestedFilename() });
       });
       this.sessions.set(id2, { context, page, owner: JSON.stringify([c.clientId, c.botId, c.taskId, c.attemptId]), revision: null, persistent, profileId, downloads });
@@ -592,7 +1654,7 @@ var BrowserTools = class {
       return { completed: true, url: session.page.url(), result: value ?? null };
     }
     if (name === "browser_snapshot") {
-      session.revision = `snapshot-${randomUUID2()}`;
+      session.revision = `snapshot-${randomUUID3()}`;
       const nodes = await session.page.locator('a,button,input,textarea,select,[role="button"]').evaluateAll((elements) => elements.slice(0, 300).map((el, i) => {
         el.setAttribute("data-dsh-agent-ref", String(i));
         return { ref: String(i), tag: el.tagName.toLowerCase(), text: (el.innerText || el.getAttribute("aria-label") || "").slice(0, 300) };
@@ -636,7 +1698,7 @@ var BrowserTools = class {
 // src/desktop.ts
 import net from "node:net";
 import { readFile as readFile2 } from "node:fs/promises";
-import { randomUUID as randomUUID3 } from "node:crypto";
+import { randomUUID as randomUUID4 } from "node:crypto";
 var error = (code, possiblyApplied = false, stopConfirmed = false) => Object.assign(new AgentError(code, 409), { possiblyApplied, stopConfirmed });
 var DesktopTools = class {
   constructor(config, options = {}) {
@@ -645,7 +1707,7 @@ var DesktopTools = class {
   }
   config;
   options;
-  nonce = randomUUID3();
+  nonce = randomUUID4();
   owners = /* @__PURE__ */ new Map();
   closing = new AbortController();
   active = /* @__PURE__ */ new Set();
@@ -820,7 +1882,7 @@ var DesktopTools = class {
 import net2 from "node:net";
 import { readFile as readFile3 } from "node:fs/promises";
 import { EventEmitter } from "node:events";
-import { randomUUID as randomUUID4 } from "node:crypto";
+import { randomUUID as randomUUID5 } from "node:crypto";
 var inputTools = ["desktop_click", "desktop_type", "desktop_key", "desktop_scroll"];
 var unknown = () => Object.assign(new AgentError("OUTCOME_UNKNOWN", 409), { possiblyApplied: true, stopConfirmed: false });
 var safeOrigin = (value) => {
@@ -990,7 +2052,7 @@ var DesktopSessions = class {
   forceKeyframes = /* @__PURE__ */ new Set();
   flights = /* @__PURE__ */ new WeakMap();
   sessions = /* @__PURE__ */ new Map();
-  nonce = randomUUID4();
+  nonce = randomUUID5();
   closing = false;
   timer;
   sockets = /* @__PURE__ */ new Set();
@@ -1028,7 +2090,7 @@ var DesktopSessions = class {
     if (mode === "control" && !controlAllowed) fail("SCOPE_DENIED", 403);
     await this.sweep();
     if (this.opening + [...this.sessions.values()].filter((s) => !s.closed).length >= 4 || this.sessions.size >= 256) fail("DESKTOP_SESSION_LIMIT", 429);
-    const id2 = `desktop-${randomUUID4()}`, token = secret();
+    const id2 = `desktop-${randomUUID5()}`, token = secret();
     this.opening++;
     let native;
     try {
@@ -1089,6 +2151,13 @@ var DesktopSessions = class {
   }
   async closeSession(c, request) {
     const row = this.own(c, request?.sessionId);
+    return this.stop(row, "SESSION_CLOSED");
+  }
+  async closeClientSession(clientId, request) {
+    if (!request || typeof request !== "object" || Array.isArray(request) || Object.keys(request).some((key2) => !["sessionId", "botId", "taskId", "attemptId"].includes(key2))) fail("INVALID_ARGUMENT");
+    for (const key2 of ["sessionId", "botId", "taskId", "attemptId"]) identifier(request[key2]);
+    const row = this.sessions.get(request.sessionId);
+    if (!row || row.context.clientId !== clientId || row.context.botId !== request.botId || row.context.taskId !== request.taskId || row.context.attemptId !== request.attemptId) fail("SCOPE_DENIED", 403);
     return this.stop(row, "SESSION_CLOSED");
   }
   hasOrigin(origin) {
@@ -1206,7 +2275,7 @@ var DesktopSessions = class {
     fail("INVALID_ARGUMENT");
   }
   /** Called only after the HTTP server validates Host/network/TLS on upgrade. */
-  accept(socket, origin, allowedOrigins = []) {
+  accept(socket, origin, allowedOrigins = [], peerClientId) {
     this.sockets.add(socket);
     let row, authenticating = false, alive2 = true;
     const authTimer = setTimeout(() => socket.close(1008, "Desktop authentication required"), this.options.authTimeoutMs ?? 5e3);
@@ -1272,6 +2341,7 @@ var DesktopSessions = class {
         try {
           const candidate = this.sessions.get(message.sessionId);
           if (message.type !== "auth" || typeof message.token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(message.token) || !candidate || !matches(message.token, candidate.digest)) fail("AUTH_INVALID", 401);
+          if (peerClientId !== void 0 && candidate.context.clientId !== peerClientId) fail("AUTH_INVALID", 401);
           if (candidate.closed || candidate.used) fail("DESKTOP_SESSION_CLOSED", 409);
           this.check(candidate.context);
           if (origin !== void 0 && (candidate.origin ? origin !== candidate.origin : !allowedOrigins.includes(origin))) fail("ORIGIN_DENIED", 403);
@@ -1375,7 +2445,7 @@ var DesktopSessions = class {
   }
   stop(row, reason) {
     this.forceKeyframes.delete(row);
-    if (row.stop) return row.stop;
+    if (row.stop) return row.stopped ? Promise.resolve({ stopConfirmed: true }) : row.stop;
     row.closed = true;
     row.closedAt = Date.now();
     clearTimeout(row.frameTimer);
@@ -1426,7 +2496,7 @@ import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir as mkdir2, open as open2, readFile as readFile4, lstat as lstat2 } from "node:fs/promises";
 import { isAbsolute, join as join3 } from "node:path";
-import { randomUUID as randomUUID5 } from "node:crypto";
+import { randomUUID as randomUUID6 } from "node:crypto";
 
 // src/container-supervisor.mjs
 async function runContainerSupervisor() {
@@ -1721,7 +2791,7 @@ var ContainerCommands = class {
     }
   }
   async run({ id: id2, c, rootId, workspace, workspaceIdentity, executable, argv, timeout, validate, validateWorkspace, shouldCancel, artifact }) {
-    const name = "dsh-worker-" + sha(canonical({ machine: this.store.machineId, id: id2 })).slice(0, 40), nonce = randomUUID5(), digest2 = sha(canonical({ rootId, workspace, workspaceIdentity, executable, argv, image: this.config.image }));
+    const name = "dsh-worker-" + sha(canonical({ machine: this.store.machineId, id: id2 })).slice(0, 40), nonce = randomUUID6(), digest2 = sha(canonical({ rootId, workspace, workspaceIdentity, executable, argv, image: this.config.image }));
     const deadlineAt = Math.min(c.expiresAt, Date.now() + timeout), supervisorFile = await this.supervisor();
     const args = containerArguments({ name, nonce, machineId: this.store.machineId, workspace, workspaceIdentity, config: this.config, executable, argv, deadlineAt, supervisorFile });
     this.store.db.prepare("INSERT INTO container_workers(operation_id,name,nonce,context,root_id,workspace,input_digest,phase,cid,reason,workspace_identity) VALUES (?,?,?,?,?,?,?,'prepared',NULL,NULL,?)").run(id2, name, nonce, canonical(c), rootId, workspace, digest2, workspaceIdentity);
@@ -2179,7 +3249,7 @@ function reconcileRootsGeneration(db, generation) {
 import { constants as constants3 } from "node:fs";
 import { open as open4, lstat as lstat4, stat as stat4, realpath as realpath3, link, unlink as unlink3 } from "node:fs/promises";
 import path3 from "node:path";
-import { randomBytes as randomBytes2 } from "node:crypto";
+import { randomBytes as randomBytes3 } from "node:crypto";
 var PINNED_WRITE_MAX_BYTES = 1048576;
 var PINNED_WRITE_MAX_LIMIT_BYTES = 16 * 1024 * 1024;
 var PINNED_WRITE_MAX_PATH_BYTES = 4096;
@@ -2418,7 +3488,7 @@ async function pinnedCreateNewFile(request) {
   try {
     await pinned.verifyHostPath(directoryPath);
     if (await pinned.lstatChild(targetName)) failWrite("TARGET_EXISTS", 409, { target: targetPath });
-    tempName = `${PINNED_WRITE_TEMP_PREFIX}${randomBytes2(16).toString("hex")}`;
+    tempName = `${PINNED_WRITE_TEMP_PREFIX}${randomBytes3(16).toString("hex")}`;
     const temp = await open4(pinned.childPath(tempName), TEMP_FLAGS, 384).catch((e) => {
       const code = fsCode(e);
       if (code === "EEXIST") failWrite("PINNED_WRITE_FAILED", 500, { reason: "temp-name-collision" });
@@ -2507,15 +3577,15 @@ async function pinnedCreateNewFile(request) {
 }
 
 // src/cli-task.ts
-import { readFile as readFile7, stat as stat6, writeFile as writeFile4 } from "node:fs/promises";
+import { readFile as readFile8, stat as stat6, writeFile as writeFile4 } from "node:fs/promises";
 import { isAbsolute as isAbsolute6, join as join7, relative, resolve as resolve2 } from "node:path";
 
 // ../packages/cli-runtime/src/agent-codex-runtime.mjs
-import { randomBytes as randomBytes4 } from "node:crypto";
+import { randomBytes as randomBytes6 } from "node:crypto";
 
 // ../packages/cli-runtime/src/codex-session-core.mjs
-import { createHash as createHash3 } from "node:crypto";
-import { readFile as readFile6, realpath as realpath6, stat as stat5, mkdir as mkdir5, writeFile as writeFile3 } from "node:fs/promises";
+import { createHash as createHash6 } from "node:crypto";
+import { readFile as readFile7, realpath as realpath6, stat as stat5, mkdir as mkdir5, writeFile as writeFile3 } from "node:fs/promises";
 import { spawn as spawn3 } from "node:child_process";
 import { isAbsolute as isAbsolute5, join as join6 } from "node:path";
 
@@ -2523,11 +3593,128 @@ import { isAbsolute as isAbsolute5, join as join6 } from "node:path";
 import { spawn as spawn2 } from "node:child_process";
 import { EventEmitter as EventEmitter2 } from "node:events";
 import { StringDecoder } from "node:string_decoder";
-import { access as access2, realpath as realpath4 } from "node:fs/promises";
-import { isAbsolute as isAbsolute3, join as join4 } from "node:path";
+import { access as access2, lstat as lstat5, readFile as readFile6, readdir as readdir2, realpath as realpath4, rmdir, unlink as unlink4 } from "node:fs/promises";
+import { lstatSync as lstatSync2, mkdirSync as mkdirSync2, mkdtempSync, readFileSync as readFileSync2, realpathSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { randomBytes as randomBytes4 } from "node:crypto";
+import { tmpdir } from "node:os";
+import { basename, dirname, isAbsolute as isAbsolute3, join as join4 } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// ../packages/cli-runtime/src/native-cli-output.mjs
+import { createHash as createHash4 } from "node:crypto";
+var FRAME = 262144;
+var RAW_FRAME = 18 * 1024 * 1024;
+var IMAGE = 6 * 1024 * 1024;
+var fail2 = () => {
+  throw new Error("CLI_FRAME_LIMIT");
+};
+function receipt(frame, rawBytes) {
+  const results = frame?.type === "user" && frame.message?.content;
+  const toolResult = Array.isArray(results) && results.length > 0 && results.every((block) => block?.type === "tool_result" && typeof block.tool_use_id === "string");
+  if (!toolResult) {
+    if (rawBytes > FRAME) fail2();
+    return frame;
+  }
+  let imageBytes = 0, images = 0, nodes = 0;
+  const visit = (value, depth = 0) => {
+    if (++nodes > 3e4 || depth > 24) fail2();
+    if (!value || typeof value !== "object") return value;
+    if (value.type === "image") {
+      const source = value.source;
+      const data = source?.type === "base64" ? source.data : value.data;
+      const mediaType = source?.type === "base64" ? source.media_type : value.mimeType;
+      if (typeof data !== "string" || data.length > IMAGE / 3 * 4 || !["image/png", "image/jpeg", "image/webp"].includes(mediaType)) fail2();
+      const bytes = Buffer.from(data, "base64");
+      if (!bytes.length || bytes.length > IMAGE || bytes.toString("base64") !== data || ++images > 32 || (imageBytes += bytes.length) > IMAGE * 2) fail2();
+      return { type: "image", mediaType, bytes: bytes.length, sha256: createHash4("sha256").update(bytes).digest("hex") };
+    }
+    if (Array.isArray(value)) return value.map((item) => visit(item, depth + 1));
+    return Object.fromEntries(Object.entries(value).map(([key2, item]) => [key2, visit(item, depth + 1)]));
+  };
+  const result = visit(frame);
+  if (rawBytes > FRAME && !images || Buffer.byteLength(JSON.stringify(result)) > FRAME) fail2();
+  return result;
+}
+var NativeCliOutput = class {
+  #buffer = "";
+  #bytes = 0;
+  push(text) {
+    this.#buffer += text;
+    const frames = [];
+    let end;
+    while ((end = this.#buffer.indexOf("\n")) >= 0) {
+      const line = this.#buffer.slice(0, end);
+      this.#buffer = this.#buffer.slice(end + 1);
+      const rawBytes = Buffer.byteLength(line);
+      if (rawBytes > RAW_FRAME) fail2();
+      if (!line.trim()) continue;
+      const frame = receipt(JSON.parse(line), rawBytes);
+      this.#bytes += Buffer.byteLength(JSON.stringify(frame));
+      if (this.#bytes > 8 * 1024 * 1024) fail2();
+      frames.push(frame);
+    }
+    if (Buffer.byteLength(this.#buffer) > RAW_FRAME) fail2();
+    return frames;
+  }
+};
+
+// ../packages/cli-runtime/src/native-process.mjs
 var HERE = fileURLToPath(new URL(".", import.meta.url));
 var MAX_FRAME = 262144;
+var COMPILER_ROOT = "DSH_NATIVE_COMPILER_ROOT";
+var COMPILER_SCRATCH = "DSH_NATIVE_COMPILER_SCRATCH";
+var inheritedCompilerRoot = process.platform === "win32" ? process.env[COMPILER_ROOT] : void 0;
+var hostTemp = process.platform === "win32" ? tmpdir() : null;
+var compilerRoot = null;
+var compilerFailure = () => Object.assign(new Error("NATIVE_COMPILER_SCRATCH_UNAVAILABLE"), { code: "NATIVE_COMPILER_SCRATCH_UNAVAILABLE" });
+var sameDirectory = (info, expected) => info.isDirectory() && !info.isSymbolicLink() && info.dev === expected.dev && info.ino === expected.ino;
+var rootStamp = (path4) => `dsh-native-compiler-v1:${basename(path4)}
+`;
+function compilerDirectory() {
+  try {
+    if (!compilerRoot) {
+      if (inheritedCompilerRoot !== void 0) {
+        if (!isAbsolute3(inheritedCompilerRoot) || inheritedCompilerRoot.length > 140 || !/^dshc-[a-f0-9]{16}$/.test(basename(inheritedCompilerRoot))) throw compilerFailure();
+        const info2 = lstatSync2(inheritedCompilerRoot, { bigint: true });
+        if (!info2.isDirectory() || info2.isSymbolicLink() || realpathSync(inheritedCompilerRoot) !== inheritedCompilerRoot || readFileSync2(join4(inheritedCompilerRoot, ".dsh-root"), "utf8") !== rootStamp(inheritedCompilerRoot)) throw compilerFailure();
+        compilerRoot = { path: inheritedCompilerRoot, info: info2 };
+      } else {
+        const parent = realpathSync(hostTemp);
+        const path5 = join4(parent, `dshc-${randomBytes4(8).toString("hex")}`);
+        if (path5.length > 140) throw compilerFailure();
+        mkdirSync2(path5);
+        writeFileSync2(join4(path5, ".dsh-root"), rootStamp(path5), { flag: "wx" });
+        compilerRoot = { path: path5, info: lstatSync2(path5, { bigint: true }) };
+      }
+    }
+    if (!sameDirectory(lstatSync2(compilerRoot.path, { bigint: true }), compilerRoot.info) || realpathSync(compilerRoot.path) !== compilerRoot.path) throw compilerFailure();
+    const path4 = mkdtempSync(join4(compilerRoot.path, "c-"));
+    const info = lstatSync2(path4, { bigint: true }), owner = randomBytes4(16).toString("hex");
+    writeFileSync2(join4(path4, ".dsh-owner"), owner, { flag: "wx" });
+    const root = compilerRoot;
+    const cleanup = async () => {
+      try {
+        if (dirname(path4) !== root.path || !/^c-[A-Za-z0-9]{6}$/.test(basename(path4))) return false;
+        if (!sameDirectory(await lstat5(root.path, { bigint: true }), root.info) || await realpath4(root.path) !== root.path) return false;
+        if (!sameDirectory(await lstat5(path4, { bigint: true }), info) || await realpath4(path4) !== path4 || await readFile6(join4(path4, ".dsh-owner"), "utf8") !== owner) return false;
+        const names = await readdir2(path4);
+        if (names.length > 128) return false;
+        for (const name of names) {
+          const entry = await lstat5(join4(path4, name));
+          if (!entry.isFile() || entry.isSymbolicLink()) return false;
+        }
+        for (const name of names) await unlink4(join4(path4, name));
+        await rmdir(path4);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    return { root: root.path, path: path4, cleanup };
+  } catch {
+    throw compilerFailure();
+  }
+}
 function privateEnvironment(home, source = process.env) {
   const env2 = {
     HOME: home,
@@ -2547,6 +3734,7 @@ function privateEnvironment(home, source = process.env) {
   };
   for (const key2 of ["SystemRoot", "windir", "ComSpec", "LANG", "LC_ALL"]) if (source[key2]) env2[key2] = source[key2];
   env2.PATH = process.platform === "win32" ? join4(source.SystemRoot ?? "C:\\Windows", "System32") : "/usr/bin:/bin";
+  if (process.platform === "win32" && (compilerRoot?.path ?? inheritedCompilerRoot)) env2[COMPILER_ROOT] = compilerRoot?.path ?? inheritedCompilerRoot;
   return env2;
 }
 async function resolveNativeHelper({ python = "/usr/bin/python3" } = {}) {
@@ -2562,25 +3750,26 @@ async function resolveNativeHelper({ python = "/usr/bin/python3" } = {}) {
 function nativeProcess(helper, mode, spec, { home, env: env2 = privateEnvironment(home) } = {}) {
   const events = new EventEmitter2();
   const args = helper.platform === "win32" ? [...helper.prefix, "-Mode", mode] : [...helper.prefix, mode];
-  const child = spawn2(helper.executable, args, { cwd: home, env: env2, windowsHide: true, shell: false, stdio: ["pipe", "pipe", "pipe"] });
-  let tail = "", buffer = "", bytes = 0, closed2 = false;
+  const compiler = helper.platform === "win32" ? compilerDirectory() : null;
+  const helperEnv = compiler ? Object.fromEntries(Object.entries(env2).filter(([key2]) => ![COMPILER_ROOT, COMPILER_SCRATCH].includes(key2.toUpperCase()))) : env2;
+  if (compiler) {
+    helperEnv[COMPILER_ROOT] = compiler.root;
+    helperEnv[COMPILER_SCRATCH] = compiler.path;
+  }
+  const child = spawn2(helper.executable, args, { cwd: home, env: helperEnv, windowsHide: true, shell: false, stdio: ["pipe", "pipe", "pipe"] });
+  let tail = "", buffer = "", bytes = 0, closed2 = false, treeStopped = false;
   const decoder = new StringDecoder("utf8"), cliDecoder = new StringDecoder("utf8");
-  let cliBuffer = "";
+  const cliOutput = new NativeCliOutput();
   const frame = (value) => {
+    if (mode === "supervise" && value.control === "stopped" && value.treeStopped === true) treeStopped = true;
     if (mode === "supervise" && value.type === "cli-output") {
       if (typeof value.data !== "string" || value.data.length > MAX_FRAME * 2) throw new Error("INVALID_CLI_FRAME");
-      cliBuffer += cliDecoder.write(Buffer.from(value.data, "base64"));
-      if (Buffer.byteLength(cliBuffer) > MAX_FRAME) throw new Error("CLI_FRAME_LIMIT");
-      let end;
-      while ((end = cliBuffer.indexOf("\n")) >= 0) {
-        const line = cliBuffer.slice(0, end);
-        cliBuffer = cliBuffer.slice(end + 1);
-        if (line.trim()) events.emit("message", JSON.parse(line));
-      }
+      for (const message of cliOutput.push(cliDecoder.write(Buffer.from(value.data, "base64")))) events.emit("message", message);
     } else events.emit(value.control ? "control" : "message", value);
   };
-  const exit = new Promise((resolve4) => child.once("close", (code, signal) => {
+  const exit = new Promise((resolve4) => child.once("close", async (code, signal) => {
     closed2 = true;
+    if (compiler && code === 0 && signal === null && (mode !== "supervise" || treeStopped)) await compiler.cleanup();
     events.emit("closed", { code, signal });
     resolve4({ code, signal });
   }));
@@ -2593,7 +3782,8 @@ function nativeProcess(helper, mode, spec, { home, env: env2 = privateEnvironmen
   child.stdout.on("data", (chunk) => {
     bytes += chunk.length;
     buffer += decoder.write(chunk);
-    if (bytes > 8 * 1024 * 1024 || Buffer.byteLength(buffer) > MAX_FRAME) {
+    const boundedStream = mode === "client" || mode === "server" || mode === "supervise";
+    if (!boundedStream && bytes > 8 * 1024 * 1024 || Buffer.byteLength(buffer) > MAX_FRAME) {
       events.emit("failure", new Error("OUTPUT_LIMIT"));
       child.stdin.end();
       return;
@@ -2690,9 +3880,9 @@ async function protectProfile(helper, home) {
 }
 
 // ../packages/capability-broker/src/cli-bootstrap.mjs
-import { generateKeyPairSync, sign, randomBytes as randomBytes3 } from "node:crypto";
-import { mkdir as mkdir4, writeFile as writeFile2, mkdtemp, chmod, lstat as lstat5, realpath as realpath5, rmdir } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { generateKeyPairSync, sign as sign2, randomBytes as randomBytes5 } from "node:crypto";
+import { mkdir as mkdir4, writeFile as writeFile2, mkdtemp, chmod, lstat as lstat6, realpath as realpath5, rmdir as rmdir2 } from "node:fs/promises";
+import { tmpdir as tmpdir2 } from "node:os";
 import { isAbsolute as isAbsolute4, join as join5 } from "node:path";
 import { performance as performance2 } from "node:perf_hooks";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
@@ -2716,14 +3906,65 @@ var PolicyError = class extends Error {
   }
 };
 
+// ../packages/capability-broker/src/cli-bridge-response.mjs
+import { createHash as createHash5 } from "node:crypto";
+var CHUNK_BYTES = 128 * 1024;
+var MAX_RESPONSE = 9 * 1024 * 1024;
+var MAX_BUFFERED = 16 * 1024 * 1024;
+var fail3 = () => {
+  throw new Error("INVALID_BRIDGE_RESPONSE");
+};
+var sha2 = (bytes) => createHash5("sha256").update(bytes).digest("hex");
+function* bridgeResponseFrames(id2, value) {
+  let bytes = Buffer.from(JSON.stringify({ type: "response", id: id2, ...value }));
+  if (bytes.length > MAX_RESPONSE) bytes = Buffer.from(JSON.stringify({ type: "response", id: id2, ok: false, code: "OUTPUT_LIMIT" }));
+  if (bytes.length <= CHUNK_BYTES) {
+    yield JSON.parse(bytes.toString("utf8"));
+    return;
+  }
+  yield { type: "response-start", id: id2, bytes: bytes.length };
+  for (let offset = 0, index = 0; offset < bytes.length; offset += CHUNK_BYTES, index++) {
+    yield { type: "response-chunk", id: id2, index, data: bytes.subarray(offset, offset + CHUNK_BYTES).toString("base64") };
+  }
+  yield { type: "response-end", id: id2, sha256: sha2(bytes) };
+}
+function normalizeBridgeMcpResult(value) {
+  if (!value || !Array.isArray(value.content) || value.content.length > 32 || Object.keys(value).some((key2) => !["content", "isError"].includes(key2)) || value.isError !== void 0 && typeof value.isError !== "boolean") fail3();
+  for (const block of value.content) {
+    if (block?.type === "text") {
+      if (Object.keys(block).some((key2) => !["type", "text"].includes(key2)) || typeof block.text !== "string") fail3();
+    } else if (block?.type === "image") {
+      if (Object.keys(block).some((key2) => !["type", "data", "mimeType"].includes(key2)) || !["image/png", "image/jpeg", "image/webp"].includes(block.mimeType) || typeof block.data !== "string" || block.data.length > 8 * 1024 * 1024) fail3();
+      const bytes = Buffer.from(block.data, "base64");
+      if (!bytes.length || bytes.toString("base64") !== block.data || bytes.length > 6 * 1024 * 1024) fail3();
+    } else fail3();
+  }
+  return value;
+}
+
 // ../packages/capability-broker/src/cli-bootstrap.mjs
 var BRIDGE = fileURLToPath2(new URL("./cli-stdio-bridge.mjs", import.meta.url));
 var MAX_BYTES = 262144;
-async function createCliBootstrap({ authority, subject, binding, tools, handlers, home, ttlMs = 3e4, helper }) {
+var REQUEST_KEYS = ["type", "id", "op", "name", "args"];
+var capabilityOf = (handler) => {
+  const value = handler.capability ?? handler.definition.name;
+  if (typeof value !== "string" || !value || Buffer.byteLength(value) > 256) throw new TypeError("INVALID_HANDLER_CAPABILITY");
+  return value;
+};
+async function createCliBootstrap({ authority, subject, binding, tools, handlers, home, ttlMs = 3e4, helper, contextFor = null }) {
   if (!isAbsolute4(home)) throw new TypeError("An isolated absolute home is required");
+  if (contextFor !== null && typeof contextFor !== "function") throw new TypeError("INVALID_HOST_CONTEXT_CALLBACK");
   const ownedBinding = Object.freeze({ ...binding });
   const registry = new Map(handlers.map((handler) => [handler.definition.name, handler]));
   if (registry.size !== handlers.length || tools.some((name) => !registry.has(name))) throw new TypeError("Unknown or duplicate bridge handler");
+  const selected = new Map(tools.map((name) => [name, { handler: registry.get(name), capability: capabilityOf(registry.get(name)) }]));
+  const leaseTools = [...new Set([...selected.values()].map((entry) => entry.capability))];
+  const byCapability = /* @__PURE__ */ new Map();
+  for (const entry of selected.values()) {
+    const sharing = byCapability.get(entry.capability);
+    if (sharing) sharing.push(entry.handler);
+    else byCapability.set(entry.capability, [entry.handler]);
+  }
   if (!Number.isSafeInteger(ttlMs) || ttlMs < 1e3 || ttlMs > 72e5 || typeof authority.renew !== "function") throw new TypeError("BOUNDED_RENEWABLE_LEASE_REQUIRED");
   const leaseTtlMs = Math.min(3e4, ttlMs);
   const startedAt = performance2.now();
@@ -2732,45 +3973,62 @@ async function createCliBootstrap({ authority, subject, binding, tools, handlers
   const publicSpki = publicKey.export({ type: "spki", format: "der" }).toString("base64url");
   await mkdir4(home, { recursive: true, mode: 448 });
   await mkdir4(join5(home, "tmp"), { recursive: true, mode: 448 });
-  const descriptorPath2 = join5(home, `bridge-${randomBytes3(12).toString("hex")}.json`);
+  const descriptorPath2 = join5(home, `bridge-${randomBytes5(12).toString("hex")}.json`);
   let socketDirectory;
-  let endpoint = process.platform === "win32" ? `dsh-cli-${randomBytes3(18).toString("hex")}` : join5(home, `p-${randomBytes3(6).toString("hex")}.sock`);
+  let endpoint = process.platform === "win32" ? `dsh-cli-${randomBytes5(18).toString("hex")}` : join5(home, `p-${randomBytes5(6).toString("hex")}.sock`);
   if (process.platform === "linux" && Buffer.byteLength(endpoint) > 103) {
-    let parent = await realpath5(tmpdir());
+    let parent = await realpath5(tmpdir2());
     if (Buffer.byteLength(join5(parent, "dsh-cli-XXXXXX", "p.sock")) > 103) parent = await realpath5("/tmp");
     socketDirectory = await mkdtemp(join5(parent, "dsh-cli-"));
     await chmod(socketDirectory, 448);
-    const stat8 = await lstat5(socketDirectory);
+    const stat8 = await lstat6(socketDirectory);
     if (!stat8.isDirectory() || stat8.isSymbolicLink() || stat8.uid !== process.getuid() || (stat8.mode & 63) !== 0) {
-      await rmdir(socketDirectory);
+      await rmdir2(socketDirectory);
       throw new Error("PRIVATE_SOCKET_DIRECTORY_REQUIRED");
     }
     endpoint = join5(socketDirectory, "p.sock");
     if (Buffer.byteLength(endpoint) > 103) {
-      await rmdir(socketDirectory);
+      await rmdir2(socketDirectory);
       throw new Error("PRIVATE_SOCKET_PATH_TOO_LONG");
     }
   }
   let lease;
   try {
-    lease = authority.issue(subject, { binding: ownedBinding, tools, ttlMs: leaseTtlMs });
+    lease = authority.issue(subject, { binding: ownedBinding, tools: leaseTools, ttlMs: leaseTtlMs });
   } catch (error2) {
-    if (socketDirectory) await rmdir(socketDirectory);
+    if (socketDirectory) await rmdir2(socketDirectory);
     throw error2;
   }
   let relay, closed2 = false, bound = false, connected = false, closing;
-  let accepted, rejected = 0, requests = 0, replies = 0;
+  let accepted, rejected = 0, requests = 0, replies = 0, highestRequestId = 0;
   const active = /* @__PURE__ */ new Map();
   const release = () => {
     authority.release(lease.token);
     for (const controller of active.values()) controller.abort(new Error("BRIDGE_CLOSED"));
   };
-  const reply = (id2, value) => {
+  const reply = async (id2, value, signal) => {
     if (!relay || relay.closed) return;
     replies++;
-    const wire = { type: "response", id: id2, ...value };
-    void relay.send(Buffer.byteLength(JSON.stringify(wire)) > MAX_BYTES ? { type: "response", id: id2, ok: false, code: "OUTPUT_LIMIT" } : wire).catch(() => {
-    });
+    for (const frame of bridgeResponseFrames(id2, value)) {
+      signal?.throwIfAborted();
+      await relay.send(frame);
+    }
+  };
+  const hostContext = (op, name, id2) => {
+    if (!contextFor) return null;
+    let value;
+    try {
+      value = contextFor({ op, name, id: id2 });
+    } catch (error2) {
+      throw error2 instanceof PolicyError ? error2 : new PolicyError("CONTEXT_UNAVAILABLE", { gate: "host-context" });
+    }
+    if (!value || typeof value !== "object" || typeof value.then === "function") throw new PolicyError("CONTEXT_UNAVAILABLE", { gate: "host-context" });
+    return value;
+  };
+  const requestSignal = (controller, context) => {
+    const signal = context?.signal ?? null;
+    if (signal !== null && !(signal instanceof AbortSignal)) throw new PolicyError("CONTEXT_UNAVAILABLE", { gate: "host-signal" });
+    return signal ? AbortSignal.any([controller.signal, signal]) : controller.signal;
   };
   async function request(message) {
     requests++;
@@ -2781,28 +4039,45 @@ async function createCliBootstrap({ authority, subject, binding, tools, handlers
     }
     if (message.type !== "request") return;
     const id2 = message.id;
+    if (id2 <= highestRequestId) {
+      void reply(id2, { ok: false, code: "DUPLICATE_REQUEST" }).catch(() => {
+      });
+      return;
+    }
+    highestRequestId = id2;
     try {
       if (closed2) throw new PolicyError("BRIDGE_CLOSED");
-      if (Buffer.byteLength(JSON.stringify(message)) > MAX_BYTES || Object.keys(message).some((key2) => !["type", "id", "op", "name", "args"].includes(key2))) throw new PolicyError("INVALID_REQUEST");
-      if (active.has(id2) || active.size >= 16) throw new PolicyError("BUSY");
+      if (Buffer.byteLength(JSON.stringify(message)) > MAX_BYTES || Object.keys(message).some((key2) => !REQUEST_KEYS.includes(key2))) throw new PolicyError("INVALID_REQUEST");
+      if (active.size >= 16) throw new PolicyError("BUSY");
       if (message.op === "list") {
-        reply(id2, { ok: true, value: authority.list(lease.token, ownedBinding).map((name) => registry.get(name).definition) });
+        const context2 = hostContext("list", null, id2);
+        requestSignal(new AbortController(), context2).throwIfAborted();
+        await reply(id2, { ok: true, value: authority.list(lease.token, ownedBinding).flatMap((capability) => byCapability.get(capability) ?? []).map((handler) => handler.definition) });
         return;
       }
       if (message.op !== "call") throw new PolicyError("INVALID_REQUEST");
+      const entry = selected.get(message.name);
+      if (!entry) throw new PolicyError("TOOL_DENIED");
+      const context = hostContext("call", message.name, id2);
       const controller = new AbortController();
+      const signal = requestSignal(controller, context);
       active.set(id2, controller);
       try {
-        const value = await authority.run(lease.token, ownedBinding, message.name, ({ signal }) => {
-          const handler = registry.get(message.name);
-          return handler.execute(handler.parse(message.args), { signal, binding: ownedBinding });
-        }, { signal: controller.signal });
-        reply(id2, { ok: true, value });
+        signal.throwIfAborted();
+        const value = await authority.run(lease.token, ownedBinding, entry.capability, ({ signal: authoritySignal }) => {
+          authoritySignal.throwIfAborted();
+          return entry.handler.execute(entry.handler.parse(message.args), { signal: authoritySignal, binding: ownedBinding, context });
+        }, { signal });
+        signal.throwIfAborted();
+        const mcpResult = entry.handler.render ? normalizeBridgeMcpResult(await entry.handler.render(value)) : null;
+        signal.throwIfAborted();
+        await reply(id2, { ok: true, ...mcpResult ? { mcpResult } : { value } }, signal);
       } finally {
         active.delete(id2);
       }
     } catch (error2) {
-      reply(id2, { ok: false, code: error2 instanceof PolicyError ? error2.code : "HANDLER_REFUSED" });
+      await reply(id2, { ok: false, code: error2 instanceof PolicyError ? error2.code : "HANDLER_REFUSED" }).catch(() => {
+      });
     }
   }
   const close = () => {
@@ -2823,7 +4098,7 @@ async function createCliBootstrap({ authority, subject, binding, tools, handlers
           await relay.exit;
         }
       }
-      if (socketDirectory) await rmdir(socketDirectory).catch(() => {
+      if (socketDirectory) await rmdir2(socketDirectory).catch(() => {
       });
     })();
     return closing;
@@ -2884,7 +4159,7 @@ async function createCliBootstrap({ authority, subject, binding, tools, handlers
       hostPid: process.pid,
       binding: ownedBinding
     });
-    const descriptor = JSON.stringify({ payload, signature: sign(null, Buffer.from(payload), privateKey).toString("base64url") });
+    const descriptor = JSON.stringify({ payload, signature: sign2(null, Buffer.from(payload), privateKey).toString("base64url") });
     await writeFile2(descriptorPath2, descriptor, { flag: "wx", mode: 384 });
   };
   return Object.freeze({
@@ -3020,14 +4295,14 @@ function assertEffectiveProfile(result, { requestedModel, bridge, home, tools, s
 }
 
 // ../packages/cli-runtime/src/codex-session-core.mjs
-var digest = (value) => createHash3("sha256").update(value).digest("hex");
+var digest = (value) => createHash6("sha256").update(value).digest("hex");
 var id = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
 var validText = (value) => typeof value === "string" && value.trim() && !value.includes("\0") && Buffer.byteLength(value) <= 64e3;
-async function pinCodexExecutable({ executable, sha256, version }, home) {
-  if (!isAbsolute5(executable) || !/^[a-f0-9]{64}$/.test(sha256) || !/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(version)) throw new TypeError("PINNED_NATIVE_ENTRY_REQUIRED");
+async function pinCodexExecutable({ executable, sha256: sha2562, version }, home) {
+  if (!isAbsolute5(executable) || !/^[a-f0-9]{64}$/.test(sha2562) || !/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(version)) throw new TypeError("PINNED_NATIVE_ENTRY_REQUIRED");
   const path4 = await realpath6(executable);
   if (!(await stat5(path4)).isFile() || process.platform === "win32" && !path4.toLowerCase().endsWith(".exe")) throw new Error("NATIVE_ENTRY_REQUIRED");
-  if (digest(await readFile6(path4)) !== sha256) throw new Error("CLI_ENTRY_CHANGED");
+  if (digest(await readFile7(path4)) !== sha2562) throw new Error("CLI_ENTRY_CHANGED");
   const reported = await new Promise((resolve4, reject) => {
     const child = spawn3(path4, ["--version"], { cwd: home, env: privateEnvironment(home), windowsHide: true, shell: false, stdio: ["ignore", "pipe", "pipe"] });
     let output = "", error2 = "";
@@ -3050,7 +4325,7 @@ async function pinCodexExecutable({ executable, sha256, version }, home) {
     });
   });
   if (reported !== `codex-cli ${version}`) throw new Error("CLI_VERSION_MISMATCH");
-  return Object.freeze({ path: path4, sha256, version });
+  return Object.freeze({ path: path4, sha256: sha2562, version });
 }
 async function createCodexSessionCore({
   authority,
@@ -3095,6 +4370,7 @@ async function createCodexSessionCore({
   await protectProfile(probe.helper, home);
   const entry = await pinCodexExecutable(suppliedEntry, home);
   const bridge = await createCliBootstrap({ authority, subject, binding, tools, handlers, home: join6(home, "b"), ttlMs: deadlineMs, helper: probe.helper });
+  const compilerRoot2 = privateEnvironment(home).DSH_NATIVE_COMPILER_ROOT;
   const config = [
     `model = ${JSON.stringify(requestedModel)}`,
     'model_provider = "openai"',
@@ -3124,15 +4400,16 @@ async function createCodexSessionCore({
     `HOME = ${JSON.stringify(home)}`,
     `USERPROFILE = ${JSON.stringify(home)}`,
     `TEMP = ${JSON.stringify(join6(home, "tmp"))}`,
-    `TMP = ${JSON.stringify(join6(home, "tmp"))}`
+    `TMP = ${JSON.stringify(join6(home, "tmp"))}`,
+    ...compilerRoot2 ? [`DSH_NATIVE_COMPILER_ROOT = ${JSON.stringify(compilerRoot2)}`] : []
   ].join("\n") + "\n";
   await writeFile3(join6(home, "config.toml"), config, { flag: "wx", mode: 384 });
   if (provisionCredentials) await provisionCredentials(home);
-  if (digest(await readFile6(join6(home, "config.toml"))) !== digest(Buffer.from(config))) {
+  if (digest(await readFile7(join6(home, "config.toml"))) !== digest(Buffer.from(config))) {
     await bridge.close();
     throw new Error("CLI_PROFILE_CHANGED_DURING_PROVISIONING");
   }
-  if (digest(await readFile6(entry.path)) !== entry.sha256) {
+  if (digest(await readFile7(entry.path)) !== entry.sha256) {
     await bridge.close();
     throw new Error("CLI_ENTRY_CHANGED");
   }
@@ -3402,7 +4679,7 @@ function agentAuthority(context, validate, requestedModel, catalogProvider, cata
     issue(_subject, { binding, tools, ttlMs }) {
       validate(context);
       if (binding?.location !== "remote" || !Array.isArray(tools) || tools.length || !Number.isSafeInteger(ttlMs) || ttlMs < 1 || ttlMs > 3e5) throw new Error("AGENT_CLI_LEASE_DENIED");
-      const token = randomBytes4(32).toString("base64url");
+      const token = randomBytes6(32).toString("base64url");
       leases.set(token, { binding: bindingKey(binding), tools: new Set(tools), expiresAt: Math.min(Date.now() + ttlMs, context.expiresAt) });
       return { token };
     },
@@ -3515,7 +4792,7 @@ var CliTasks = class {
   }
   async provision(profile, c, home) {
     const reference = profile.bots[c.botId].credentialRef;
-    const bytes = await readFile7(reference);
+    const bytes = await readFile8(reference);
     if (bytes.length > 65536) fail("CLI_CREDENTIAL_PROVISION_FAILED");
     await writeFile4(join7(home, "auth.json"), bytes, { flag: "wx", mode: 384 });
   }
@@ -3611,19 +4888,19 @@ var CliTasks = class {
       if (identity) await identity.pin.close();
       hooks.clearProcess();
     }
-    const base = session?.snapshot(), receipt = identity && base ? this.remoteReceipt(identity, base) : null, stopConfirmed = stop?.treeStopped === true;
-    if (receipt && stopConfirmed && controller.signal.aborted && !["completed", "failed"].includes(receipt.terminal)) receipt.terminal = "interrupted";
-    const terminal2 = receipt?.terminal === "completed" ? "succeeded" : receipt?.terminal === "failed" ? "failed" : receipt?.terminal === "interrupted" ? "cancelled" : "unknown";
+    const base = session?.snapshot(), receipt2 = identity && base ? this.remoteReceipt(identity, base) : null, stopConfirmed = stop?.treeStopped === true;
+    if (receipt2 && stopConfirmed && controller.signal.aborted && !["completed", "failed"].includes(receipt2.terminal)) receipt2.terminal = "interrupted";
+    const terminal2 = receipt2?.terminal === "completed" ? "succeeded" : receipt2?.terminal === "failed" ? "failed" : receipt2?.terminal === "interrupted" ? "cancelled" : "unknown";
     const status = !stopConfirmed ? "unknown" : error2 && terminal2 === "succeeded" ? "unknown" : terminal2;
     const code = status === "unknown" ? "OUTCOME_UNKNOWN" : status === "cancelled" ? "CANCELLED" : status === "failed" ? error2?.code ?? "CLI_TASK_FAILED" : null;
     const result = {
       kind: "remote-cli",
       schemaVersion: 1,
-      receipt,
+      receipt: receipt2,
       stopConfirmed,
       stopEvidence: stop ?? { treeStopped: false, status: "unconfirmed" },
       exitCode: Number.isSafeInteger(stop?.exitCode) ? stop.exitCode : null,
-      ...receipt?.cliTurnRequestsDispatched === 0 ? { notStarted: true, possiblyApplied: false } : {}
+      ...receipt2?.cliTurnRequestsDispatched === 0 ? { notStarted: true, possiblyApplied: false } : {}
     };
     return { status, result, error: code };
   }
@@ -3848,7 +5125,7 @@ var Agent = class {
     if (data.length > 8 * 1024 * 1024) fail("ARTIFACT_LIMIT", 413);
     const usage = await this.evictArtifacts(data.length);
     if (usage + data.length > ARTIFACT_QUOTA_BYTES) fail("ARTIFACT_QUOTA", 507);
-    const id2 = `artifact-${randomUUID6()}`;
+    const id2 = `artifact-${randomUUID7()}`;
     await mkdir6(join8(this.config.dataDir, "artifacts"), { recursive: true, mode: 448 });
     await writeFile5(join8(this.config.dataDir, "artifacts", id2), data, { flag: "wx", mode: 384 });
     this.store.db.prepare("INSERT INTO artifacts VALUES (?,?,?,?,?)").run(id2, canonical(c), sha(data), data.length, media);
@@ -3862,7 +5139,7 @@ var Agent = class {
       if (usage + needed <= ARTIFACT_QUOTA_BYTES) break;
       this.store.db.prepare("DELETE FROM artifacts WHERE id=?").run(row.id);
       usage -= row.size;
-      await unlink4(join8(this.config.dataDir, "artifacts", row.id)).catch(() => {
+      await unlink5(join8(this.config.dataDir, "artifacts", row.id)).catch(() => {
       });
     }
     return usage;
@@ -3885,7 +5162,7 @@ var Agent = class {
       if (!row) fail("ARTIFACT_NOT_FOUND", 404);
       this.store.own(row.context, c);
       if (name === "artifact_stat") return { artifactId: row.id, sha256: row.hash, size: row.size, mediaType: row.media };
-      const offset = integer(a.offset, 0, Number.MAX_SAFE_INTEGER, 0), length = integer(a.length, 1, 1048576, 65536), data = await readFile8(join8(this.config.dataDir, "artifacts", row.id));
+      const offset = integer(a.offset, 0, Number.MAX_SAFE_INTEGER, 0), length = integer(a.length, 1, 1048576, 65536), data = await readFile9(join8(this.config.dataDir, "artifacts", row.id));
       if (sha(data) !== row.hash) fail("ARTIFACT_CORRUPT");
       return { encoding: "base64", content: data.subarray(offset, offset + length).toString("base64"), eof: offset + length >= row.size };
     }
@@ -3971,9 +5248,9 @@ var Agent = class {
     if (pin) await pin.verify();
   }
   async legacyWrite(a, c, signal, target) {
-    const temp = join8(dirname(target), `.dsh-write-${randomUUID6()}`);
+    const temp = join8(dirname2(target), `.dsh-write-${randomUUID7()}`);
     try {
-      const parent = await stat7(dirname(target));
+      const parent = await stat7(dirname2(target));
       let previous = null;
       try {
         previous = (await this.roots.read(a.rootId, a.relativePath, 0, 1048577)).data;
@@ -3987,7 +5264,7 @@ var Agent = class {
       if (signal?.aborted) throw Object.assign(new AgentError("WRITE_CANCELLED", 409), { possiblyApplied: false });
       this.store.validate(c);
       await this.roots.resolve(a.rootId, a.relativePath, true);
-      const now = await stat7(dirname(target));
+      const now = await stat7(dirname2(target));
       if (now.ino !== parent.ino || now.dev !== parent.dev) fail("FILE_CHANGED", 409);
       let current = null;
       try {
@@ -4000,7 +5277,7 @@ var Agent = class {
       await rename(temp, target);
       return { sha256: sha(data), size: data.length };
     } finally {
-      await unlink4(temp).catch(() => {
+      await unlink5(temp).catch(() => {
       });
     }
   }
@@ -4110,7 +5387,7 @@ var Agent = class {
       await this.roots.assertPublicTree(source);
       if (await this.git(source, ["status", "--porcelain"])) fail("WORKSPACE_DIRTY", 409);
       const head = await this.git(source, ["rev-parse", "HEAD"]);
-      const id2 = `worktree-${randomUUID6()}`, relative2 = a.worktreeRelativePath;
+      const id2 = `worktree-${randomUUID7()}`, relative2 = a.worktreeRelativePath;
       if (typeof relative2 !== "string") fail("INVALID_ARGUMENT");
       const target = await this.roots.resolve(a.rootId, relative2, true);
       if (target === source || this.roots.inside(source, target)) fail("INVALID_WORKTREE_PATH");
@@ -4131,7 +5408,7 @@ var Agent = class {
     const patch = await this.git(row.path, ["diff", "--binary", row.head]);
     if (name === "worktree_diff") return { sourceHead: row.head, ...await this.artifact(Buffer.from(patch + "\n"), c, "text/x-diff") };
     if (await this.git(row.path, ["rev-parse", "HEAD"]) !== row.head || await this.git(row.source, ["rev-parse", "HEAD"]) !== row.head || await this.git(row.source, ["status", "--porcelain"])) return { status: "integration-pending", reason: "SOURCE_CHANGED", worktreeId: a.worktreeId };
-    const patchFile = join8(this.config.dataDir, `patch-${randomUUID6()}`);
+    const patchFile = join8(this.config.dataDir, `patch-${randomUUID7()}`);
     await writeFile5(patchFile, patch + "\n", { mode: 384 });
     try {
       if (!patch) return { status: "no-changes" };
@@ -4143,7 +5420,7 @@ var Agent = class {
       if (e instanceof AgentError) throw e;
       return { status: "integration-pending", reason: "PATCH_CONFLICT", worktreeId: a.worktreeId };
     } finally {
-      await unlink4(patchFile);
+      await unlink5(patchFile);
     }
   }
   async close() {
@@ -4161,9 +5438,9 @@ var Agent = class {
 };
 
 // src/transport.ts
-import http from "node:http";
+import http2 from "node:http";
 import https from "node:https";
-import { readFileSync as readFileSync2 } from "node:fs";
+import { readFileSync as readFileSync3 } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { isIP } from "node:net";
 import { Server, WebStandardStreamableHTTPServerTransport, SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/server";
@@ -4234,7 +5511,133 @@ var AuthThrottle = class {
 };
 
 // src/transport.ts
+import { WebSocketServer as WebSocketServer2 } from "ws";
+
+// src/e2e-server.ts
+import http from "node:http";
+import { duplexPair } from "node:stream";
 import { WebSocketServer } from "ws";
+function secureTransport(pairing, handler, upgrade) {
+  const sockets = new WebSocketServer({
+    noServer: true,
+    maxPayload: 65535,
+    perMessageDeflate: false,
+    handleProtocols: (protocols) => protocols.has(DIRECT_PROTOCOL) ? DIRECT_PROTOCOL : false
+  });
+  const sessions = /* @__PURE__ */ new Set(), attempts = /* @__PURE__ */ new Map();
+  let windowStart = 0, windowCount = 0, closing = false;
+  const sweep = setInterval(() => {
+    for (const session of sessions) if (session.peer && !pairing.validPeer(session.peer)) session.remove();
+  }, 500);
+  sweep.unref();
+  return {
+    accept(req, socket, head) {
+      if (closing || sockets.clients.size >= 16) fail("E2E_CONNECTION_LIMIT", 429);
+      if (req.headers.origin !== void 0 || req.headers["sec-websocket-protocol"] !== DIRECT_PROTOCOL) fail("E2E_CLIENT_REQUIRED", 403);
+      const now = Date.now(), source = req.socket.remoteAddress ?? "unknown";
+      if (now - windowStart >= 6e4 || now < windowStart) {
+        windowStart = now;
+        windowCount = 0;
+      }
+      const previous = attempts.get(source), row = previous && now - previous.start < 6e4 && now >= previous.start ? previous : { start: now, count: 0 };
+      if (++row.count > 30 || ++windowCount > 120) fail("E2E_CONNECTION_RATE_LIMIT", 429);
+      attempts.delete(source);
+      attempts.set(source, row);
+      while (attempts.size > 256) attempts.delete(attempts.keys().next().value);
+      sockets.handleUpgrade(req, socket, head, (ws) => {
+        sockets.emit("connection", ws, req);
+        const streams = /* @__PURE__ */ new Set();
+        let session;
+        const origin = http.createServer((request, response) => {
+          if (!session.peer || !pairing.validPeer(session.peer)) {
+            response.writeHead(403);
+            response.end();
+            return;
+          }
+          handler(request, response, session.peer);
+        });
+        origin.requestTimeout = 3e4;
+        origin.headersTimeout = 1e4;
+        origin.on("upgrade", (request, connection, bytes) => {
+          if (!session.peer || !pairing.validPeer(session.peer)) return connection.destroy();
+          upgrade(request, connection, bytes, session.peer);
+        });
+        const transport = {
+          send: (message) => {
+            if (ws.readyState === 1) ws.send(message);
+          },
+          close: (code) => {
+            if (ws.readyState < 2) ws.close(code === 1e3 || code >= 3e3 && code <= 4999 ? code : 1e3);
+          },
+          get bufferedAmount() {
+            return ws.bufferedAmount;
+          },
+          onceDrained(listener) {
+            const check = () => {
+              if (ws.readyState !== 1 || ws.bufferedAmount <= SEND_BUFFER_HIGH / 4) listener();
+              else {
+                const timer = setTimeout(check, 5);
+                timer.unref();
+              }
+            };
+            check();
+          }
+        };
+        session = E2ESession.computer({
+          transport,
+          transportByte: TRANSPORT_DIRECT,
+          staticKey: pairing.transportKey,
+          candidates: () => pairing.candidates(),
+          async connectOrigin() {
+            if (!session.peer || !pairing.validPeer(session.peer)) throw new Error("Peer removed");
+            const [client, server] = duplexPair();
+            Object.assign(server, { setTimeout() {
+              return server;
+            }, setNoDelay() {
+              return server;
+            }, setKeepAlive() {
+              return server;
+            }, remoteAddress: source });
+            client.on("error", () => {
+            });
+            server.on("error", () => {
+            });
+            client.once("close", () => server.destroy());
+            server.once("close", () => client.destroy());
+            streams.add(server);
+            server.once("close", () => streams.delete(server));
+            origin.emit("connection", server);
+            return client;
+          }
+        });
+        sessions.add(session);
+        ws.on("message", (data, binary) => {
+          try {
+            session.receive(Buffer.from(data), binary);
+          } catch {
+            session.close(4e3);
+          }
+        });
+        ws.on("error", () => session.close(4e3));
+        ws.once("close", (code) => session.transportClosed(code));
+        void session.closed.then(() => {
+          sessions.delete(session);
+          for (const stream of streams) stream.destroy();
+          origin.close();
+        });
+      });
+    },
+    async close() {
+      closing = true;
+      clearInterval(sweep);
+      for (const session of sessions) session.shutdown();
+      for (const socket of sockets.clients) socket.terminate();
+      await new Promise((resolve4) => sockets.close(() => resolve4()));
+    }
+  };
+}
+
+// src/transport.ts
 var loopback = (host) => ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(host);
 function validateNetwork(c) {
   const host = c.host ?? "127.0.0.1", mode = c.mode ?? "loopback";
@@ -4267,22 +5670,23 @@ function validateNetwork(c) {
   }
   if (mode === "cloudflare-tunnel" && (!loopback(host) || !c.protectedTunnel)) fail("TUNNEL_BACKEND_MUST_BE_LOOPBACK");
   if (mode === "public-tls" && !c.tls && (!loopback(host) || !c.trustedProxies?.length)) fail("TLS_REQUIRED");
-  if (!c.tls && !loopback(host) && !c.protectedTunnel) fail("TLS_REQUIRED");
-  if (!["loopback", "wireguard", "tailscale", "cloudflare-tunnel", "public-tls"].includes(mode)) fail("INVALID_NETWORK_MODE");
+  if (!c.tls && !loopback(host) && !c.protectedTunnel && mode !== "e2e") fail("TLS_REQUIRED");
+  if (!["loopback", "wireguard", "tailscale", "cloudflare-tunnel", "public-tls", "e2e"].includes(mode)) fail("INVALID_NETWORK_MODE");
 }
 async function serve(agent, c = {}) {
   c = structuredClone(c);
   validateNetwork(c);
   const throttle = new AuthThrottle(c.authLimits), host = c.host ?? "127.0.0.1";
-  const requestBoundary = (req, upgrade = false) => {
+  if (c.mode === "e2e" && !agent.store.pairing) fail("PAIRING_SERVICE_REQUIRED");
+  const requestBoundary = (req, upgrade = false, encrypted2 = false) => {
     const address = server.address(), defaultHost = `${host.includes(":") ? `[${host}]` : host}:${address.port}`;
     if (!(c.allowedHosts ?? [defaultHost]).includes(req.headers.host ?? "")) fail("HOST_DENIED", 403);
     const origin = req.headers.origin;
     if (origin !== void 0 && !(c.allowedOrigins ?? []).includes(origin) && !(upgrade && agent.desktopSessions.hasOrigin(origin))) fail("ORIGIN_DENIED", 403);
-    if (c.mode === "public-tls" && !c.tls && (!(c.trustedProxies ?? []).includes(req.socket.remoteAddress ?? "unknown") || req.headers["x-forwarded-proto"] !== "https")) fail("TLS_REQUIRED", 403);
+    if (!encrypted2 && c.mode === "public-tls" && !c.tls && (!(c.trustedProxies ?? []).includes(req.socket.remoteAddress ?? "unknown") || req.headers["x-forwarded-proto"] !== "https")) fail("TLS_REQUIRED", 403);
     return defaultHost;
   };
-  const handler = async (req, res) => {
+  const handler = async (req, res, peer) => {
     let context;
     const source = req.socket.remoteAddress ?? "unknown";
     const json = (status, value) => {
@@ -4290,7 +5694,27 @@ async function serve(agent, c = {}) {
       res.end(JSON.stringify(value));
     };
     try {
-      const defaultHost = requestBoundary(req);
+      const defaultHost = requestBoundary(req, false, !!peer);
+      if (c.mode === "e2e" && !peer) fail("E2E_REQUIRED", 426);
+      const url = new URL(req.url ?? "/", `http://${defaultHost}`);
+      if (peer && !agent.store.pairing.validPeer(peer)) fail("AUTH_INVALID", 401);
+      if (url.pathname === "/pair/v2/redeem") {
+        if (!peer || peer.kind !== "invite" || req.method !== "POST" || url.search) fail("PAIRING_CHANNEL_REQUIRED", 403);
+        let body2 = Buffer.alloc(0);
+        for await (const chunk of req) {
+          body2 = Buffer.concat([body2, chunk]);
+          if (body2.length > 2048) fail("REQUEST_TOO_LARGE", 413);
+        }
+        let input;
+        try {
+          input = JSON.parse(body2.toString("utf8"));
+        } catch {
+          fail("INVALID_JSON");
+        }
+        json(200, agent.store.pairing.redeem(peer, input));
+        return;
+      }
+      if (peer?.kind === "invite") fail("PAIRING_CHANNEL_ONLY", 403);
       const reject = (decision) => {
         if (decision.audit) agent.store.audit(decision.code);
         if (decision.retryAfterMs) res.setHeader("retry-after", String(Math.max(1, Math.ceil(decision.retryAfterMs / 1e3))));
@@ -4300,12 +5724,13 @@ async function serve(agent, c = {}) {
       if (!/^Bearer [A-Za-z0-9_-]{43}$/.test(auth)) {
         reject(throttle.failure(source));
       }
-      const url = new URL(req.url ?? "/", `http://${defaultHost}`);
       let client;
       const authenticate = () => {
         try {
+          if (peer && !agent.store.pairing.validPeer(peer)) fail("AUTH_INVALID", 401);
           if (url.pathname.startsWith("/control/v1/")) client = agent.store.client(auth.slice(7));
           else context = agent.store.grant(auth.slice(7));
+          if (peer && (client?.id ?? context?.clientId) !== peer.id) fail("AUTH_INVALID", 401);
         } catch {
           reject(throttle.failure(source));
         }
@@ -4337,6 +5762,10 @@ async function serve(agent, c = {}) {
         const result = agent.store.revokeGrants(client, parsed);
         await agent.desktopSessions.sweep();
         json(200, result);
+        return;
+      }
+      if (url.pathname === "/control/v1/desktop/close") {
+        json(200, await agent.desktopSessions.closeClientSession(client.id, parsed));
         return;
       }
       if (url.pathname === "/desktop/v1/session") {
@@ -4383,20 +5812,23 @@ async function serve(agent, c = {}) {
       json(e instanceof AgentError ? e.status : 500, { error: { code: e instanceof AgentError ? e.code : "AGENT_INTERNAL" } });
     }
   };
-  const tls = c.tls ? { key: readFileSync2(c.tls.keyFile), cert: readFileSync2(c.tls.certFile), ca: c.tls.caFile ? readFileSync2(c.tls.caFile) : void 0, requestCert: !!c.tls.requireClientCertificate, rejectUnauthorized: !!c.tls.requireClientCertificate } : null;
-  const server = tls ? https.createServer(tls, handler) : http.createServer(handler);
+  const tls = c.tls ? { key: readFileSync3(c.tls.keyFile), cert: readFileSync3(c.tls.certFile), ca: c.tls.caFile ? readFileSync3(c.tls.caFile) : void 0, requestCert: !!c.tls.requireClientCertificate, rejectUnauthorized: !!c.tls.requireClientCertificate } : null;
+  const publicHandler = (req, res) => void handler(req, res);
+  const server = tls ? https.createServer(tls, publicHandler) : http2.createServer(publicHandler);
   server.requestTimeout = 3e4;
   server.headersTimeout = 1e4;
   server.maxConnections = 128;
-  const websocket = new WebSocketServer({ noServer: true, clientTracking: true, maxPayload: 65536, perMessageDeflate: false });
-  server.on("upgrade", (req, socket, head) => {
+  const websocket = new WebSocketServer2({ noServer: true, clientTracking: true, maxPayload: 65536, perMessageDeflate: false });
+  const desktopUpgrade = (req, socket, head, peer) => {
     try {
-      const defaultHost = requestBoundary(req, true), url = new URL(req.url ?? "/", `http://${defaultHost}`);
+      const defaultHost = requestBoundary(req, true, !!peer), url = new URL(req.url ?? "/", `http://${defaultHost}`);
+      if (c.mode === "e2e" && !peer) fail("E2E_REQUIRED", 426);
+      if (peer && (peer.kind !== "client" || !agent.store.pairing.validPeer(peer))) fail("AUTH_INVALID", 401);
       if (url.pathname !== "/desktop/v1/socket" || url.search) fail("NOT_FOUND", 404);
       if (websocket.clients.size >= 16) fail("DESKTOP_CONNECTION_LIMIT", 429);
       websocket.handleUpgrade(req, socket, head, (ws) => {
         websocket.emit("connection", ws, req);
-        agent.desktopSessions.accept(ws, req.headers.origin, c.allowedOrigins ?? []);
+        agent.desktopSessions.accept(ws, req.headers.origin, c.allowedOrigins ?? [], peer?.id);
       });
     } catch (e) {
       const status = e instanceof AgentError ? e.status : 500;
@@ -4406,15 +5838,40 @@ Content-Length: 0\r
 \r
 `);
     }
+  };
+  const encrypted = agent.store.pairing ? secureTransport(agent.store.pairing, (req, res, peer) => void handler(req, res, peer), desktopUpgrade) : null;
+  server.on("upgrade", (req, socket, head) => {
+    try {
+      const defaultHost = requestBoundary(req, true), url = new URL(req.url ?? "/", `http://${defaultHost}`);
+      if (url.pathname === "/v1/e2e" && !url.search) {
+        if (!encrypted) fail("NOT_FOUND", 404);
+        encrypted.accept(req, socket, head);
+        return;
+      }
+      desktopUpgrade(req, socket, head);
+    } catch (e) {
+      const status = e instanceof AgentError ? e.status : 500;
+      socket.end(`HTTP/1.1 ${status} Rejected\r
+Connection: close\r
+Content-Length: 0\r
+\r
+`);
+    }
   });
-  await new Promise((resolve4, reject) => {
-    server.once("error", reject);
-    server.listen(c.port ?? 9701, host, () => resolve4());
-  });
+  try {
+    await new Promise((resolve4, reject) => {
+      server.once("error", reject);
+      server.listen(c.port ?? 9701, host, () => resolve4());
+    });
+  } catch (error2) {
+    await encrypted?.close();
+    throw error2;
+  }
   return { server, address: server.address(), supportedMcpVersions: SUPPORTED_PROTOCOL_VERSIONS, close: async () => {
     await agent.desktopSessions.close();
     for (const client of websocket.clients) client.terminate();
     await new Promise((resolve4) => websocket.close(() => resolve4()));
+    await encrypted?.close();
     await new Promise((resolve4, reject) => server.close((e) => e ? reject(e) : resolve4()));
   } };
 }

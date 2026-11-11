@@ -1,0 +1,10 @@
+OpenMausBot protocol components
+Upstream: https://github.com/milind-soni/OpenMausBot
+Pinned commit: 1bc4749aa8307d7d6998bf86de4ef6478460dd93
+Author: Milind Soni and OpenMausBot contributors
+License: Apache License 2.0; see vendor/LICENSE.
+
+The companion end-to-end encryption protocol, descriptor, credentials, yamux
+codec and interoperability vectors are copied without modification. Product
+adapters and their permission policy are separate from the frozen upstream
+files. SOURCE.json records each source path and byte hash.

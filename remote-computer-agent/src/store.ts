@@ -3,7 +3,9 @@ import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { randomUUID } from 'node:crypto'
 import { canonical, fail, identifier, matches, secret, sha, TOOL_NAMES, type Context } from './protocol.js'
+import { SecurePairing, MAX_PAIRED_CLIENTS } from './secure-pairing.js'
 export class Store {
+  pairing: SecurePairing
   db:any;machineId:string;private lockFd:number|undefined;private lockPath:string;private controllerGuard:any;private closed=false;private admin=false
   constructor(public dataDir:string,Database?:any,options:{admin?:boolean}={}) {
     this.admin=options.admin===true
@@ -38,6 +40,7 @@ export class Store {
         CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,time INTEGER NOT NULL,code TEXT NOT NULL,actor TEXT,operation TEXT);`)
       this.db.prepare('INSERT OR IGNORE INTO meta VALUES (?,?)').run('machineId',`machine-${randomUUID()}`)
       this.machineId=this.db.prepare('SELECT value FROM meta WHERE key=?').get('machineId').value
+      this.pairing=new SecurePairing(this.db,this.machineId,(id,ceiling)=>this.commitClient(id,ceiling))
       if(!options.admin)this.db.prepare("UPDATE operations SET status='unknown',error='OUTCOME_UNKNOWN' WHERE status IN ('admitted','running','cancel_pending')").run()
       // Tickets are process-lifetime credentials; a restart requires explicit reissuance.
       if(!options.admin)this.db.prepare('DELETE FROM grants').run()
@@ -52,7 +55,7 @@ export class Store {
       }
     }finally{if(this.controllerGuard){try{this.controllerGuard.exec('ROLLBACK')}catch{};this.controllerGuard.close();this.controllerGuard=undefined}}
   }
-  pair(id:string,ceiling:{botIds?:string[];hostManagedBots?:boolean;roots:string[];tools:string[]}) {
+  private approvedCeiling(id:string,ceiling:{botIds?:string[];hostManagedBots?:boolean;roots:string[];tools:string[]}) {
     identifier(id)
     if(!ceiling||ceiling.hostManagedBots!==undefined&&typeof ceiling.hostManagedBots!=='boolean'||!Array.isArray(ceiling.botIds??[])||!Array.isArray(ceiling.roots)||!ceiling.roots.length||!Array.isArray(ceiling.tools)||!ceiling.tools.length||ceiling.tools.some(x=>!TOOL_NAMES.includes(x)))fail('INVALID_CEILING')
     const managed=ceiling.hostManagedBots===true,botIds=ceiling.botIds??[]
@@ -60,11 +63,23 @@ export class Store {
     if(!managed&&!botIds.length)fail('INVALID_CEILING')
     botIds.forEach(identifier);ceiling.roots.forEach(identifier)
     const saved={botIds,roots:ceiling.roots,tools:ceiling.tools,...(managed?{hostManagedBots:true}:{})}
-    const token=secret();this.db.prepare('INSERT INTO clients VALUES (?,?,1,0,?)').run(id,sha(token),canonical(saved));return {clientId:id,token,machineId:this.machineId,secretRef:`remote-agent/${this.machineId}/${id}`,hostManagedBots:managed}
+    return saved
   }
+  private commitClient(id:string,ceiling:{botIds:string[];hostManagedBots?:boolean;roots:string[];tools:string[]}) { return this.db.transaction(()=>{
+    const previous=this.db.prepare('SELECT revoked FROM clients WHERE id=?').get(id);if(previous&&!previous.revoked)fail('CLIENT_ALREADY_PAIRED',409)
+    if(this.db.prepare('SELECT count(*) AS n FROM clients WHERE revoked=0').get().n>=MAX_PAIRED_CLIENTS)fail('PAIRING_DEVICE_LIMIT',429)
+    const token=secret();if(previous)this.db.prepare('UPDATE clients SET digest=?,revision=revision+1,revoked=0,ceiling=? WHERE id=? AND revoked=1').run(sha(token),canonical(ceiling),id)
+    else this.db.prepare('INSERT INTO clients VALUES (?,?,1,0,?)').run(id,sha(token),canonical(ceiling));return {clientId:id,token,machineId:this.machineId,secretRef:`remote-agent/${this.machineId}/${id}`,hostManagedBots:ceiling.hostManagedBots===true}
+  }).immediate() }
+  pair(id:string,ceiling:{botIds?:string[];hostManagedBots?:boolean;roots:string[];tools:string[]}) { return this.commitClient(id,this.approvedCeiling(id,ceiling)) }
+  invite(id:string,ceiling:{botIds?:string[];hostManagedBots?:boolean;roots:string[];tools:string[]},options:{endpoint:string;name?:string}) { if(!this.admin)fail('ADMIN_REQUIRED',403);return this.pairing.create(id,this.approvedCeiling(id,ceiling),options) }
   client(token:string) {if(typeof token!=='string'||token.length>256)fail('AUTH_INVALID',401);const row=this.db.prepare('SELECT * FROM clients WHERE digest=?').get(sha(token));const verified=matches(token,row?.digest??'0'.repeat(64));if(!verified||!row||row.revoked)fail('AUTH_INVALID',401);return row}
-  rotate(id:string) {const token=secret();if(!this.db.prepare('UPDATE clients SET digest=?,revision=revision+1,revoked=0 WHERE id=?').run(sha(token),identifier(id)).changes)fail('AUTH_INVALID',401);return {clientId:id,token}}
-  revoke(id:string) {this.db.prepare('UPDATE clients SET revoked=1,revision=revision+1 WHERE id=?').run(identifier(id))}
+  rotate(id:string) {return this.db.transaction(()=>{
+    identifier(id);const row=this.db.prepare('SELECT revoked FROM clients WHERE id=?').get(id);if(!row)fail('AUTH_INVALID',401)
+    if(row.revoked&&this.db.prepare('SELECT count(*) AS n FROM clients WHERE revoked=0').get().n>=MAX_PAIRED_CLIENTS)fail('PAIRING_DEVICE_LIMIT',429)
+    const token=secret();this.db.prepare('UPDATE clients SET digest=?,revision=revision+1,revoked=0 WHERE id=?').run(sha(token),id);this.pairing.invalidate(id);return {clientId:id,token}
+  }).immediate() }
+  revoke(id:string) {this.db.prepare('UPDATE clients SET revoked=1,revision=revision+1 WHERE id=?').run(identifier(id));this.pairing.invalidate(id)}
   private currentClient(client:any){const row=this.db.prepare('SELECT * FROM clients WHERE id=?').get(client?.id);if(!row||row.revoked||row.revision!==client.revision||row.digest!==client.digest)fail('AUTH_INVALID',401);return row}
   issue(client:any,request:any) {
     client=this.currentClient(client)
@@ -97,5 +112,5 @@ export class Store {
   finish(id:string,status:string,result:any=null,error:string|null=null) {this.db.prepare('UPDATE operations SET status=?,result=?,error=?,finished=? WHERE id=?').run(status,result===null?null:canonical(result),error,Date.now(),id)}
   running(id:string) {this.db.prepare("UPDATE operations SET status='running' WHERE id=? AND status='admitted'").run(id)}
   audit(code:string,actor:string|null=null,operation:string|null=null){this.db.prepare('INSERT INTO audit(time,code,actor,operation) VALUES (?,?,?,?)').run(Date.now(),code,actor,operation);this.db.prepare('DELETE FROM audit WHERE id < (SELECT max(id)-10000 FROM audit)').run()}
-  close(){if(this.closed)return;this.closed=true;try{this.db.close()}finally{this.releaseController()}}
+  close(){if(this.closed)return;this.closed=true;this.pairing?.close();try{this.db.close()}finally{this.releaseController()}}
 }

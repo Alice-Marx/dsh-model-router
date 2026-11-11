@@ -1,0 +1,24 @@
+--- a/src/client/model-menu.js
++++ b/src/client/model-menu.js
+@@ -1,6 +1,6 @@
+ import { createElement as h, Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+ import { createPortal } from 'react-dom'
+-import { currentPart } from './text.js'
++import { isOwnChatOf } from './sources.js'
+ import { CheckIcon, SlidersIcon } from './icons.js'
+ import { BotMark } from './mark.js'
+ import { KeyIcon, MaskedInput } from './secret-card.js'
+@@ -202,9 +202,11 @@
+   const bot = roster.byId[sessionId]
+   const [busy, setBusy] = useState('')
+   const [error, setError] = useState('')
+-  const shown = Boolean(bot) && currentPart(bot) === sessionId && roster.ready
++  // A thread is another own chat of the same Bot, so the Bot's model choice
++  // belongs to it exactly as it belongs to the default chat.
++  const shown = Boolean(bot) && isOwnChatOf(bot, sessionId) && roster.ready
+   useEffect(() => { if (shown) void actions.refreshModels?.() }, [shown, sessionId])
+-  if (!bot || currentPart(bot) !== sessionId || !roster.ready) return null
++  if (!bot || !isOwnChatOf(bot, sessionId) || !roster.ready) return null
+   const models = roster.models ?? []
+   // A model whose provider has no API key fails every turn, so it is no choice.
+   const usable = models.filter(model => !model.needsKey)

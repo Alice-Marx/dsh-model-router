@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises'
 import {EventEmitter} from 'node:events'
 import {randomUUID} from 'node:crypto'
 import type {WebSocket} from 'ws'
-import {AgentError,canonical,fail,integer,matches,secret,sha,type Context} from './protocol.js'
+import {AgentError,canonical,fail,identifier,integer,matches,secret,sha,type Context} from './protocol.js'
 
 type Config={pipeName:string;secretFile:string}
 type Ack={ok:boolean;code?:string;possiblyApplied?:boolean;stopConfirmed?:boolean;mode?:'watch'|'control';expiresAt?:number}
@@ -113,6 +113,13 @@ export class DesktopSessions {
     try{this.check(c);const ack=await row.native.request({t:'renew',expiresAt:c.expiresAt});if(ack.ok!==true)fail(ack.code??'DESKTOP_RENEW_FAILED',409);this.check(c);if(row.closed)fail('DESKTOP_SESSION_CLOSED',409);row.context=structuredClone(c);this.audit(row,'renewed');return this.ticket(row)}catch(e){await this.stop(row,'DESKTOP_RENEW_FAILED');throw e}finally{row.renewing=false}
   }
   async closeSession(c:Context,request:any){const row=this.own(c,request?.sessionId);return this.stop(row,'SESSION_CLOSED')}
+  async closeClientSession(clientId:string,request:any){
+    if(!request||typeof request!=='object'||Array.isArray(request)||Object.keys(request).some(key=>!['sessionId','botId','taskId','attemptId'].includes(key)))fail('INVALID_ARGUMENT')
+    for(const key of ['sessionId','botId','taskId','attemptId'])identifier(request[key])
+    const row=this.sessions.get(request.sessionId)
+    if(!row||row.context.clientId!==clientId||row.context.botId!==request.botId||row.context.taskId!==request.taskId||row.context.attemptId!==request.attemptId)fail('SCOPE_DENIED',403)
+    return this.stop(row,'SESSION_CLOSED')
+  }
   hasOrigin(origin:string){return [...this.sessions.values()].some(row=>!row.closed&&row.origin===origin&&row.context.expiresAt>Date.now())}
   private send(row:Session,message:any){if(row.socket?.readyState===1)row.socket.send(JSON.stringify(message))}
   private nextFrame(row:Session,delay=0){if(row.closed||row.frameRequested||row.pendingFrame||!row.socket||row.socket.readyState!==1)return;clearTimeout(row.frameTimer);row.frameRequested=true;row.frameTimer=setTimeout(()=>void (async()=>{if(row.closed)return;this.check(row.context);if(row.profile!==row.appliedProfile){const ack=await row.native.request({t:'video',...videoProfiles[row.profile]});if(!ack.ok)throw new AgentError(ack.code??'DESKTOP_VIDEO_FAILED');row.appliedProfile=row.profile}if(!row.closed)row.native.frame(this.forceKeyframes.delete(row))})().catch(()=>this.stop(row,'DESKTOP_VIDEO_FAILED')),delay);row.frameTimer.unref()}
@@ -156,7 +163,7 @@ export class DesktopSessions {
     fail('INVALID_ARGUMENT')
   }
   /** Called only after the HTTP server validates Host/network/TLS on upgrade. */
-  accept(socket:WebSocket,origin?:string,allowedOrigins:string[]=[]){
+  accept(socket:WebSocket,origin?:string,allowedOrigins:string[]=[],peerClientId?:string){
     this.sockets.add(socket);let row:Session|undefined,authenticating=false,alive=true
     const authTimer=setTimeout(()=>socket.close(1008,'Desktop authentication required'),this.options.authTimeoutMs??5000);authTimer.unref()
     const heartbeat=setInterval(()=>{if(!alive){socket.terminate();return}alive=false;socket.ping()},15000);heartbeat.unref();socket.on('pong',data=>{
@@ -181,6 +188,7 @@ export class DesktopSessions {
         try{
           const candidate=this.sessions.get(message.sessionId)
           if(message.type!=='auth'||typeof message.token!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(message.token)||!candidate||!matches(message.token,candidate.digest))fail('AUTH_INVALID',401)
+          if(peerClientId!==undefined&&candidate.context.clientId!==peerClientId)fail('AUTH_INVALID',401)
           if(candidate.closed||candidate.used)fail('DESKTOP_SESSION_CLOSED',409)
           this.check(candidate.context)
           if(origin!==undefined&&(candidate.origin?origin!==candidate.origin:!allowedOrigins.includes(origin)))fail('ORIGIN_DENIED',403)
@@ -221,7 +229,7 @@ export class DesktopSessions {
   }
   private stop(row:Session,reason:string):Promise<{stopConfirmed:boolean}>{
     this.forceKeyframes.delete(row)
-    if(row.stop)return row.stop
+    if(row.stop)return row.stopped?Promise.resolve({stopConfirmed:true}):row.stop
     row.closed=true;row.closedAt=Date.now();clearTimeout(row.frameTimer);clearTimeout(row.ackTimer);row.pendingFrame=undefined
     row.stop=(async()=>{const result=await row.native.close().catch(()=>({stopConfirmed:false}));row.stopped=result.stopConfirmed===true;row.mode='watch';this.send(row,{type:'status',status:'disconnected',mode:'watch',code:reason,stopConfirmed:row.stopped});row.socket?.close(1000,'Desktop session closed');this.audit(row,'closed',{reason,stopConfirmed:row.stopped});return {stopConfirmed:row.stopped}})()
     return row.stop

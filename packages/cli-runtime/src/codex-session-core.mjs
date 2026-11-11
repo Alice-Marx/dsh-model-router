@@ -54,6 +54,9 @@ export async function createCodexSessionCore({ authority, subject, binding, oper
   await protectProfile(probe.helper, home)
   const entry = await pinCodexExecutable(suppliedEntry, home)
   const bridge = await createCliBootstrap({ authority, subject, binding, tools, handlers, home: join(home, 'b'), ttlMs: deadlineMs, helper: probe.helper })
+  // Codex filters inherited MCP environment variables. Preserve the Host-owned
+  // compiler root explicitly while keeping the CLI's private HOME and TEMP.
+  const compilerRoot = privateEnvironment(home).DSH_NATIVE_COMPILER_ROOT
   const config = [
     `model = ${JSON.stringify(requestedModel)}`, 'model_provider = "openai"', 'approval_policy = "never"', 'sandbox_mode = "read-only"',
     'web_search = "disabled"', 'cli_auth_credentials_store = "file"', 'suppress_unstable_features_warning = true',
@@ -65,6 +68,7 @@ export async function createCodexSessionCore({ authority, subject, binding, oper
     `enabled_tools = ${JSON.stringify(tools)}`, 'env_vars = []', 'startup_timeout_sec = 20',
     '[mcp_servers.dsh_task.env]', `HOME = ${JSON.stringify(home)}`, `USERPROFILE = ${JSON.stringify(home)}`,
     `TEMP = ${JSON.stringify(join(home, 'tmp'))}`, `TMP = ${JSON.stringify(join(home, 'tmp'))}`,
+    ...(compilerRoot ? [`DSH_NATIVE_COMPILER_ROOT = ${JSON.stringify(compilerRoot)}`] : []),
   ].join('\n') + '\n'
   await writeFile(join(home, 'config.toml'), config, { flag: 'wx', mode: 0o600 })
   if (provisionCredentials) await provisionCredentials(home)

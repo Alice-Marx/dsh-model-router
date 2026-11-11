@@ -5,13 +5,16 @@ import { Server } from '@modelcontextprotocol/server'
 import { serveStdio, StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 import { nativeProcess, privateEnvironment } from '../../cli-runtime/src/native-process.mjs'
 import { dirname, isAbsolute } from 'node:path'
+import { BridgeResponseReader } from './cli-bridge-response.mjs'
 
 let relay, handle
 const pending = new Map()
+const responses = new BridgeResponseReader()
 let sequence = 0
 const finish = () => {
   for (const value of pending.values()) value.reject(new Error('BROKER_CLOSED'))
   pending.clear()
+  responses.clear()
   relay?.end()
 }
 try {
@@ -35,27 +38,37 @@ try {
   const ask = (op, payload, signal) => new Promise((resolve, reject) => {
     if (relay.closed || pending.size >= 16) { reject(new Error('BROKER_UNAVAILABLE')); return }
     const id = ++sequence
-    const abort = () => { const value = pending.get(id); pending.delete(id); void relay.send({ type: 'cancel', id }).catch(() => {}); value?.reject(new Error('REQUEST_CANCELLED')) }
+    const abort = () => { const value = pending.get(id); pending.delete(id); responses.drop(id); void relay.send({ type: 'cancel', id }).catch(() => {}); value?.reject(new Error('REQUEST_CANCELLED')) }
     if (signal?.aborted) { reject(new Error('REQUEST_CANCELLED')); return }
     const timer = setTimeout(abort, Math.min(remaining, 30_000))
     signal?.addEventListener('abort', abort, { once: true })
     const settle = fn => value => { clearTimeout(timer); signal?.removeEventListener('abort', abort); fn(value) }
     pending.set(id, { resolve: settle(resolve), reject: settle(reject) })
-    void relay.send({ type: 'request', id, op, ...payload }).catch(() => { const value = pending.get(id); pending.delete(id); value?.reject(new Error('BROKER_CLOSED')) })
+    void relay.send({ type: 'request', id, op, ...payload }).catch(() => { const value = pending.get(id); pending.delete(id); responses.drop(id); value?.reject(new Error('BROKER_CLOSED')) })
   })
   relay.events.on('message', message => {
-    if (message?.type !== 'response' || !Number.isSafeInteger(message.id)) return
-    const value = pending.get(message.id); pending.delete(message.id)
-    if (message.ok) value?.resolve(message.value)
-    else value?.reject(new Error(message.code ?? 'BROKER_REFUSED'))
+    if (!Number.isSafeInteger(message?.id) || !pending.has(message.id)) return
+    try {
+      const response = responses.accept(message)
+      if (!response) return
+      const value = pending.get(response.id); pending.delete(response.id)
+      if (response.ok) value?.resolve(response)
+      else value?.reject(new Error(response.code ?? 'BROKER_REFUSED'))
+    } catch {
+      const value = pending.get(message.id); pending.delete(message.id); responses.drop(message.id)
+      value?.reject(new Error('INVALID_BRIDGE_RESPONSE'))
+    }
   })
   relay.events.on('failure', () => { finish(); void handle?.close() })
   relay.events.once('closed', () => { finish(); void handle?.close() })
   handle = serveStdio(() => {
     const server = new Server({ name: 'dsh-task-capability-bridge', version: '0.0.0' }, { capabilities: { tools: {} } })
-    server.setRequestHandler('tools/list', async (_request, ctx) => ({ tools: await ask('list', {}, ctx.mcpReq.signal) }))
+    server.setRequestHandler('tools/list', async (_request, ctx) => ({ tools: (await ask('list', {}, ctx.mcpReq.signal)).value }))
     server.setRequestHandler('tools/call', async (request, ctx) => {
-      try { return { content: [{ type: 'text', text: JSON.stringify(await ask('call', { name: request.params.name, args: request.params.arguments ?? {} }, ctx.mcpReq.signal)) }] } }
+      try {
+        const response = await ask('call', { name: request.params.name, args: request.params.arguments ?? {} }, ctx.mcpReq.signal)
+        return response.mcpResult ?? { content: [{ type: 'text', text: JSON.stringify(response.value) }] }
+      }
       catch (error) { return { isError: true, content: [{ type: 'text', text: error.message }] } }
     })
     server.onclose = finish

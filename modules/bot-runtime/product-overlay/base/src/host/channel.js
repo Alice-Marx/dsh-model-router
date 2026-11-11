@@ -1,0 +1,647 @@
+// Client channel: the team view the browser renders, and the POST /api/bot endpoints.
+import { randomUUID } from 'node:crypto'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { install as installBtw } from './btw.js'
+import { install as installSide } from './side.js'
+import { handoffReply, questionReply, viewReply } from './parts.js'
+import { validateViewAnswer } from 'deep-view/core'
+import { COLORS, EXTRA_COLORS, ROUTE } from './constants.js'
+
+const LANGUAGES = { zh: 'Chinese (简体中文)', en: 'English' }
+const RUN_STATS = ['sessionStats', 'tokenUsage', 'contextPressure']
+
+const invalid = message => Object.assign(new Error(message), { code: 'bot/invalid' })
+// Programming and file system errors are DS Bot's own faults, logged with their stack;
+// any other error is a refusal whose message is meant for the user.
+const isInternal = error => error instanceof TypeError || error instanceof ReferenceError || error instanceof RangeError
+  || error instanceof SyntaxError || (typeof error?.code === 'string' && /^E[A-Z_]+$/.test(error.code))
+export function errorCode(error) {
+  if (typeof error?.code === 'string' && error.code.startsWith('bot/')) return error.code
+  return isInternal(error) ? 'bot/internal' : 'bot/refused'
+}
+
+export function install(rt) {
+  installBtw(rt)
+  installSide(rt)
+  const { ctx, state } = rt
+
+  // The DSH interface language of the last browser that asked for the team.
+  let uiLocale
+  rt.uiLanguage = () => (uiLocale === undefined ? undefined : LANGUAGES[uiLocale.split('-')[0].toLowerCase()] ?? uiLocale)
+
+  const ok = value => ({ ok: true, value })
+  const fail = (message, code = 'bot/error') => ({ ok: false, error: { code, message, details: {} } })
+  // Models come from DSH, not state.json, so a provider added in Harness settings
+  // changes the view without a new revision.
+  const modelsKey = () => `${rt.cachedCatalog().map(entry => `${entry.ref}${entry.needsKey ? '!' : ''}${entry.reasoning ? `:${JSON.stringify(entry.reasoning)}` : ''}`).join(',')}|${rt.cachedDefault() ?? ''}`
+  const view = () => ({
+    revision: state.revision,
+    workspaceId: state.workspaceId ?? null,
+    // `mainBotId` is the first Main Bot, which the sidebar shows as its tile.
+    mainBotId: state.mainBotIds[0] ?? null,
+    mainBotIds: state.mainBotIds,
+    // `sessionId` is the Bot's current own-chat part; `parts` its earlier ones.
+    // `waiting`: the Bot holds its greeting until the user picks its model or fixes
+    // what failed it. `blocked`: the facts of a failure only the user can fix (turns.js).
+    bots: Object.values(state.bots).map(({ segments, kickoff, ...bot }) => ({
+      ...bot, sessionId: rt.chatOf(bot.id), parts: (segments ?? []).map(segment => segment.sessionId), ...(kickoff ? { waiting: true } : {}),
+    })),
+    // `sessionId` is the group's own Session's current part, `ownParts` its earlier
+    // ones; `parts` the members' hidden group Sessions and their earlier segments,
+    // for usage.
+    rooms: Object.values(state.rooms).map(({ log, seen, paused, sessions, segments, parts: ownParts, ...room }) => {
+      const parts = [...Object.values(sessions ?? {}), ...Object.values(segments ?? {}).flat().map(segment => segment.sessionId), ...(ownParts ?? []).map(segment => segment.sessionId)]
+      const last = (log ?? []).filter(line => line.kind === undefined).at(-1)
+      return { ...room, sessionId: rt.sessionOfRoom(room), ownParts: (ownParts ?? []).map(segment => segment.sessionId), parts, ...(last ? { preview: last.who === 'User' ? last.text : `${last.who}：${last.text}` } : {}) }
+    }),
+    // Deleted private Bots whose folder, memory and chats stay closed to the others.
+    privateArchives: rt.archivesView(),
+    exchangeTurns: state.exchangeTurns,
+    questions: state.questions,
+    views: state.views ?? {},
+    // Aside answers of each Bot's current part, newest first. Not part of the
+    // model-visible history; earlier parts send their cards on their own pages.
+    btwCards: rt.btwView?.() ?? {},
+    // Each Bot's side chats, in creation order. The answers never join the
+    // model-visible history; the side panel reads them here.
+    sideChats: rt.sideView?.() ?? {},
+    // The team's DSH Agent (at most one): plain dsh Sessions, not Bots.
+    agents: Object.values(state.agents),
+    // Key names and who may use them; values never leave the host.
+    secrets: rt.secretsView(),
+    capabilities: rt.capabilityLibraryView(),
+    secretRequests: state.secretRequests ?? {},
+    colors: [...COLORS, ...EXTRA_COLORS],
+    models: rt.cachedCatalog(),
+    defaultModel: rt.cachedDefault() ?? null,
+    permissions: rt.permissionCatalog?.() ?? null,
+    modelsKey: modelsKey(),
+    prefs: state.prefs,
+    // Whether a Desktop window should serve Bot browser reads (see browser.js).
+    browser: rt.browserEnabled,
+    // False when config.memory turns memory off: no Memory row or panel.
+    memory: rt.memoryEnabled !== false,
+    // Set while another dsh host holds the team (store.js): why this one cannot change it.
+    readOnly: rt.readOnly() ?? null,
+  })
+  // What changes without a new revision, sent with every state answer. `learning`:
+  // each Bot's pending skill proposals. `memoryNews`:
+  // per Bot or group chat, its latest memory change; `memoryReviews`: memory reviews waiting or
+  // running; `work`: per Bot, the turn it runs and its tool; per group, the members whose
+  // turn there runs; the approvals waiting; per Bot, who it waits for to hand back work;
+  // and per Session, when its running turn began.
+  const live = () => ({
+    activity: rt.activityView(),
+    work: { bots: rt.workView(), rooms: rt.roomWorkView(), approvals: rt.approvalsView(), waiting: rt.waitingView?.() ?? {}, turns: rt.turnsView?.() ?? {}, steered: rt.steeredView?.() ?? {} },
+    memoryNews: rt.memoryNews(),
+    memoryReviews: rt.memoryReviews(),
+    learning: rt.learningView(),
+    connectors: rt.connectorsView(),
+    capabilityStatuses: rt.capabilityStatusesView(),
+  })
+  // The live fields' sources are spread across the host with no single change
+  // counter, so the serialized answer itself is the detector: a poll whose `live`
+  // still names it gets only the key back, not the fields again. The key carries
+  // a per-run prefix: a window can outlive the host, and a counter that restarts
+  // at 1 would let its stale key name a different answer.
+  const liveRun = randomUUID()
+  let liveSeq = 0
+  let liveCache = null
+  const liveAnswer = () => {
+    const value = live()
+    const json = JSON.stringify(value)
+    if (liveCache?.json === json) return liveCache
+    return liveCache = { key: `${liveRun}:${++liveSeq}`, value, json }
+  }
+  // What a host that only reads the team may still answer.
+  // Updates change the dsh profile, not the team, so a reading host may run them too.
+  const READS = new Set(['state', 'models', 'efforts', 'providers', 'provider-models', 'earlier', 'chat', 'run-stats', 'room-progress', 'exchange', 'exchange-text', 'file-text', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer', 'thinking', 'avatar-library'])
+
+  async function setPrefs(body) {
+    if (body.theme !== undefined) {
+      if (typeof body.theme !== 'string' || !/^[a-z][\w-]{0,31}$/.test(body.theme)) throw invalid('Unknown theme')
+      state.prefs.theme = body.theme
+    }
+    if (body.accent !== undefined) {
+      if (body.accent === null || body.accent === '') delete state.prefs.accent
+      else if (/^#[0-9a-f]{6}$/i.test(body.accent)) state.prefs.accent = body.accent
+      else throw invalid('Accent must be a #rrggbb color')
+    }
+    if (body.motion !== undefined) {
+      if (body.motion === null || body.motion === 'normal') delete state.prefs.motion
+      else if (body.motion === 'quiet' || body.motion === 'lively') state.prefs.motion = body.motion
+      else throw invalid('Motion must be quiet, normal or lively')
+    }
+    if (body.layout !== undefined) {
+      if (body.layout === null || body.layout === 'bubble') delete state.prefs.layout
+      else if (body.layout === 'flat') state.prefs.layout = body.layout
+      else throw invalid('Layout must be bubble or flat')
+    }
+    if (body.width !== undefined) {
+      if (body.width === null || body.width === 80) delete state.prefs.width
+      else if (Number.isInteger(body.width) && body.width >= 50 && body.width <= 100) state.prefs.width = body.width
+      else throw invalid('Width must be a whole percent from 50 to 100')
+    }
+    if (body.flatWidth !== undefined) {
+      if (body.flatWidth === null || body.flatWidth === 100) delete state.prefs.flatWidth
+      else if (Number.isInteger(body.flatWidth) && body.flatWidth >= 50 && body.flatWidth <= 100) state.prefs.flatWidth = body.flatWidth
+      else throw invalid('Flat text width must be a whole percent from 50 to 100')
+    }
+    if (body.defaultBotModel !== undefined) {
+      // The model new Bots start on when a create names none. It resolves now, so the
+      // saved ref is one the catalog served at save time; a create still re-checks it.
+      if (body.defaultBotModel === null || body.defaultBotModel === '') delete state.prefs.defaultBotModel
+      else state.prefs.defaultBotModel = await rt.resolveModel(body.defaultBotModel)
+    }
+    if (body.thinking !== undefined) {
+      // A value this version does not know is ignored, not refused: the toggle
+      // may grow more states later.
+      if (body.thinking === true) state.prefs.thinking = true
+      else if (body.thinking === false || body.thinking === null) delete state.prefs.thinking
+    }
+    if (body.enterToSend !== undefined) {
+      if (body.enterToSend === false) state.prefs.enterToSend = false
+      else if (body.enterToSend === true || body.enterToSend === null) delete state.prefs.enterToSend
+    }
+    return rt.save()
+  }
+
+  const handle = async (endpoint, payload, signal) => {
+    try {
+      const body = payload ?? {}
+      await rt.refresh()
+      const readOnly = rt.readOnly()
+      if (readOnly !== undefined && !READS.has(endpoint)) return fail(readOnly, 'bot/read-only')
+      switch (endpoint) {
+        case 'state': {
+          if (typeof body.locale === 'string' && /^[a-z]{2,3}(-[\w-]+)?$/i.test(body.locale)) uiLocale = body.locale
+          if (readOnly === undefined) await rt.bootstrap()
+          await rt.catalog()
+          await rt.loadSecrets()
+          const answer = liveAnswer()
+          if (body.since === state.revision && (body.models === undefined || body.models === modelsKey())) {
+            if (body.live === answer.key) return ok({ revision: state.revision, unchanged: true, liveKey: answer.key })
+            return ok({ revision: state.revision, unchanged: true, liveKey: answer.key, ...answer.value })
+          }
+          return ok({ ...view(), liveKey: answer.key, ...answer.value })
+        }
+        case 'models':
+          await rt.catalog({ fresh: true })
+          return ok({ modelsKey: modelsKey() })
+        case 'efforts':
+          return ok(await rt.reasoningOf(String(body.ref ?? '')) ?? { efforts: [] })
+        // A Turn's exact thinking time, from the timed stream in its events; `ms`
+        // omitted when the stream carries no reasoning records.
+        case 'thinking': {
+          const sessionId = String(body.sessionId ?? '')
+          const turn = Number(body.turn)
+          if (!Number.isFinite(turn) || rt.selfOf(sessionId) === undefined) return ok(null)
+          await rt.load()
+          const ms = await rt.thinkingOf(sessionId, turn)
+          return ok(ms === undefined ? {} : { ms })
+        }
+        // Model providers and their keys, for a window without DSH's own Models page.
+        case 'providers':
+          return ok(await rt.providersView())
+        case 'provider-key':
+          if (body.value === null) await rt.clearProviderKey(String(body.provider ?? ''))
+          else await rt.setProviderKey(String(body.provider ?? ''), body.value)
+          return ok(await rt.providersView())
+        case 'provider-add':
+          return ok(await rt.addProvider(body))
+        case 'provider-models':
+          return ok(await rt.discoverModels(body))
+        case 'provider-remove':
+          return ok(await rt.removeProvider(String(body.provider ?? '')))
+        case 'duplicate-bot':
+          await rt.load()
+          return ok(await rt.duplicateBot(body.id))
+        case 'set-prefs':
+          await rt.load()
+          await setPrefs(body)
+          return ok(state.prefs)
+        case 'exchange': {
+          await rt.load()
+          const pair = new Set([body.a, body.b])
+          return ok(state.exchanges.filter(entry => pair.has(entry.from) && pair.has(entry.to)))
+        }
+        case 'exchange-text': {
+          await rt.load()
+          const entry = state.exchanges.find(item => item.id === body.id)
+          if (entry === undefined) return fail('This message is no longer kept', 'bot/stale')
+          return ok(await rt.exchangeText(entry))
+        }
+        // A long Bot post's file (attachLong), for the group chat's "Show all".
+        case 'file-text': {
+          if (typeof body.file?.attachmentId !== 'string') return fail('No file named', 'bot/invalid')
+          const read = await rt.fileText(body.file)
+          return read === undefined ? fail('This file cannot be read here', 'bot/unavailable') : ok(read)
+        }
+        case 'earlier':
+          await rt.load()
+          return ok(await rt.earlierPage(String(body.sessionId ?? ''), body.cursor ?? undefined))
+        case 'chat':
+          await rt.load()
+          return ok(await rt.chatPage(String(body.botId ?? ''), body.cursor ?? undefined))
+        // DSH's own whole-log figures for the current part of a Bot's chat, the ones its
+        // status bar shows; a window without that bar shows them in the Bot's details.
+        case 'run-stats': {
+          await rt.load()
+          const bot = rt.botOf(String(body.botId ?? ''))
+          if (bot === undefined) return fail('Unknown Bot', 'bot/not-found')
+          const projections = ctx.get?.('sessionProjections')
+          if (projections === undefined) return ok(null)
+          const agent = await rt.resolveAgent(rt.chatOf(bot.id))
+          return ok(projections.snapshot(agent.session, RUN_STATS).values)
+        }
+        case 'usage':
+          await rt.load()
+          return ok(await rt.usageView({ timeZone: typeof body.timeZone === 'string' ? body.timeZone.slice(0, 64) : undefined }))
+        case 'room-progress': {
+          // Any part id of the group's own Session means the group itself.
+          const room = rt.roomOf(body.roomId) ?? rt.roomOf(rt.pastOwners.get(body.roomId)?.roomId)
+          return ok([...rt.roomProgress.entries()].filter(([, entry]) => entry.roomId === (room?.id ?? body.roomId)).map(([callId, entry]) => ({ callId, replies: entry.replies, speaking: entry.slots.filter(slot => slot.status === 'speaking').map(slot => slot.id) })))
+        }
+        case 'create-bot': {
+          await rt.bootstrap()
+          const bot = await rt.createBot({ name: body.name, role: body.role, color: body.color, instructions: body.instructions, brief: body.brief, avatar: body.avatar, model: body.model, effort: body.effort, workDir: body.workDir })
+          return ok(bot)
+        }
+        case 'update-bot':
+          await rt.load()
+          return ok(await rt.updateBot(body.id, body))
+        // The repair card's Retry, once the user fixed what failed the Bot's turn.
+        case 'resume': {
+          await rt.load()
+          const bot = rt.botOf(String(body.botId ?? ''))
+          if (bot === undefined) return fail('Unknown Bot', 'bot/not-found')
+          await rt.resumeBot(bot)
+          return ok(true)
+        }
+        // The avatar library: photos the user imported once, kept beside the team.
+        case 'avatar-library':
+          await rt.load()
+          return ok(await rt.avatarLibraryView({ offset: body.offset, limit: body.limit }))
+        case 'avatar-import':
+          await rt.load()
+          return ok(await rt.avatarLibraryImport(Array.isArray(body.items) ? body.items : []))
+        case 'avatar-delete':
+          await rt.load()
+          return ok(await rt.avatarLibraryDelete(String(body.id ?? '')))
+        case 'delete-bot':
+          await rt.load()
+          await rt.deleteBot(body.id)
+          return ok(view())
+        case 'private-release':
+          await rt.load()
+          await rt.releaseArchive(String(body.id ?? ''))
+          return ok(view())
+        case 'set-main':
+          await rt.load()
+          await rt.setMain(body.id, body.main !== false, {
+            primary: body.primary === true,
+            replace: typeof body.replace === 'string' ? body.replace : undefined,
+          })
+          return ok(view())
+        case 'create-room': {
+          await rt.load()
+          const room = await rt.createRoom({ members: Array.isArray(body.members) ? body.members : [], name: body.name, ...(typeof body.admin === 'string' ? { admin: body.admin } : {}) })
+          if (body.greet === true) await rt.greetRoom(room.id).catch(error => rt.warn('ds-bot: greeting in %s failed: %s', room.name, error))
+          return ok(room)
+        }
+        case 'update-room': {
+          await rt.load()
+          const { room, changes } = await rt.updateRoom(body.id, {
+            name: body.name,
+            notice: body.notice,
+            mode: body.mode,
+            admin: body.admin,
+            members: Array.isArray(body.members) ? body.members : undefined,
+            add: Array.isArray(body.add) ? body.add : undefined,
+            remove: Array.isArray(body.remove) ? body.remove : undefined,
+            workDir: body.workDir,
+            permission: body.permission,
+          })
+          return ok({ room: view().rooms.find(entry => entry.id === room.id), changes })
+        }
+        case 'folders':
+        case 'folder-pick':
+        case 'folder-list':
+          await rt.load()
+          return ok(await rt.folderEndpoint(endpoint, body, signal))
+        case 'team-workspace':
+          await rt.load()
+          return ok({ team: await rt.setTeamWorkspace(String(body.path ?? '')) })
+        case 'add-agent':
+          await rt.load()
+          return ok(await rt.addAgent())
+        case 'agent-session':
+          await rt.load()
+          return ok({ sessionId: await rt.createAgentSession(body.agentId, body.workspaceId) })
+        case 'agent-adopt':
+          await rt.load()
+          return ok({ sessionId: await rt.adoptAgentSession(body.agentId, body.sessionId) })
+        case 'agent-archive':
+          await rt.load()
+          await rt.archiveAgentSession(body.agentId, body.sessionId)
+          return ok(true)
+        case 'agent-rename':
+          await rt.load()
+          await rt.renameAgentSession(body.agentId, body.sessionId, body.title)
+          return ok(true)
+        case 'remove-agent':
+          await rt.load()
+          await rt.removeAgent(body.agentId)
+          return ok(view())
+        case 'set-flags':
+          await rt.load()
+          return ok(await rt.setFlags(body.id, body))
+        case 'delete-room':
+          await rt.load()
+          await rt.deleteRoom(body.id)
+          return ok(view())
+        case 'approval-answer':
+          rt.answerApproval(body.id, body.choice)
+          return ok(true)
+        case 'stop-member-work': {
+          const stopped = await rt.stopMemberWork(String(body.roomId ?? ''), String(body.botId ?? ''))
+          rt.goalUserStopped?.(String(body.roomId ?? ''))
+          return ok(stopped)
+        }
+        case 'stop-room-work': {
+          const stopped = await rt.stopRoomWork(String(body.roomId ?? ''))
+          rt.goalUserStopped?.(String(body.roomId ?? ''))
+          return ok(stopped)
+        }
+        case 'goal-draft': {
+          await rt.load()
+          const result = await rt.goalDraft(String(body.roomId ?? ''), body.text)
+          return result.error !== undefined ? fail(result.error, result.code ?? 'bot/refused') : ok(view())
+        }
+        case 'goal-control': {
+          await rt.load()
+          const result = await rt.goalControl(String(body.roomId ?? ''), body)
+          return result.error !== undefined ? fail(result.error, result.code ?? 'bot/refused') : ok(view())
+        }
+        case 'dismiss-question':
+          await rt.load()
+          if (rt.own(state.questions, body.sessionId) !== undefined) {
+            delete state.questions[body.sessionId]
+            await rt.save()
+          }
+          return ok(true)
+        case 'dismiss-view':
+          await rt.load()
+          if (rt.own(state.views, body.sessionId) !== undefined) {
+            delete state.views[body.sessionId]
+            await rt.save()
+          }
+          return ok(true)
+        case 'secret-set':
+        case 'secret-allow':
+        case 'secret-cancel':
+        case 'secret-update':
+        case 'secret-delete':
+          await rt.load()
+          return ok(await rt.secretEndpoint(endpoint, body))
+        case 'connector-connect':
+        case 'connector-disconnect':
+        case 'connector-retry':
+          await rt.load()
+          return ok(await rt.connectorEndpoint(endpoint, body))
+        case 'capability-save':
+        case 'capability-delete':
+        case 'capability-approve':
+        case 'bot-capability':
+          await rt.load()
+          return ok(await rt.capabilityEndpoint(endpoint, body))
+        case 'schedules':
+        case 'schedule-create':
+        case 'schedule-delete':
+          await rt.load()
+          return ok(await rt.scheduleEndpoint(endpoint, body))
+        case 'memory-view':
+        case 'memory-ask':
+        case 'memory-forget':
+        case 'memory-history':
+        case 'memory-restore':
+          await rt.load()
+          return ok(await rt.memoryEndpoint(endpoint, body))
+        case 'learning-answer':
+          await rt.load()
+          return ok(await rt.learningEndpoint(endpoint, body))
+        case 'answer-question': {
+          if (typeof body.sessionId !== 'string') return fail('Nothing to send', 'bot/invalid')
+          await rt.load()
+          const past = rt.pastOwners.get(body.sessionId)
+          const sessionId = rt.botOf(body.sessionId) ? rt.chatOf(body.sessionId) : past && past.roomId === undefined ? rt.chatOf(past.botId) : body.sessionId
+          const question = rt.own(state.questions, sessionId)
+          if (question === undefined || question.id !== body.questionId) return fail('This question is no longer open', 'bot/stale')
+          const reply = questionReply(question, body.answer)
+          if (reply === undefined) return fail('Nothing to send', 'bot/invalid')
+          // Claim the question before queueing so a second answer is refused.
+          delete state.questions[sessionId]
+          try {
+            await rt.ensureCapabilities(sessionId)
+            const agent = await rt.resolveAgent(sessionId)
+            agent.followup(createUserMessage({ content: [{ type: 'text', text: reply.text }], source: reply.source }))
+            await ctx.sessions.flush(agent.session)
+          } catch (error) {
+            state.questions[sessionId] ??= question
+            throw error
+          }
+          await rt.save()
+          return ok(true)
+        }
+        case 'view-reply': {
+          if (typeof body.sessionId !== 'string') return fail('Nothing to send', 'bot/invalid')
+          await rt.load()
+          const past = rt.pastOwners.get(body.sessionId)
+          const sessionId = rt.botOf(body.sessionId) ? rt.chatOf(body.sessionId) : past && past.roomId === undefined ? rt.chatOf(past.botId) : body.sessionId
+          const pending = rt.own(state.views, sessionId)
+          if (pending === undefined || pending.id !== body.viewId) return fail('This view is no longer open', 'bot/stale')
+          const checked = validateViewAnswer(pending.view, body.action, body.values)
+          if (checked.error !== undefined) return fail(checked.error, 'bot/invalid')
+          const reply = viewReply(pending, body.action, body.values)
+          if (reply === undefined) return fail('Nothing to send', 'bot/invalid')
+          // Claim the view before queueing so a second answer is refused.
+          delete state.views[sessionId]
+          try {
+            await rt.ensureCapabilities(sessionId)
+            const agent = await rt.resolveAgent(sessionId)
+            agent.followup(createUserMessage({ content: [{ type: 'text', text: reply.text }], source: reply.source }))
+            await ctx.sessions.flush(agent.session)
+          } catch (error) {
+            state.views[sessionId] ??= pending
+            throw error
+          }
+          await rt.save()
+          return ok(true)
+        }
+        case 'send': {
+          const text = String(body.text ?? '').trim()
+          if (text === '' || typeof body.sessionId !== 'string') return fail('Nothing to send', 'bot/invalid')
+          await rt.load()
+          // A Bot id, a group chat's id, or an earlier part of either means the
+          // current part.
+          const past = rt.pastOwners.get(body.sessionId)
+          const room = rt.roomOf(body.sessionId)
+          const sessionId = rt.botOf(body.sessionId) ? rt.chatOf(body.sessionId)
+            : room !== undefined ? rt.sessionOfRoom(room)
+              : past?.roomId === undefined && past !== undefined ? rt.chatOf(past.botId)
+                : past !== undefined ? rt.sessionOfRoom(rt.roomOf(past.roomId)) : body.sessionId
+          await rt.ensureCapabilities(sessionId)
+          await ctx.sessionController.prompt({
+            requestId: randomUUID(),
+            sessionId,
+            mode: 'queue',
+            content: [{ type: 'text', text }],
+          }, AbortSignal.timeout(30_000))
+          return ok(true)
+        }
+        case 'btw-delete': {
+          if (typeof body.sessionId !== 'string' || body.sessionId === '' || typeof body.cardId !== 'string' || body.cardId === '') return fail('Nothing to delete', 'bot/invalid')
+          await rt.load()
+          return ok(await rt.btwDelete({ sessionId: body.sessionId, cardId: body.cardId }))
+        }
+        // Side chats in the Bot's panel: each question is an aside on a fresh
+        // snapshot of this Bot's private chat; the earlier finished pairs of
+        // that chat ride along. Nothing is written into the Session.
+        case 'side-new': {
+          if (typeof body.sessionId !== 'string' || body.sessionId === '') return fail('Nothing to open', 'bot/invalid')
+          await rt.load()
+          return ok(await rt.sideNew({ sessionId: body.sessionId }))
+        }
+        case 'side-ask': {
+          if (typeof body.sessionId !== 'string' || body.sessionId === '') return fail('Nothing to ask', 'bot/invalid')
+          if (body.chatId !== undefined && typeof body.chatId !== 'string') return fail('Nothing to ask', 'bot/invalid')
+          if (String(body.text ?? '').trim() === '') return fail('Write a question.', 'bot/invalid')
+          await rt.load()
+          return ok(await rt.sideAsk({ sessionId: body.sessionId, chatId: body.chatId, recent: body.recent === true, text: String(body.text) }))
+        }
+        case 'side-cancel': {
+          if (typeof body.chatId !== 'string' || body.chatId === '' || typeof body.entryId !== 'string' || body.entryId === '') return fail('Nothing to cancel', 'bot/invalid')
+          await rt.load()
+          return ok(await rt.sideCancel({ chatId: body.chatId, entryId: body.entryId }))
+        }
+        case 'side-close': {
+          if (typeof body.chatId !== 'string' || body.chatId === '') return fail('Nothing to close', 'bot/invalid')
+          await rt.load()
+          return ok(await rt.sideClose({ chatId: body.chatId }))
+        }
+        case 'update-check': {
+          const fresh = body.fresh === true
+          return ok({ ...(await rt.updateCheck({ fresh })), dsh: (await rt.dshUpdateCheck?.({ fresh })) ?? null })
+        }
+        case 'update-install':
+          return ok(rt.updateStart())
+        case 'dsh-update-install':
+          return ok(rt.dshUpdateStart?.())
+        case 'repo-stars':
+          return ok(await rt.repoStars())
+        // The Desktop window's long poll for read_browser, and its answers.
+        case 'browser-wait': {
+          if (rt.browserChannel === undefined) return fail('Bot browsers are off on this host', 'bot/browser-off')
+          const clientId = typeof body.clientId === 'string' ? body.clientId.slice(0, 100) : ''
+          if (clientId === '') return fail('A browser poll needs a clientId', 'bot/invalid')
+          await rt.load()
+          const requests = await rt.browserChannel.wait(clientId, rt.browserOpen(body.open))
+          return ok({ requests, holds: rt.browserChannel.holdSnapshot() })
+        }
+        case 'browser-result':
+          if (rt.browserChannel === undefined) return fail('Bot browsers are off on this host', 'bot/browser-off')
+          return ok(rt.browserChannel.result(body))
+        case 'browser-takeover': {
+          if (rt.browserChannel === undefined) return fail('Bot browsers are off on this host', 'bot/browser-off')
+          await rt.load()
+          const botId = String(body.botId ?? '')
+          if (!rt.botOf(botId)) return fail('Unknown Bot', 'bot/not-found')
+          // Taking over a handoff keeps its reason, note, and call, so its card stays up.
+          const asked = rt.browserChannel.holdOf(botId)
+          rt.browserChannel.setHold(botId, asked?.callId !== undefined
+            ? { by: 'user', reason: asked.reason, note: asked.note, callId: asked.callId }
+            : { by: 'user', reason: 'takeover', note: 'The user is controlling this browser.' })
+          return ok(true)
+        }
+        // A card's 'done' or 'skip' says how the handoff went. The panel's Give back
+        // sends no outcome, so its reply only says that control returned to the Bot.
+        case 'browser-give-back': {
+          if (rt.browserChannel === undefined) return fail('Bot browsers are off on this host', 'bot/browser-off')
+          await rt.load()
+          const botId = String(body.botId ?? '')
+          if (!rt.botOf(botId)) return fail('Unknown Bot', 'bot/not-found')
+          if (body.outcome !== undefined && !['done', 'skip', 'returned'].includes(body.outcome)) return fail('Nothing to send', 'bot/invalid')
+          const hold = rt.browserChannel.holdOf(botId)
+          if (hold === null) return fail('This browser is not held', 'bot/forbidden')
+          if (body.callId !== undefined && body.callId !== hold.callId) return fail('This handoff is no longer open', 'bot/stale')
+          // Claim the hold before queueing so a second answer is refused.
+          rt.browserChannel.setHold(botId, null)
+          if (hold.callId === undefined) return ok(true)
+          try {
+            const sessionId = rt.chatOf(botId)
+            const reply = handoffReply(hold, body.outcome)
+            await rt.ensureCapabilities(sessionId)
+            const agent = await rt.resolveAgent(sessionId)
+            agent.followup(createUserMessage({ content: [{ type: 'text', text: reply.text }], source: reply.source }))
+            await ctx.sessions.flush(agent.session)
+          } catch (error) {
+            if (rt.browserChannel.holdOf(botId) === null) rt.browserChannel.setHold(botId, hold)
+            throw error
+          }
+          return ok(true)
+        }
+        case 'browser-stop': {
+          await rt.load()
+          const botId = String(body.botId ?? '')
+          if (!rt.botOf(botId)) return fail('Unknown Bot', 'bot/not-found')
+          const sessionId = rt.chatOf(botId)
+          if (sessionId && rt.live.get(sessionId)?.turn !== undefined) {
+            const agent = await rt.resolveAgent(sessionId)
+            agent.cancel({ kind: 'user' })
+          }
+          for (const room of Object.values(rt.state.rooms ?? {})) {
+            if (room.members?.includes(botId)) await rt.stopMemberWork?.(room.id, botId)
+          }
+          rt.browserChannel?.setHold(botId, { by: 'user', reason: 'stopped', note: 'The user is controlling this browser.' })
+          return ok(true)
+        }
+        case 'diagnostics':
+          await rt.load()
+          return ok(await rt.diagnostics.report(body))
+        case 'diagnostics-log':
+          return ok(await rt.diagnostics.logText())
+        case 'diagnostics-clear':
+          await rt.diagnostics.clear()
+          return ok(true)
+        default:
+          return fail(`Unknown endpoint ${endpoint}`, 'bot/not-found')
+      }
+    } catch (error) {
+      const code = errorCode(error)
+      const message = error?.message ?? String(error)
+      if (code === 'bot/internal') rt.noteFailure({ source: 'api', text: `${endpoint}: ${message}`, code: error?.code ?? error?.name, stack: error?.stack })
+      return fail(message, code)
+    }
+  }
+
+  // An exact Fetch route on the shared /api channel; the browser authenticates with its session cookie.
+  ctx.effect(() => ctx.connection.fetch.register({
+    path: ROUTE,
+    methods: ['POST'],
+    requestBody: 'buffered',
+    fetch: async (request) => {
+      let body
+      try { body = await request.json() } catch { body = {} }
+      const result = await handle(String(body?.endpoint ?? ''), body?.payload, request.signal)
+      return new Response(JSON.stringify(result), { status: 200, headers: { 'content-type': 'application/json' } })
+    },
+  }), 'ds-bot: api route')
+
+  ctx.effect(() => {
+    void rt.load()
+    // Registered last, so this disposer runs before the state lock is released.
+    // In-flight side questions abort here; their entries stay answering for the
+    // next owner.
+    return () => Promise.all([rt.btwDispose?.(), rt.sideDispose?.()])
+  }, 'ds-bot: load state')
+}

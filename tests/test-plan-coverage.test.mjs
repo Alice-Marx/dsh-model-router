@@ -8,7 +8,7 @@ import {readdir, readFile} from 'node:fs/promises'
 
 const plan = JSON.parse(await readFile(new URL('../scripts/test-plan.json', import.meta.url), 'utf8'))
 const onDisk = (await readdir(new URL('../tests/', import.meta.url)))
-  .filter((name) => /\.(test|native)\.mjs$/.test(name))
+  .filter((name) => /\.(test|spec|native)\.mjs$/.test(name))
   .map((name) => `tests/${name}`)
   .sort()
 
@@ -36,7 +36,7 @@ for (const stage of plan.stages) {
 for (const probe of ['scripts/integration-task-probe.mjs', 'scripts/integration-finance-probe.mjs']) {
   let source = ''
   try { source = await readFile(new URL(`../${probe}`, import.meta.url), 'utf8') } catch { continue }
-  for (const match of source.matchAll(/(tests\/[A-Za-z0-9_.-]+\.(?:test|native)\.mjs)/g)) selected.add(match[1])
+  for (const match of source.matchAll(/(tests\/[A-Za-z0-9_.-]+\.(?:test|spec|native)\.mjs)/g)) selected.add(match[1])
 }
 
 const excluded = plan.excluded ?? {}

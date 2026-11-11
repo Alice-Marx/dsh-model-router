@@ -19,6 +19,12 @@ export function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } =
     while (pending.size) {
       const [id, item] = pending.entries().next().value
       if (!item.acknowledged) return
+      if (item.release) {
+        const at=Math.max(item.sentAt,times.at(-1)??item.sentAt),delayMs=times.length?Math.max(0,Math.round(at-times.at(-1))):0
+        if(steps.length>=MAX_ROUTINE_STEPS){invalidate('ROUTINE_TOO_LONG');return}
+        if(delayMs>60_000){invalidate('ROUTINE_PAUSE_TOO_LONG');return}
+        steps.push({action:'release-input',delayMs});times.push(at);moveGroup=null;inputReleased=true;pending.delete(id);continue
+      }
       const movement = item.event.type === 'pointer' && item.event.action === 'move'
       const at = Math.max(item.sentAt, times.at(-1) ?? item.sentAt)
       const continuing = movement && moveGroup?.button === item.event.button
@@ -35,7 +41,7 @@ export function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } =
       if (!movement) moveGroup = null
       else if (!continuing) moveGroup = { startedAt: at, bucket: 0, tailIndex: null, button: item.event.button }
       else { moveGroup.bucket = bucket; moveGroup.tailIndex = index }
-      observedInputs++; if (replace) coalescedMoves++
+      observedInputs++;inputReleased=false; if (replace) coalescedMoves++
       pending.delete(id)
     }
   }
@@ -71,6 +77,21 @@ export function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } =
       if (status !== 'recording') return
       invalidate(meta?.failure?.status === 'unknown' || meta?.failure?.possiblyApplied !== false ? 'ROUTINE_ACK_LOST' : 'ROUTINE_DEMONSTRATION_FAILED')
     },
+    releaseSent(meta) {
+      if(status!=='recording')return
+      if(!sameSession(meta)||!Number.isSafeInteger(meta.id)||meta.id<=lastId||!Number.isFinite(meta.sentAt)){invalidate('ROUTINE_RECORDING_SESSION_CHANGED');return}
+      if(pending.size>=MAX_PENDING_INPUTS){invalidate('ROUTINE_INPUT_PENDING_LIMIT');return}
+      pending.set(meta.id,{release:true,sentAt:meta.sentAt,acknowledged:false});lastId=meta.id;inputReleased=false;emit()
+    },
+    releaseAcknowledged(meta) {
+      if(status!=='recording')return
+      const item=pending.get(meta?.id)
+      if(!sameSession(meta)||!item?.release){invalidate('ROUTINE_ACK_MISMATCH');return}
+      item.acknowledged=true;flush();emit()
+    },
+    releaseFailed(meta) {
+      if(status==='recording')invalidate(meta?.failure?.possiblyApplied===false?'ROUTINE_DEMONSTRATION_FAILED':'ROUTINE_RELEASE_UNCONFIRMED')
+    },
     metadataChanged(metadata) {
       if (status !== 'recording' || !metadata?.width) return
       let next
@@ -88,7 +109,7 @@ export function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } =
       if (pending.size) fail('ROUTINE_INPUT_PENDING')
       if (!inputReleased) fail('ROUTINE_RELEASE_REQUIRED')
       const value = normalizeRoutine({ name, description, steps, recording: { source: 'desktop-session', display,
-        recordedAt: startedAt, durationMs: Math.max(0, now() - startedAt), acknowledgedInputs: steps.length,
+        recordedAt: startedAt, durationMs: Math.max(0, now() - startedAt), acknowledgedInputs: steps.filter(step=>step.action==='input').length,
         ...(coalescedMoves ? { observedInputs, pointerSampleMs: ROUTINE_POINTER_SAMPLE_MS } : {}) } })
       status = 'finished'; emit(); return clone(value)
     },

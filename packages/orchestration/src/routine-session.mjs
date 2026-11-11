@@ -12,10 +12,9 @@ const deferred = () => {
 export function createRoutineDesktopSession({ ticket, WebSocketImpl = globalThis.WebSocket, renewTicket, closeTicket,
   signal, ackTimeoutMs = 5_000, renewEveryMs = 45_000, now = Date.now,
   onFrame, onMetadata, onState, onBeforeInput, onAcknowledgedInput, onInputFailure } = {}) {
-  if (!ticket?.sessionId || !ticket?.token || !ticket?.websocketUrl || typeof WebSocketImpl !== 'function') throw error('ROUTINE_DESKTOP_UNAVAILABLE')
+  if (!ticket?.sessionId || !ticket?.token || (typeof ticket.openWebSocket!=='function'&&(!ticket.websocketUrl||typeof WebSocketImpl!=='function'))) throw error('ROUTINE_DESKTOP_UNAVAILABLE')
   if (!Number.isSafeInteger(ackTimeoutMs) || ackTimeoutMs < 1 || ackTimeoutMs > 60_000) throw error('ROUTINE_ACK_TIMEOUT_INVALID')
-  const socket = new WebSocketImpl(ticket.websocketUrl)
-  socket.binaryType = 'arraybuffer'
+  let socket
   const ready = deferred(), pending = new Map()
   let mode = 'watch', metadata = null, nextId = 0, queue = Promise.resolve(), closed = false, fatal = null
   let renewTimer, currentTicket = ticket
@@ -31,12 +30,12 @@ export function createRoutineDesktopSession({ ticket, WebSocketImpl = globalThis
     emit({ status: 'error', mode, code })
   }
   const send = value => {
-    if (closed || socket.readyState !== 1) throw error('ROUTINE_DESKTOP_DISCONNECTED')
+    if (closed || socket?.readyState !== 1) throw error('ROUTINE_DESKTOP_DISCONNECTED')
     socket.send(JSON.stringify(value))
   }
   const request = (packet, type, id, operationSignal) => {
     if (operationSignal?.aborted) return Promise.reject(error('ROUTINE_CANCELLED', 'cancelled'))
-    if (closed || socket.readyState !== 1) return Promise.reject(error('ROUTINE_DESKTOP_DISCONNECTED'))
+    if (closed || socket?.readyState !== 1) return Promise.reject(error('ROUTINE_DESKTOP_DISCONNECTED'))
     const key = `${type}:${id ?? ''}`, result = deferred()
     const waiter = { ...result, type, id, sent: false, fail: null, finish: null }
     const clear = () => { clearTimeout(timer); operationSignal?.removeEventListener?.('abort', abort); pending.delete(key) }
@@ -58,17 +57,17 @@ export function createRoutineDesktopSession({ ticket, WebSocketImpl = globalThis
         if (closed) return
         if (!renewed || renewed.sessionId !== ticket.sessionId || !Number.isFinite(renewed.expiresAt) || renewed.expiresAt <= now()) throw error('ROUTINE_RENEW_INVALID')
         currentTicket = renewed; scheduleRenew()
-      } catch { breakConnection('ROUTINE_AUTHORIZATION_LOST'); try { socket.close() } catch {} }
+      } catch { breakConnection('ROUTINE_AUTHORIZATION_LOST'); try { socket?.close() } catch {} }
     }, Math.max(1, Math.min(renewEveryMs, untilExpiry)))
     renewTimer.unref?.()
   }
-  socket.onopen = () => {
+  const onOpen = () => {
     try { send({ type: 'auth', sessionId: ticket.sessionId, token: ticket.token }); emit({ status: 'authenticating', mode }) }
     catch (failure) { breakConnection(failure.code ?? 'ROUTINE_AUTH_FAILED') }
   }
-  const readyTimer = setTimeout(() => { breakConnection('ROUTINE_READY_TIMEOUT'); try { socket.close() } catch {} }, ackTimeoutMs)
+  const readyTimer = setTimeout(() => { breakConnection('ROUTINE_READY_TIMEOUT'); try { socket?.close() } catch {} }, ackTimeoutMs)
   ready.promise.finally(() => clearTimeout(readyTimer)).catch(() => {})
-  socket.onmessage = message => {
+  const onMessage = message => {
     if (closed) return
     if (typeof message.data !== 'string') { onFrame?.(message.data); return }
     let value
@@ -101,8 +100,15 @@ export function createRoutineDesktopSession({ ticket, WebSocketImpl = globalThis
     }
     if (value.type === 'error') breakConnection(value.code ?? 'ROUTINE_DESKTOP_ERROR')
   }
-  socket.onerror = () => breakConnection('ROUTINE_DESKTOP_DISCONNECTED')
-  socket.onclose = () => breakConnection('ROUTINE_DESKTOP_DISCONNECTED')
+  const attach = value => {
+    value.onerror=()=>breakConnection('ROUTINE_DESKTOP_DISCONNECTED')
+    if(closed||fatal){value.close();return}
+    socket=value;socket.binaryType='arraybuffer';socket.onopen=onOpen;socket.onmessage=onMessage
+    socket.onclose=()=>breakConnection('ROUTINE_DESKTOP_DISCONNECTED')
+    if(socket.readyState===1)onOpen()
+  }
+  if(typeof ticket.openWebSocket==='function')Promise.resolve().then(()=>ticket.openWebSocket()).then(attach,()=>breakConnection('ROUTINE_DESKTOP_UNAVAILABLE'))
+  else attach(new WebSocketImpl(ticket.websocketUrl))
   const serialize = (work, cleanup = false) => {
     const result = queue.then(async () => {
       if (!cleanup && fatal) throw fatal
@@ -148,9 +154,9 @@ export function createRoutineDesktopSession({ ticket, WebSocketImpl = globalThis
     async close() {
       if (closed) return { stopConfirmed: false, code: 'ROUTINE_ALREADY_CLOSED' }
       clearTimeout(renewTimer)
-      try { if (socket.readyState === 1) send({ type: 'close' }) } catch {}
+      try { if (socket?.readyState === 1) send({ type: 'close' }) } catch {}
       closed = true; mode = 'watch'; stopPending(error('ROUTINE_DESKTOP_CLOSED'))
-      try { socket.close() } catch {}
+      try { socket?.close() } catch {}
       try { return await closeTicket?.(ticket.sessionId) ?? { stopConfirmed: false } }
       catch (failure) { return { stopConfirmed: false, code: failure.code ?? 'ROUTINE_STOP_UNCONFIRMED' } }
     },

@@ -1,0 +1,6 @@
+export * from '../modules/openmaus-protocol/vendor/companion/src/e2e/noise.ts'
+export * from '../modules/openmaus-protocol/vendor/companion/src/e2e/credentials.ts'
+export * from '../modules/openmaus-protocol/vendor/companion/src/e2e/descriptor.ts'
+export * from '../modules/openmaus-protocol/vendor/companion/src/e2e/yamux.ts'
+export * from '../modules/openmaus-protocol/vendor/companion/src/e2e/session.ts'
+export * from '../modules/openmaus-protocol/vendor/companion/src/e2e/phone.ts'

@@ -1,0 +1,169 @@
+/*
+ * Thread directory styles. Colour lives in the --bp-thread-* tokens below and
+ * follows one appearance: light is the default, the dark block only names what
+ * changes. Body text stays on the high-contrast ink; state is carried by a
+ * leading rail and badges, so a status never trades readability for hue.
+ */
+html body[data-bot-product-ui] .bp-threads {
+  --bp-thread-canvas: #f4f5f7;
+  --bp-thread-surface: #ffffff;
+  --bp-thread-inset: #eef0f3;
+  --bp-thread-hover: #e6e9ee;
+  --bp-thread-line: #dde1e8;
+  --bp-thread-ink: #252a33;
+  --bp-thread-muted: #5f6875;
+  --bp-thread-accent: #4a6484;
+  --bp-thread-accent-ink: #ffffff;
+  --bp-thread-focus: #4a6484;
+  --bp-thread-ok: #2e7d32;
+  --bp-thread-bad: #b3261e;
+  --bp-thread-wait: #8a5a12;
+  --bp-thread-idle: #5f6875;
+  display: flex; flex-direction: column; min-height: 0; gap: 8px;
+  color: var(--bp-thread-ink);
+  background: var(--bp-thread-canvas);
+}
+html body[data-bot-product-ui][data-bp-appearance="dark"] .bp-threads,
+html body[data-bot-product-ui][data-ds-dark-theme]:not([data-bp-appearance="light"]) .bp-threads {
+  --bp-thread-canvas: #131519;
+  --bp-thread-surface: #1c1f24;
+  --bp-thread-inset: #232730;
+  --bp-thread-hover: #2a2f39;
+  --bp-thread-line: #333a45;
+  --bp-thread-ink: #e8eaee;
+  --bp-thread-muted: #aab2bd;
+  --bp-thread-accent: #a9c4e0;
+  --bp-thread-accent-ink: #131519;
+  --bp-thread-focus: #a9c4e0;
+  --bp-thread-ok: #7bd48a;
+  --bp-thread-bad: #f2b8b5;
+  --bp-thread-wait: #f6c76b;
+  --bp-thread-idle: #aab2bd;
+}
+
+html body[data-bot-product-ui] .bp-threads-bar {
+  display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+  border-bottom: 1px solid var(--bp-thread-line); background: var(--bp-thread-surface);
+}
+html body[data-bot-product-ui] .bp-threads-title { margin: 0; font-size: 15px; font-weight: 650; }
+html body[data-bot-product-ui] .bp-threads-count { margin-left: auto; font-size: 12px; color: var(--bp-thread-muted); }
+html body[data-bot-product-ui] .bp-threads-note { margin: 0; padding: 12px 16px; color: var(--bp-thread-muted); font-size: 13px; }
+
+html body[data-bot-product-ui] .bp-threads-new { display: flex; gap: 8px; padding: 0 16px; }
+html body[data-bot-product-ui] .bp-threads-input {
+  flex: 1; min-width: 0; min-height: 36px; padding: 0 10px;
+  border: 1px solid var(--bp-thread-line); border-radius: 8px;
+  background: var(--bp-thread-inset); color: var(--bp-thread-ink); font: inherit; font-size: 13px;
+}
+html body[data-bot-product-ui] .bp-threads-button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; flex: none;
+  border: 1px solid var(--bp-thread-line); border-radius: 8px;
+  background: var(--bp-thread-accent); color: var(--bp-thread-accent-ink); font-size: 13px; cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-threads-button:hover:not(:disabled) { filter: brightness(1.08); }
+html body[data-bot-product-ui] .bp-threads-button:disabled { opacity: 0.5; cursor: default; }
+html body[data-bot-product-ui] .bp-threads-button.is-quiet { background: var(--bp-thread-inset); color: var(--bp-thread-ink); }
+
+html body[data-bot-product-ui] .bp-threads-list { list-style: none; margin: 0; padding: 0 8px 8px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+html body[data-bot-product-ui] .bp-thread {
+  position: relative; display: flex; align-items: stretch; gap: 4px;
+  background: var(--bp-thread-surface); border: 1px solid var(--bp-thread-line); border-radius: 10px;
+  border-left: 3px solid var(--bp-thread-idle);
+}
+html body[data-bot-product-ui] .bp-thread.is-active { border-left-color: var(--bp-thread-accent); }
+html body[data-bot-product-ui] .bp-thread.is-archived { border-left-color: var(--bp-thread-wait); }
+html body[data-bot-product-ui] .bp-thread-open {
+  flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px; min-height: 40px;
+  background: none; border: 0; border-radius: 8px; text-align: left; color: inherit; cursor: pointer; font: inherit;
+}
+html body[data-bot-product-ui] .bp-thread-open:hover:not(:disabled) { background: var(--bp-thread-hover); }
+html body[data-bot-product-ui] .bp-thread-open:disabled { cursor: default; }
+html body[data-bot-product-ui] .bp-thread-name { font-size: 14px; line-height: 1.35; }
+html body[data-bot-product-ui] .bp-thread-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--bp-thread-muted); }
+html body[data-bot-product-ui] .bp-thread-badge {
+  padding: 0 6px; border-radius: 999px; background: var(--bp-thread-accent); color: var(--bp-thread-accent-ink); font-size: 11px; font-weight: 700;
+}
+html body[data-bot-product-ui] .bp-thread-badge.is-quiet { background: var(--bp-thread-inset); color: var(--bp-thread-muted); }
+html body[data-bot-product-ui] .bp-thread-badge.is-wait { background: var(--bp-thread-wait); color: #131519; }
+html body[data-bot-product-ui][data-bp-appearance="dark"] .bp-thread-badge.is-wait,
+html body[data-bot-product-ui][data-ds-dark-theme]:not([data-bp-appearance="light"]) .bp-thread-badge.is-wait { color: #131519; }
+
+html body[data-bot-product-ui] .bp-thread-actions { display: flex; align-items: center; flex: none; }
+html body[data-bot-product-ui] .bp-threads-icon {
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; min-height: 40px;
+  border: 0; border-left: 1px solid var(--bp-thread-line); border-radius: 0 8px 8px 0;
+  background: none; color: var(--bp-thread-muted); cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-threads-icon:hover:not(:disabled) { background: var(--bp-thread-hover); color: var(--bp-thread-ink); }
+html body[data-bot-product-ui] .bp-threads-icon:disabled { opacity: 0.5; cursor: default; }
+html body[data-bot-product-ui] .bp-thread-rename { display: flex; flex: 1; flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+
+/* The chat-title addon: one pill, no colour of its own. */
+html body[data-bot-product-ui] .bp-threads-head {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; max-width: 220px; padding: 0 10px;
+  border: 1px solid var(--bp-thread-line); border-radius: 999px;
+  background: var(--bp-thread-inset); color: var(--bp-thread-ink); font-size: 12px; cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-threads-head:hover { background: var(--bp-thread-hover); }
+html body[data-bot-product-ui] .bp-threads-head-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body[data-bot-product-ui] .bp-threads-head-count {
+  min-width: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--bp-thread-accent); color: var(--bp-thread-accent-ink); font-size: 11px; font-weight: 700; text-align: center;
+}
+
+/* The owner's explicit recovery for a create whose outcome is unknown. It is
+   the only way forward, so it sits with the note that explains it. */
+html body[data-bot-product-ui] .bp-threads-recover {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0 16px; padding: 10px 12px;
+  border: 1px solid var(--bp-thread-wait); border-radius: 10px; background: var(--bp-thread-surface);
+}
+
+/* The chat-header control. It sits beside the product's own conversation tools
+   as one compact chip, so it never becomes a second toolbar. */
+html body[data-bot-product-ui] .bp-threads-head-wrap { position: relative; display: inline-flex; flex: none; }
+/* The menu is placed against the control's own box by the component, so the
+   position here is only the fallback before the first measurement. */
+html body[data-bot-product-ui] .bp-threads-menu {
+  z-index: 40; width: min(300px, calc(100vw - 24px));
+  display: flex; flex-direction: column; gap: 8px; padding: 10px;
+  border: 1px solid var(--bp-thread-line); border-radius: 12px;
+  background: var(--bp-thread-surface); color: var(--bp-thread-ink);
+  box-shadow: 0 12px 32px -12px rgba(15, 23, 42, .38);
+}html body[data-bot-product-ui] .bp-threads-menu-title { margin: 0; font-size: 12px; font-weight: 650; color: var(--bp-thread-muted); }
+html body[data-bot-product-ui] .bp-threads-menu-list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; max-height: 264px; overflow-y: auto; }
+html body[data-bot-product-ui] .bp-threads-menu-row {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; min-height: 36px; padding: 6px 8px; text-align: left;
+  border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; font-size: 13px; cursor: pointer;
+}
+html body[data-bot-product-ui] .bp-threads-menu-row:hover { background: var(--bp-thread-hover); }
+html body[data-bot-product-ui] .bp-threads-menu-row.is-active { background: var(--bp-thread-inset); }
+html body[data-bot-product-ui] .bp-threads-menu-row[disabled] { cursor: default; opacity: .65; }
+html body[data-bot-product-ui] .bp-threads-menu-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body[data-bot-product-ui] .bp-threads-menu-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--bp-thread-muted); }
+html body[data-bot-product-ui] .bp-threads-menu-new { display: flex; gap: 6px; }
+html body[data-bot-product-ui] .bp-threads-menu-new .bp-threads-input { min-height: 32px; font-size: 12px; }
+html body[data-bot-product-ui] .bp-threads-menu-new .bp-threads-button { min-height: 32px; padding: 0 8px; font-size: 12px; }
+html body[data-bot-product-ui] .bp-threads-menu-more {
+  padding: 4px 0; border: 0; background: none; color: var(--bp-thread-accent);
+  font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+}
+
+html body[data-bot-product-ui] .bp-threads :is(button, input):focus-visible {
+  outline: 2px solid var(--bp-thread-focus); outline-offset: 1px;
+}
+
+/* A phone keeps every row full-width and comfortable at 375px. */
+@media (max-width: 640px) {
+  html body[data-bot-product-ui] .bp-threads-bar { padding: 10px 12px; }
+  html body[data-bot-product-ui] .bp-threads-new { padding: 0 12px; }
+  html body[data-bot-product-ui] .bp-thread-open { padding: 10px; }
+  html body[data-bot-product-ui] .bp-threads-button span { display: none; }
+  html body[data-bot-product-ui] .bp-threads-head { max-width: 140px; }
+}
+
+/* Touch: every control reaches a 40px target and nothing depends on hover. */
+@media (pointer: coarse) {
+  html body[data-bot-product-ui] .bp-threads-button { min-width: 40px; min-height: 40px; }
+  html body[data-bot-product-ui] .bp-threads-icon { width: 44px; }
+  html body[data-bot-product-ui] .bp-threads-head { min-height: 40px; }
+}

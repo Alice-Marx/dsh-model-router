@@ -16,7 +16,7 @@
     {
       "path": "src/client/details-drawer.js",
       "kind": "patched",
-      "summary": "Adds the 电脑操作 (desktop) tab to a 1:1 Bot's drawer and renders DesktopPane in it.",
+      "summary": "Adds the 电脑操作 (desktop) tab to a 1:1 Bot's drawer and renders DesktopPane in it; a thread Session keeps its own transcript, stats, questions and usage, and its name is shown instead of offering to rename the Bot.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "f4917de604dc7c3daf3b4a5267a04c326c9b20aea94bb5e27bfcb6e106396172"
@@ -34,7 +34,7 @@
     {
       "path": "src/client/index.js",
       "kind": "patched",
-      "summary": "Accepts a wrapped TeamSidebar in the sidebar.workspaces slot probe, so the product's own wrapper still counts as the DS Bot team surface.",
+      "summary": "Opens a thread Session as itself in partFor — resolved before the Bot, because a thread Session also resolves to its Bot — keeps homeToMainBot from bouncing an open thread to Main, and refreshes thread projections.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "4fd22b26d817ca3ae5454e5a8042c1c4b806ff4ae78c9e38f90ee5ee3c996b9a"
@@ -56,6 +56,132 @@
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "3818fea953dc7a766d7dcb738661a448a922f84ac42b8d434ac7fb83e09b9c65"
+      }
+    },
+    {
+      "path": "src/client/header.js",
+      "kind": "patched",
+      "summary": "Renders the product conversationAddon after the native header identity, preserving goals, activity and slot component identity, and names the open thread beside its Bot so two contexts of one Bot are never confused.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "2e16b329fcc5e0994066db13fe54558ac70fdd7b4131155c89b7aa04d0c59bab"
+      }
+    },
+    {
+      "path": "src/host/roster.js",
+      "kind": "patched",
+      "summary": "Adds the trusted thread records addThreadSession/renameThread/setThreadArchived (one save each, the Bot model and permission preset applied, no notice or turn), keeps updateBotProfile untouched, and archives thread Sessions on Bot delete.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "0a06730a0ce2ecf6b67d82319ef9b7fc127b3b2c2170b6e50d3d77ce4c866e32"
+      }
+    },
+    {
+      "path": "src/host/store.js",
+      "kind": "patched",
+      "summary": "Indexes a Bot thread Session as another own chat of the same Bot: live threads sit in chatOwners/threadOwners, archived ones in pastOwners with no authority, and threadsOf/threadOf/threadSessionOf/sessionsOfBot are exposed for the product.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "aae02595f97b2337e485f16a84091c9d91d40f6dbdc211350fe3fe0cddf52b19"
+      }
+    },
+    {
+      "path": "src/host/parts.js",
+      "kind": "patched",
+      "summary": "Keeps the part steward off thread Sessions: a thread is not a part chain, so nothing condenses it or hands its input on to the Bot default chat.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "f7a2e272f0296414075d2318d45cf58871fff3a22c1d3035707a75bec77ef619"
+      }
+    },
+    {
+      "path": "src/host/models.js",
+      "kind": "patched",
+      "summary": "Applies a Bot model change to its live thread Sessions as it already does for group Sessions.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "db1424879e28d6252818eccbb4bc763bc87ff355be503abe3f95399aaed869a9"
+      }
+    },
+    {
+      "path": "src/host/usage.js",
+      "kind": "patched",
+      "summary": "Attributes a thread Session usage to its Bot through the shared sessionsOfBot list.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "3d4ff2168d7dfb726c2d5454f36eef58dec1c768b79c2c0c17f4192a34b2bbd7"
+      }
+    },
+    {
+      "path": "src/host/privacy.js",
+      "kind": "patched",
+      "summary": "Covers thread Sessions when a private Bot files are purged.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "370b5adf762714a8b794f2079a8bbfd8f9c63811bf599ecadad80a63a9f12c5a"
+      }
+    },
+    {
+      "path": "src/host/memory.js",
+      "kind": "patched",
+      "summary": "Renews memory for thread Sessions when a Bot memory is archived.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "5e145d02c6c9d8d217b1725ae8bd88483c6a847300d50f107da70575696b7503"
+      }
+    },
+    {
+      "path": "src/host/channel.js",
+      "kind": "patched",
+      "summary": "Projects a Bot threads to the client and refuses input aimed at an archived thread instead of redirecting it to the default chat.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "0e05d9a424b188fe338f7102404a9fb295069d0ece241d63cc4f87be18947d03"
+      }
+    },
+    {
+      "path": "src/client/sources.js",
+      "kind": "patched",
+      "summary": "Indexes thread Sessions in a read-only threadsById map by Session id and thread id, resolves a thread Session to its Bot in byId (never taking a Bot's own chat identity), and exports isOwnChatOf so Bot-scoped surfaces recognise a thread as another own chat of the same Bot.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "1cc04070d1869dcc382efc31fafcff8fda9c3271342896c98355c37299458e1c"
+      }
+    },
+    {
+      "path": "src/client/model-menu.js",
+      "kind": "patched",
+      "summary": "The Bot's model-choice dock belongs to a thread too: it recognises a thread Session as another own chat of the same Bot instead of only the default chat.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "78c28d9459e78ce4ffa9b3edc64d7d2218b02112eaf3b0ae204cf2700321b7a5"
+      }
+    },
+    {
+      "path": "src/client/learning-card.js",
+      "kind": "patched",
+      "summary": "Memory learning proposals are shown for a thread Session, which is another own chat of the same Bot, not only for the default chat.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "29e0ddffc08814b3e9676fb40474ba5ae0702edb1b53267d52e51b4b31be733f"
+      }
+    },
+    {
+      "path": "src/client/secret-card.js",
+      "kind": "patched",
+      "summary": "The secret-request dock waits for a thread Session's own cards, so a tool asking for a secret inside a thread is answered there.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "2ac7d7546918b7104d7af8b71d08a6fc07bdc2aeb4168d3ad26bddf2f9fd4ff5"
+      }
+    },
+    {
+      "path": "src/client/turn-error.js",
+      "kind": "patched",
+      "summary": "A turn failure inside a thread keeps its sign-in and model-move affordances, exactly as the Bot's default chat does.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "4ed1e99fb3fe66be3a55176389e1ab08e282070e23e9e06089a20f6dbec3b59b"
       }
     }
   ],
@@ -112,8 +238,8 @@
     {
       "path": "vendor/ds-bot/client.js",
       "sourcePath": "ds-bot/client.js",
-      "sha256": "0001edd74a091d3f523d99b0cdaf855dacaffe476d7e07e87dd016025e23318a",
-      "gitBlob": "f8a98ff50f3ce121471744ae7a2a7a326d5dc3fb",
+      "sha256": "4cbc9dab369ad584735430f8f599ff42f95cc25187ae613b3e249a7038927e19",
+      "gitBlob": "83f416cb587bd0eeaca083627fe963fa86b3c7d3",
       "origin": "generated"
     },
     {
@@ -595,8 +721,8 @@
     {
       "path": "vendor/ds-bot/src/client/details-drawer.js",
       "sourcePath": "ds-bot/src/client/details-drawer.js",
-      "sha256": "0bc1fa9d72dd7411376292f0e904153d9d26e66aaaeea125363d8c2d7c04109b",
-      "gitBlob": "b18b52a36ab8b30d03148cb0f67835256f81728d",
+      "sha256": "befbf65f7ffde439846154b7a75479dcc85e507851fa6eac9d54f19c6dc3f3ff",
+      "gitBlob": "80e500b2631059df8a4e7c65047c3f68083c0c88",
       "origin": "overlay"
     },
     {
@@ -707,9 +833,9 @@
     {
       "path": "vendor/ds-bot/src/client/header.js",
       "sourcePath": "ds-bot/src/client/header.js",
-      "sha256": "2e16b329fcc5e0994066db13fe54558ac70fdd7b4131155c89b7aa04d0c59bab",
-      "gitBlob": "590a8038361635ef293c31ab11901832155b729c",
-      "origin": "upstream"
+      "sha256": "f351d5146259fb1bb5d37054515d8af7d810244fe7629fef948f675c4fb59657",
+      "gitBlob": "b8fecbd814f35e3b248ec21b790f39ec817174b0",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/i18n.js",
@@ -728,8 +854,8 @@
     {
       "path": "vendor/ds-bot/src/client/index.js",
       "sourcePath": "ds-bot/src/client/index.js",
-      "sha256": "d551f0971af0d7b914c0d3b02e8637b0c6ce1d39c6e5c0d8cf01c8ff556a0568",
-      "gitBlob": "2458a7f22aea8d241f93c2ed730c7b1f4043db1f",
+      "sha256": "85b9eae74c40ccd1f746c1b9e4afcde30ff7bf48efa3d5e6621f8282a37e33a0",
+      "gitBlob": "b06262af6a875788b740a737a52b738cfcd43002",
       "origin": "overlay"
     },
     {
@@ -756,9 +882,9 @@
     {
       "path": "vendor/ds-bot/src/client/learning-card.js",
       "sourcePath": "ds-bot/src/client/learning-card.js",
-      "sha256": "29e0ddffc08814b3e9676fb40474ba5ae0702edb1b53267d52e51b4b31be733f",
-      "gitBlob": "448dd57bd66cf5ac7d519d162ce2e3871da7f61f",
-      "origin": "upstream"
+      "sha256": "598171bb8436c1bb49cd9f8b22a63a310ff05f3e960c28da18ce78ddca1e4bc6",
+      "gitBlob": "53c38a6545ce19ab0f9639c09cfd091451e08658",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/mark.js",
@@ -784,9 +910,9 @@
     {
       "path": "vendor/ds-bot/src/client/model-menu.js",
       "sourcePath": "ds-bot/src/client/model-menu.js",
-      "sha256": "78c28d9459e78ce4ffa9b3edc64d7d2218b02112eaf3b0ae204cf2700321b7a5",
-      "gitBlob": "6a6d477ee1b478396bc5b6002ce161a70c45839a",
-      "origin": "upstream"
+      "sha256": "69a7388f92b874ba7b1da04505185a1abdcc73d1d42e67ca23ae0ce4f08056f9",
+      "gitBlob": "3757efc44eab2a34057dc4c1c9e20b68a1e0d41b",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/motion.js",
@@ -875,9 +1001,9 @@
     {
       "path": "vendor/ds-bot/src/client/secret-card.js",
       "sourcePath": "ds-bot/src/client/secret-card.js",
-      "sha256": "2ac7d7546918b7104d7af8b71d08a6fc07bdc2aeb4168d3ad26bddf2f9fd4ff5",
-      "gitBlob": "d94ab17d1c05e343b6c0c2607042c920a6f62de1",
-      "origin": "upstream"
+      "sha256": "483e08362e1502e727e353b74bb921e18559a852c09532a0ec5858fd02615806",
+      "gitBlob": "4c118cb99d25b41536dc4b31bb9797e338f04c7a",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/settings.js",
@@ -917,9 +1043,9 @@
     {
       "path": "vendor/ds-bot/src/client/sources.js",
       "sourcePath": "ds-bot/src/client/sources.js",
-      "sha256": "1cc04070d1869dcc382efc31fafcff8fda9c3271342896c98355c37299458e1c",
-      "gitBlob": "3f887ac716f2f2c6d292e354972c93682da33144",
-      "origin": "upstream"
+      "sha256": "eb3c5f70c60cab79039d5ce771e864c533c915aca9d3b4662fcf045c98d66860",
+      "gitBlob": "53d49e0485d9cb32c72a5c4b0448885c3a8bc2dd",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/speech.js",
@@ -973,9 +1099,9 @@
     {
       "path": "vendor/ds-bot/src/client/turn-error.js",
       "sourcePath": "ds-bot/src/client/turn-error.js",
-      "sha256": "4ed1e99fb3fe66be3a55176389e1ab08e282070e23e9e06089a20f6dbec3b59b",
-      "gitBlob": "f8778be852b2a461736f7f0183c3cf887f94fb6f",
-      "origin": "upstream"
+      "sha256": "07bfc99a2c11b144cfcbcf7951237a5ad0e853c0e48988382fc39d92afe96b47",
+      "gitBlob": "7f34129a2dcb28e377c669d6b510703fd5781131",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/turn-reasoning.js",
@@ -1134,9 +1260,9 @@
     {
       "path": "vendor/ds-bot/src/host/channel.js",
       "sourcePath": "ds-bot/src/host/channel.js",
-      "sha256": "0e05d9a424b188fe338f7102404a9fb295069d0ece241d63cc4f87be18947d03",
-      "gitBlob": "1977891091fb9e53429aa0265fa8a3a1b7fd2db7",
-      "origin": "upstream"
+      "sha256": "363ba4779753b18b350233959358af2ff27efe8158828c2b2bc03295e5a66e0e",
+      "gitBlob": "b2d2a764e2338c8fac5c44cea4cc57dd474269a2",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/host/chat-index.js",
@@ -1267,16 +1393,16 @@
     {
       "path": "vendor/ds-bot/src/host/memory.js",
       "sourcePath": "ds-bot/src/host/memory.js",
-      "sha256": "5e145d02c6c9d8d217b1725ae8bd88483c6a847300d50f107da70575696b7503",
-      "gitBlob": "7ebe1b14a8988a7af5a3950f8a1c5537c141d6c9",
-      "origin": "upstream"
+      "sha256": "e96abcea64320faae0088ace7971aa3415b1803a8ce7d94fa39f27f9e200096d",
+      "gitBlob": "91efa72b230c6c146901afd61f321adda6a45d1c",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/host/models.js",
       "sourcePath": "ds-bot/src/host/models.js",
-      "sha256": "db1424879e28d6252818eccbb4bc763bc87ff355be503abe3f95399aaed869a9",
-      "gitBlob": "9ea69cfc8b04754bfd6b989690ebfadd9899fc83",
-      "origin": "upstream"
+      "sha256": "164f455b356ee11b5e29d1a03fe1df2316b476efee02200eb86ab0f518e66a5f",
+      "gitBlob": "dfb19b892651bdc226fde3cf00bfc91c6204469e",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/host/office-skills.js",
@@ -1288,9 +1414,9 @@
     {
       "path": "vendor/ds-bot/src/host/parts.js",
       "sourcePath": "ds-bot/src/host/parts.js",
-      "sha256": "f7a2e272f0296414075d2318d45cf58871fff3a22c1d3035707a75bec77ef619",
-      "gitBlob": "392ef433da649a97840b24deb4960ab313235e85",
-      "origin": "upstream"
+      "sha256": "a8838e607ba61b65b2e776b2f1586c3ca6a28112551585ee895826f555a5ac41",
+      "gitBlob": "ded9f132b41086a6a1682b6c2e1aaa8f186d38eb",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/host/permissions.js",
@@ -1302,9 +1428,9 @@
     {
       "path": "vendor/ds-bot/src/host/privacy.js",
       "sourcePath": "ds-bot/src/host/privacy.js",
-      "sha256": "370b5adf762714a8b794f2079a8bbfd8f9c63811bf599ecadad80a63a9f12c5a",
-      "gitBlob": "9cb3e4bc11a443824524ca2582443b20758bf091",
-      "origin": "upstream"
+      "sha256": "dce19addbe585932d9cdcf8375cbd34ccfb92ca8b809a72ab03a965a7c5a9fba",
+      "gitBlob": "20ad3cf78011177ad578f859462946fb3b98e3cd",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/host/prompt.js",
@@ -1337,9 +1463,9 @@
     {
       "path": "vendor/ds-bot/src/host/roster.js",
       "sourcePath": "ds-bot/src/host/roster.js",
-      "sha256": "0a06730a0ce2ecf6b67d82319ef9b7fc127b3b2c2170b6e50d3d77ce4c866e32",
-      "gitBlob": "b87dccc1f78ed9e8f8e1f1ed7384bb6e5a72804a",
-      "origin": "upstream"
+      "sha256": "7eaa83caa98b08be978ce58ad754e58c5de9ed2290ee577bcd8225a578bdeb58",
+      "gitBlob": "f2d9ae2f853f1223b52e9c589bcc5cc316252940",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/host/schedules.js",
@@ -1386,9 +1512,9 @@
     {
       "path": "vendor/ds-bot/src/host/store.js",
       "sourcePath": "ds-bot/src/host/store.js",
-      "sha256": "aae02595f97b2337e485f16a84091c9d91d40f6dbdc211350fe3fe0cddf52b19",
-      "gitBlob": "6e1aa737e0a046f208330bce03557417b8d07a5b",
-      "origin": "upstream"
+      "sha256": "a603a6d908caf8196b8d289913b1dda556c0be1c9cc13ae8120f400958adcf2b",
+      "gitBlob": "aa95a4dc3db7c0cfe9605456291c4dacf9878913",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/host/text.js",
@@ -1435,9 +1561,9 @@
     {
       "path": "vendor/ds-bot/src/host/usage.js",
       "sourcePath": "ds-bot/src/host/usage.js",
-      "sha256": "3d4ff2168d7dfb726c2d5454f36eef58dec1c768b79c2c0c17f4192a34b2bbd7",
-      "gitBlob": "17a7b4590650db56a38593c88a3ca8e9817c1742",
-      "origin": "upstream"
+      "sha256": "db255f1628b0b20403f495fcc853bdfc66e1525257ff4ab0e0dbea854c14452f",
+      "gitBlob": "d2ad4a4de07126fbee886cdae0962ebc2dee9a06",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/office/check.js",

@@ -866,7 +866,7 @@ export function install(rt) {
   // A deleted Bot's memory moves to the archive, whole.
   function archiveBotMemory(botId) {
     const bot = rt.botOf(botId)
-    for (const sessionId of [botId, rt.chatOf(botId), ...(bot?.segments ?? []).map(segment => segment.sessionId), ...rt.groupSessionsOf(botId)]) renewMemory(sessionId)
+    for (const sessionId of rt.sessionsOfBot(botId)) renewMemory(sessionId)
     summaries.delete(botId)
     news.delete(botId)
     return queued(async () => {
