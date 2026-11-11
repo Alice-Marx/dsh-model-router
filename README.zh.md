@@ -14,9 +14,11 @@
 
 本项目是社区插件，复用 Harness 的模型配置和 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.68.0 · Windows Remote Agent：0.1.2**
+**当前正式版：0.68.1 · Windows Remote Agent：0.1.2**
 
-**0.68.0 正式版。** 本版提供以 Bot 联系人与聊天为中心的工作空间、安全设备配对、持久团队委派和原生工具活动记录。本地验收使用隔离数据与离线模型；全部 OpenMausBot 功能对齐、真实用户 Host 与设备验收仍未完成。
+**0.68.1 正式版。** 本版提供以 Bot 联系人与聊天为中心的工作空间、安全设备配对、持久团队委派和原生工具活动记录。本地验收使用隔离数据与离线模型；全部 OpenMausBot 功能对齐、真实用户 Host 与设备验收仍未完成。
+
+Bot 设置先读取已保存模型并显示可编辑表单，再后台检测官方 CLI。CLI 卡住不再拖住设置窗口或 Host 启动。Host 单次检测总时限为12秒，客户端等待刷新最多15秒；超时工具在重新检测成功前保持不可用。检测期间仍可编辑、切换身份页与关闭窗口，未保存内容会保留，旧检测的迟到结果不能覆盖新选择。
 
 Bot 官方工具现在独立于聊天模型配置。在 Bot 模型设置中点“安装与登录”，安装或选择 CLI，自行完成厂商登录，再点“重新检测”。已就绪且支持托管执行的工具可选择“厂商默认模型”、执行模式并“保存绑定”，Bot 使用其他提供商聊天也可授予。重新检测保留未保存设置。未安装、未登录、状态未知和仅终端交互的工具会显示真实状态，不能授予托管执行。普通 Bot 只能调用已保存的工具、CLI 模型与模式；每次启动前复核已提交授权及实时可用性。集成、独立和原生对话共用执行器与运行记录。“厂商默认”沿用 CLI 自身配置，不声称已核验实际模型 ID。Bot 执行失败不会静默转 API 或不受限终端；尚未适配的工具仍可由用户在终端交互使用。
 
@@ -93,8 +95,8 @@ API 资金调用需要 Host 提供模型容量信息。保存的输入额度需�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.68.0`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.68.0`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.68.1`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.68.1`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 在 Harness 官方 **模型** 设置中配置 Provider 凭据和模型。完整版本进入 Bot 工作区；纯路由版本从侧栏打开 **模型路由**。
 
@@ -102,10 +104,10 @@ API 资金调用需要 Host 提供模型容量信息。保存的输入额度需�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.68.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.68.1
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.68.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.68.1
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -189,7 +191,7 @@ Host 的 Claude 对话引擎配置可启用 `hostTools: true`，通过私有 MCP
 
 ## 多 Bot 任务进度与待处理
 
-**适用于完整 Bot 版本 0.68.0。** 在 **任务** 页面按 Bot 查看任务数量，通过 **全部 / 进行中 / 待处理 / 已结束** 筛选，或搜索任务名称及任务、计划、操作编号。计数和筛选针对已加载记录；资金准入检查属于进行中，等待预算属于待处理。
+**适用于完整 Bot 版本 0.68.1。** 在 **任务** 页面按 Bot 查看任务数量，通过 **全部 / 进行中 / 待处理 / 已结束** 筛选，或搜索任务名称及任务、计划、操作编号。计数和筛选针对已加载记录；资金准入检查属于进行中，等待预算属于待处理。
 
 **需要你处理** 显示完整数量，超过六项时可展开全部。每项都能打开原任务；等待审批时可进入对应 Bot 私聊查看原请求。打开任务后可查看 **任务时间线**，了解排队、资金准入、执行、停止请求及收据核对，并展开每次尝试的原编号。日志读取不会重新派发任务或调用模型；停止请求仍需等待确认。旧宿主未提供时间线时，页面保留现有收据详情。
 
@@ -240,7 +242,7 @@ Main Bot 也可调用 `bot_route_task` 或同义工具 `bot_dispatch`；两者�
 
 **在被控制的电脑上：**
 
-1. 下载 [Windows Agent 0.1.2 完整包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.68.0/dsh-remote-agent-0.1.2-windows-x64.zip)，解压到长期保留的目录，运行 `start.cmd`，并保持 Windows 交互用户已登录。
+1. 下载 [Windows Agent 0.1.2 完整包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.68.1/dsh-remote-agent-0.1.2-windows-x64.zip)，解压到长期保留的目录，运行 `start.cmd`，并保持 Windows 交互用户已登录。
 2. 在向导中设置可访问的地址、端口、允许工作目录及可选命令/浏览器能力。向导为当前用户注册 Agent 与桌面 helper，生成 `private/pairing.private.json`，不保存 Windows 密码；再次运行会保留已有配置。
 
 **在 Harness 中：**

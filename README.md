@@ -14,9 +14,11 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It reuses Harness model configuration and Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.68.0 · Windows Remote Agent: 0.1.2**
+**Current stable version: 0.68.1 · Windows Remote Agent: 0.1.2**
 
-**Release 0.68.0.** This release brings the Bot-centred workspace, secure device pairing, persistent team delegation and native-tool activity records. Local validation uses isolated data and offline providers; full OpenMausBot parity and live user Host/device acceptance remain incomplete.
+**Release 0.68.1.** This release brings the Bot-centred workspace, secure device pairing, persistent team delegation and native-tool activity records. Local validation uses isolated data and offline providers; full OpenMausBot parity and live user Host/device acceptance remain incomplete.
+
+Bot settings now load the saved model and editable form before checking official CLIs in the background. A stalled CLI cannot keep the settings drawer or Host startup waiting. The Host ends a detection attempt after 12 seconds; the client stops waiting for a refresh after 15 seconds. Timed-out tools remain unavailable until a successful recheck. Switching tabs, editing and closing the drawer stay available, unsaved changes survive detection, and late results from an old check cannot replace a newer selection.
 
 Bot official tools now use their own CLI configuration independently of the chat model. In a Bot’s model settings, choose **Install and sign in**, install or select the CLI, complete the vendor login yourself, then use **Recheck**. Supported, ready entries offer **Vendor default model**, an execution mode and **Save binding**; this also works when the Bot chats through another provider. Rechecking preserves unsaved settings. Missing, signed-out, unknown and terminal-only tools show their actual state and cannot be granted for managed execution. Ordinary Bots can run only their saved tool, CLI model and mode; every launch rechecks committed authorization and live readiness. Integrated, independent and native conversation tools use the same runner and execution records. A default model means the CLI’s own configuration, not a claim that its actual model ID has been verified. Bot failures never silently use an API or an unrestricted terminal. Unadapted tools remain available for manual terminal use.
 
@@ -93,8 +95,8 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.68.0`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.68.0`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.68.1`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.68.1`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. Configure provider credentials and models in the official Harness **Models** settings. Open the Bot workspace for the full edition, or **Model Router** in the sidebar for the routing-only edition.
 
@@ -102,10 +104,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.68.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.68.1
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.68.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.68.1
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -189,7 +191,7 @@ Integration mode reuses Harness Sessions. An optional independent runtime has it
 
 ## Multi-Bot task progress and pending items
 
-**Available in the full Bot edition 0.68.0.** On **Tasks**, inspect task counts per Bot, filter by **All / In progress / Needs attention / Ended**, or search task names and task, plan, or operation IDs. Counts and filters cover loaded records; funding admission is in progress, while budget waiting needs attention.
+**Available in the full Bot edition 0.68.1.** On **Tasks**, inspect task counts per Bot, filter by **All / In progress / Needs attention / Ended**, or search task names and task, plan, or operation IDs. Counts and filters cover loaded records; funding admission is in progress, while budget waiting needs attention.
 
 **Needs your attention** reports the full count and expands beyond six items. Each reminder opens the original task; approval reminders can open the owning Bot's conversation to show its original request. Open a task's **timeline** for queue, admission, execution, stop-request, and reconciliation events, with the original identities for each attempt. Reading history does not dispatch tasks or invoke models; stop requests still require confirmation. Older Hosts without history support retain existing receipt details.
 
@@ -240,7 +242,7 @@ The Main Bot can also call `bot_route_task` or its alias `bot_dispatch`. Both di
 
 **On the computer to control:**
 
-1. Download the [complete Windows Agent 0.1.2 package](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.68.0/dsh-remote-agent-0.1.2-windows-x64.zip), extract it into a permanent directory, and run `start.cmd`. Keep the interactive Windows user signed in.
+1. Download the [complete Windows Agent 0.1.2 package](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.68.1/dsh-remote-agent-0.1.2-windows-x64.zip), extract it into a permanent directory, and run `start.cmd`. Keep the interactive Windows user signed in.
 2. In the setup wizard, configure the accessible address, port, approved work directories, and optional command/browser capabilities. It registers the Agent and desktop helper for the current user and generates `private/pairing.private.json` without storing a Windows password. Subsequent runs retain the existing configuration.
 
 **In Harness:**

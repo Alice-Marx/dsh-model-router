@@ -168,3 +168,27 @@ test('a failed Host change publication also closes the fresh snapshot', async ()
   assert.equal(card(f.service.snapshot()).status, 'unavailable')
   assert.deepEqual(card(f.service.snapshot()).grantTools, [])
 })
+
+for (const stage of ['health', 'readiness', 'notification']) test('a hung '+stage+' is bounded, closes CLI authority and permits a clean retry', async () => {
+  let finishOld, oldSignal, stuck = true
+  const f = serviceFixture({ timeoutMs: 25,
+    probeHealth: async ({ signal }) => {
+      oldSignal ??= signal
+      if (stage === 'health' && stuck) return new Promise(resolve => { finishOld = resolve })
+      return { tools: [healthy()] }
+    },
+    probeReadiness: async () => stage === 'readiness' && stuck ? new Promise(resolve => { finishOld = resolve }) : readiness()[0],
+    onChanged: async () => { if (stage === 'notification' && stuck) await new Promise(resolve => { finishOld = resolve }) },
+  })
+  const expired = await f.service.refresh({ fresh: true })
+  assert.equal(oldSignal.aborted, true)
+  assert.equal(card(expired).status, 'unavailable')
+  assert.match(card(expired).reason, /超时/)
+  assert.deepEqual(card(expired).identities, [])
+  stuck = false
+  const fresh = await f.service.refresh({ fresh: true })
+  assert.equal(card(fresh).status, 'ready')
+  finishOld?.(stage === 'health' ? { tools: [] } : stage === 'readiness' ? { ready: false } : undefined)
+  await new Promise(setImmediate)
+  assert.equal(card(f.service.snapshot()).status, 'ready', 'the retired detection cannot overwrite a newer result')
+})

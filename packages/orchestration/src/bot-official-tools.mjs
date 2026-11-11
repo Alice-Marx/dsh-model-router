@@ -3,6 +3,7 @@ import { OFFICIAL_TOOLS } from '../../../.dsh-plugin/shared/official-tool-regist
 /** A stored choice, never a vendor model name or a --model argument. */
 export const BOT_CLI_DEFAULT_MODEL = 'vendor-default'
 export const BOT_OFFICIAL_TOOLS_TTL_MS = 2 * 60_000
+export const BOT_OFFICIAL_TOOLS_TIMEOUT_MS = 12_000
 export const BOT_OFFICIAL_TOOL_STATUSES = Object.freeze([
   'checking', 'not-installed', 'logged-out', 'login-unknown', 'terminal-only', 'unavailable', 'ready',
 ])
@@ -59,48 +60,74 @@ export function buildBotOfficialToolsCatalog({ health = null, capabilities = [],
  * from reintroducing a revoked installation/account selection.
  */
 export function createBotOfficialToolsCatalog({ probeHealth, probeCapabilities, probeReadiness, legacyModels = [], legacyTools = [],
-  now = Date.now, ttlMs = BOT_OFFICIAL_TOOLS_TTL_MS, onChanged = () => {} } = {}) {
+  now = Date.now, ttlMs = BOT_OFFICIAL_TOOLS_TTL_MS, timeoutMs = BOT_OFFICIAL_TOOLS_TIMEOUT_MS, onChanged = () => {} } = {}) {
   for (const [name, fn] of Object.entries({ probeHealth, probeCapabilities, probeReadiness, now, onChanged })) {
     if (typeof fn !== 'function') throw new TypeError(`${name} must be a function`)
   }
   if (!Number.isFinite(ttlMs) || ttlMs <= 0) throw new TypeError('ttlMs must be positive')
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new TypeError('timeoutMs must be positive')
   const legacy = { legacyModels, legacyTools }
   let value = buildBotOfficialToolsCatalog(), checkedAt = null, pending = null, epoch = 0
   const current = () => checkedAt !== null && now() >= checkedAt && now() - checkedAt < ttlMs
   const snapshot = () => copy(current() ? value : buildBotOfficialToolsCatalog())
   return Object.freeze({
     snapshot,
-    invalidate() { epoch++; checkedAt = null; value = buildBotOfficialToolsCatalog() },
+    invalidate() { epoch++; checkedAt = null; value = buildBotOfficialToolsCatalog(); const previous = pending; pending = null; previous?.controller.abort(new Error('OFFICIAL_DETECTION_INVALIDATED')) },
     refresh({ fresh = false } = {}) {
-      if (pending) return pending
+      if (pending) return pending.promise
       if (!fresh && current()) return Promise.resolve(snapshot())
       const generation = epoch
       const wasCurrent = current()
-      pending = (async () => {
+      const controller = new AbortController(), run = { controller, promise: null }
+      let abort
+      const stopped = new Promise((_resolve, reject) => {
+        abort = () => reject(controller.signal.reason)
+        controller.signal.addEventListener('abort', abort, { once: true })
+      })
+      const timer = setTimeout(() => controller.abort(Object.assign(new Error('OFFICIAL_DETECTION_TIMEOUT'), { code: 'OFFICIAL_DETECTION_TIMEOUT' })), timeoutMs)
+      const unavailable = error => buildBotOfficialToolsCatalog({ health: { tools: OFFICIAL_TOOLS.map(tool => ({ id: tool.id })) }, status: 'unavailable' })
+        .map(tool => error?.code === 'OFFICIAL_DETECTION_TIMEOUT' ? { ...tool, reason: '官方工具检测超时，请重新检测；模型与聊天设置仍可使用。' } : tool)
+      run.promise = (async () => {
         let next
         try {
-          const [health, capabilities] = await Promise.all([probeHealth({ fresh }), probeCapabilities()])
-          const readiness = await Promise.all(rows(health).filter(item => item.installed === true)
-            .map(async item => {
-              try { return { ...(await probeReadiness(item.id)), id: item.id } }
-              catch { return { id: item.id, ready: false, readyModes: [] } }
-            }))
-          next = buildBotOfficialToolsCatalog({ health, capabilities, readiness, ...legacy })
-        } catch { next = buildBotOfficialToolsCatalog({ health: { tools: OFFICIAL_TOOLS.map(tool => ({ id: tool.id })) }, status: 'unavailable' }) }
+          next = await Promise.race([stopped, (async () => {
+            const [health, capabilities] = await Promise.all([
+              probeHealth({ fresh, signal: controller.signal }),
+              probeCapabilities({ signal: controller.signal }),
+            ])
+            controller.signal.throwIfAborted()
+            const readiness = await Promise.all(rows(health).filter(item => item.installed === true)
+              .map(async item => {
+                try { return { ...(await probeReadiness(item.id, { signal: controller.signal })), id: item.id } }
+                catch { return { id: item.id, ready: false, readyModes: [] } }
+              }))
+            controller.signal.throwIfAborted()
+            return buildBotOfficialToolsCatalog({ health, capabilities, readiness, ...legacy })
+          })()])
+        } catch (error) { next = unavailable(error) }
         if (generation !== epoch) return snapshot()
         const changed = !wasCurrent || JSON.stringify(next) !== JSON.stringify(value)
         value = next; checkedAt = now()
         if (changed) {
-          try { await onChanged(snapshot()) }
+          try {
+            // A timed-out probe still publishes the closed catalog, without
+            // allowing a hung notification to retain the shared pending slot.
+            const notification = Promise.resolve().then(() => onChanged(snapshot()))
+            await Promise.race([notification, stopped])
+          }
           catch (error) {
-            value = buildBotOfficialToolsCatalog({ health: { tools: OFFICIAL_TOOLS.map(tool => ({ id: tool.id })) }, status: 'unavailable' })
+            value = unavailable(error)
             checkedAt = now()
-            throw error
+            if (error?.code !== 'OFFICIAL_DETECTION_TIMEOUT') throw error
           }
         }
         return snapshot()
-      })().finally(() => { pending = null })
-      return pending
+      })().finally(() => {
+        clearTimeout(timer); controller.signal.removeEventListener('abort', abort)
+        if (pending === run) pending = null
+      })
+      pending = run
+      return run.promise
     },
   })
 }

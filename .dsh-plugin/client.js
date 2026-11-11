@@ -40389,7 +40389,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.68.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.68.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -49496,12 +49496,12 @@ function BotSettingsDialog(props) {
   return /* @__PURE__ */ import_react85.default.createElement(SettingsDialog2, { key, ...props });
 }
 function SettingsDialog2({ productApi, botId, onClose, onOpenTools }) {
-  let [view, setView] = (0, import_react85.useState)(null), [error, setError] = (0, import_react85.useState)(""), [loading, setLoading] = (0, import_react85.useState)(!0), [busy, setBusy] = (0, import_react85.useState)(!1), [tab, setTab] = (0, import_react85.useState)("binding"), [identityVisited, setIdentityVisited] = (0, import_react85.useState)(!1), tabId = (0, import_react85.useId)(), surface = (0, import_react85.useRef)(null), closeButton = (0, import_react85.useRef)(null), session = (0, import_react85.useRef)({ live: !1, epoch: 0, busy: !1, requests: /* @__PURE__ */ new Set() }), call2 = async (action, payload) => {
+  let [view, setView] = (0, import_react85.useState)(null), [error, setError] = (0, import_react85.useState)(""), [loading, setLoading] = (0, import_react85.useState)(!0), [busy, setBusy] = (0, import_react85.useState)(!1), [tab, setTab] = (0, import_react85.useState)("binding"), [identityVisited, setIdentityVisited] = (0, import_react85.useState)(!1), [checkingTools, setCheckingTools] = (0, import_react85.useState)(!1), [toolNotice, setToolNotice] = (0, import_react85.useState)(""), tabId = (0, import_react85.useId)(), surface = (0, import_react85.useRef)(null), closeButton = (0, import_react85.useRef)(null), session = (0, import_react85.useRef)({ live: !1, epoch: 0, busy: !1, requests: /* @__PURE__ */ new Set() }), call2 = async (action, payload) => {
     let current = session.current, controller = new AbortController();
     current.requests.add(controller);
     let cancel, deadline = new Promise((_resolve, reject) => {
-      cancel = () => reject(new Error("REQUEST_ABORTED")), controller.signal.addEventListener("abort", cancel, { once: !0 });
-    }), timer = setTimeout(() => controller.abort(), action === "binding.inspect" && payload?.refreshOfficialTools === !0 ? 45e3 : 1e4);
+      cancel = () => reject(controller.signal.reason instanceof Error ? controller.signal.reason : new Error("REQUEST_ABORTED")), controller.signal.addEventListener("abort", cancel, { once: !0 });
+    }), timer = setTimeout(() => controller.abort(new Error("REQUEST_TIMED_OUT")), action === "binding.inspect" && payload?.refreshOfficialTools === !0 ? 15e3 : 1e4);
     try {
       return await Promise.race([Promise.resolve().then(() => productApi.dispatch(action, payload, controller.signal)), deadline]);
     } finally {
@@ -49525,12 +49525,31 @@ function SettingsDialog2({ productApi, botId, onClose, onOpenTools }) {
     let current = session.current;
     current.live = !0;
     let restore = document.activeElement, style = document.createElement("style");
-    return style.dataset.botSettingsDialog = "1", style.textContent = bot_settings_dialog_default, document.head.append(style), closeButton.current?.focus(), read(!0), () => {
+    return style.dataset.botSettingsDialog = "1", style.textContent = bot_settings_dialog_default, document.head.append(style), closeButton.current?.focus(), read(), () => {
       current.live = !1, current.epoch++;
       for (let controller of current.requests) controller.abort();
       style.remove(), restore?.isConnected && typeof restore.focus == "function" && restore.focus();
     };
-  }, [productApi, botId]), (0, import_react85.useEffect)(() => {
+  }, [productApi, botId]);
+  let loadedBot = view?.bot?.id;
+  (0, import_react85.useEffect)(() => {
+    if (!loadedBot) return;
+    let current = session.current, epoch = current.epoch, revision = view.record.revision, live = !0;
+    return setCheckingTools(!0), setToolNotice(""), (async () => {
+      try {
+        let value = await call2("binding.inspect", { botId, refreshOfficialTools: !0 });
+        if (!live || !current.live || epoch !== current.epoch) return;
+        if (value?.schemaVersion !== 1 || value.bot?.id !== botId || value.record?.botId !== botId || !Array.isArray(value.record.catalog?.tools)) throw new Error("WRONG_BINDING_OWNER");
+        setView((saved) => saved?.record.revision === revision ? { ...saved, record: { ...saved.record, catalog: value.record.catalog } } : saved);
+      } catch {
+        live && current.live && epoch === current.epoch && setToolNotice("官方工具检测暂未完成，可继续编辑设置，或点“重新检测”。");
+      } finally {
+        live && current.live && setCheckingTools(!1);
+      }
+    })(), () => {
+      live = !1;
+    };
+  }, [loadedBot, productApi, botId]), (0, import_react85.useEffect)(() => {
     let keyboard = (event) => {
       if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || document.querySelector(".bp-model-popover")) return;
       let active2 = document.activeElement;
@@ -49544,7 +49563,7 @@ function SettingsDialog2({ productApi, botId, onClose, onOpenTools }) {
   let dispatch = async (action, payload) => {
     let current = session.current;
     if (!current.live || current.busy || !["binding.inspect", "binding.save", "funding.account.save"].includes(action) || action !== "funding.account.save" && payload?.botId !== botId) throw new Error("设置暂时无法保存，请重新读取。");
-    current.busy = !0, setBusy(!0);
+    action === "binding.inspect" && current.epoch++, current.busy = !0, setBusy(!0);
     try {
       let result = await call2(action, payload);
       if (action === "binding.inspect") {
@@ -49553,7 +49572,7 @@ function SettingsDialog2({ productApi, botId, onClose, onOpenTools }) {
       } else current.live && await read();
       return result;
     } catch (cause) {
-      throw cause?.message === "REQUEST_ABORTED" ? action === "binding.inspect" ? new Error("工具检测超时或已取消，请重试。") : (current.live && setError("保存结果尚未确认，请重新读取后核对。"), new Error("保存结果尚未确认，请重新读取后核对。")) : cause;
+      throw ["REQUEST_ABORTED", "REQUEST_TIMED_OUT"].includes(cause?.message) ? action === "binding.inspect" ? new Error("工具检测超时或已取消，请重试。") : (current.live && setError("保存结果尚未确认，请重新读取后核对。"), new Error("保存结果尚未确认，请重新读取后核对。")) : cause;
     } finally {
       current.busy = !1, current.live && setBusy(!1);
     }
@@ -49567,9 +49586,9 @@ function SettingsDialog2({ productApi, botId, onClose, onOpenTools }) {
   };
   return (0, import_react_dom11.createPortal)(/* @__PURE__ */ import_react85.default.createElement("div", { className: "bp-bot-settings-backdrop", onMouseDown: (event) => {
     event.target === event.currentTarget && onClose?.();
-  } }, /* @__PURE__ */ import_react85.default.createElement("section", { ref: surface, className: "bp-bot-settings-dialog", role: "dialog", "aria-modal": "true", "aria-label": `${view?.bot?.name ?? "Bot"} 的设置` }, /* @__PURE__ */ import_react85.default.createElement("header", { className: "bp-bot-settings-header" }, /* @__PURE__ */ import_react85.default.createElement("span", { className: "bp-bot-settings-avatar" }, /* @__PURE__ */ import_react85.default.createElement(UiIcon, { name: "bot", size: 23 })), /* @__PURE__ */ import_react85.default.createElement("div", null, /* @__PURE__ */ import_react85.default.createElement("h2", null, view?.bot?.name ?? "Bot 设置"), /* @__PURE__ */ import_react85.default.createElement("p", null, "模型、工具与 Bot 个性")), /* @__PURE__ */ import_react85.default.createElement("button", { ref: closeButton, type: "button", "aria-label": "关闭 Bot 设置", onClick: onClose }, /* @__PURE__ */ import_react85.default.createElement(UiIcon, { name: "close", size: 19 }))), /* @__PURE__ */ import_react85.default.createElement("div", { className: "bp-bot-settings-tabs", role: "tablist", "aria-label": "Bot 设置分类", onKeyDown: tabKeys }, [["binding", "模型与工具", "spark"], ["identity", "身份与个性", "bot"]].map(([id3, label, icon2]) => /* @__PURE__ */ import_react85.default.createElement("button", { key: id3, type: "button", role: "tab", "data-settings-tab": id3, id: `${tabId}-${id3}`, "aria-controls": `${tabId}-${id3}-panel`, "aria-selected": tab === id3, tabIndex: tab === id3 ? 0 : -1, onClick: () => chooseTab(id3) }, /* @__PURE__ */ import_react85.default.createElement(UiIcon, { name: icon2, size: 15 }), label))), /* @__PURE__ */ import_react85.default.createElement("div", { className: "bp-page bp-bot-settings-body" }, /* @__PURE__ */ import_react85.default.createElement("div", { role: "tabpanel", id: `${tabId}-binding-panel`, "aria-labelledby": `${tabId}-binding`, hidden: tab !== "binding" }, loading && !view && /* @__PURE__ */ import_react85.default.createElement("p", { className: "bp-muted", role: "status" }, "正在读取 Bot 设置，检测安装、登录与执行能力…"), error && /* @__PURE__ */ import_react85.default.createElement("div", { className: "bp-bot-settings-error", role: "alert" }, /* @__PURE__ */ import_react85.default.createElement("p", null, error), /* @__PURE__ */ import_react85.default.createElement("button", { type: "button", disabled: busy || loading, onClick: () => {
-    read(!0);
-  } }, "重新读取")), view && /* @__PURE__ */ import_react85.default.createElement(BotBindingEditor, { bot: view.bot, record: view.record, accounts: view.accounts, dispatch, hostScope: productApi, busy: busy || loading || !!error, onOpenTools })), /* @__PURE__ */ import_react85.default.createElement("div", { role: "tabpanel", id: `${tabId}-identity-panel`, "aria-labelledby": `${tabId}-identity`, hidden: tab !== "identity" }, identityVisited && /* @__PURE__ */ import_react85.default.createElement(BotProfileIdentity, { productApi, botId, busy, onSaved: (bot) => setView((current) => current && bot.id === botId ? { ...current, bot: { ...current.bot, name: bot.name, role: bot.role } } : current) }))))), document.body);
+  } }, /* @__PURE__ */ import_react85.default.createElement("section", { ref: surface, className: "bp-bot-settings-dialog", role: "dialog", "aria-modal": "true", "aria-label": `${view?.bot?.name ?? "Bot"} 的设置` }, /* @__PURE__ */ import_react85.default.createElement("header", { className: "bp-bot-settings-header" }, /* @__PURE__ */ import_react85.default.createElement("span", { className: "bp-bot-settings-avatar" }, /* @__PURE__ */ import_react85.default.createElement(UiIcon, { name: "bot", size: 23 })), /* @__PURE__ */ import_react85.default.createElement("div", null, /* @__PURE__ */ import_react85.default.createElement("h2", null, view?.bot?.name ?? "Bot 设置"), /* @__PURE__ */ import_react85.default.createElement("p", null, "模型、工具与 Bot 个性")), /* @__PURE__ */ import_react85.default.createElement("button", { ref: closeButton, type: "button", "aria-label": "关闭 Bot 设置", onClick: onClose }, /* @__PURE__ */ import_react85.default.createElement(UiIcon, { name: "close", size: 19 }))), /* @__PURE__ */ import_react85.default.createElement("div", { className: "bp-bot-settings-tabs", role: "tablist", "aria-label": "Bot 设置分类", onKeyDown: tabKeys }, [["binding", "模型与工具", "spark"], ["identity", "身份与个性", "bot"]].map(([id3, label, icon2]) => /* @__PURE__ */ import_react85.default.createElement("button", { key: id3, type: "button", role: "tab", "data-settings-tab": id3, id: `${tabId}-${id3}`, "aria-controls": `${tabId}-${id3}-panel`, "aria-selected": tab === id3, tabIndex: tab === id3 ? 0 : -1, onClick: () => chooseTab(id3) }, /* @__PURE__ */ import_react85.default.createElement(UiIcon, { name: icon2, size: 15 }), label))), /* @__PURE__ */ import_react85.default.createElement("div", { className: "bp-page bp-bot-settings-body" }, /* @__PURE__ */ import_react85.default.createElement("div", { role: "tabpanel", id: `${tabId}-binding-panel`, "aria-labelledby": `${tabId}-binding`, hidden: tab !== "binding" }, loading && !view && /* @__PURE__ */ import_react85.default.createElement("p", { className: "bp-muted", role: "status" }, "正在读取 Bot 设置…"), error && /* @__PURE__ */ import_react85.default.createElement("div", { className: "bp-bot-settings-error", role: "alert" }, /* @__PURE__ */ import_react85.default.createElement("p", null, error), /* @__PURE__ */ import_react85.default.createElement("button", { type: "button", disabled: busy || loading, onClick: () => {
+    read();
+  } }, "重新读取")), view && checkingTools && /* @__PURE__ */ import_react85.default.createElement("p", { className: "bp-muted", role: "status" }, "正在后台检测官方工具，模型设置可直接使用。"), view && toolNotice && /* @__PURE__ */ import_react85.default.createElement("p", { className: "bp-muted", role: "status" }, toolNotice), view && /* @__PURE__ */ import_react85.default.createElement(BotBindingEditor, { bot: view.bot, record: view.record, accounts: view.accounts, dispatch, hostScope: productApi, busy: busy || loading || !!error, onOpenTools })), /* @__PURE__ */ import_react85.default.createElement("div", { role: "tabpanel", id: `${tabId}-identity-panel`, "aria-labelledby": `${tabId}-identity`, hidden: tab !== "identity" }, identityVisited && /* @__PURE__ */ import_react85.default.createElement(BotProfileIdentity, { productApi, botId, busy, onSaved: (bot) => setView((current) => current && bot.id === botId ? { ...current, bot: { ...current.bot, name: bot.name, role: bot.role } } : current) }))))), document.body);
 }
 
 // apps/integration-client/bot-thread-header.jsx

@@ -44,13 +44,14 @@ test('chat settings read only the selected Bot, keep a model choice as a draft, 
   const f = await fixture(t), source = api()
   await f.render({ productApi: source })
   assert.match(f.q('[role="dialog"]').getAttribute('aria-label'), /研究伙伴/)
-  assert.deepEqual(source.calls.map(call => call.action), ['binding.inspect'])
-  assert.deepEqual(source.calls[0].payload, { botId: 'bot-a', refreshOfficialTools: true })
+  assert.deepEqual(source.calls.map(call => call.action), ['binding.inspect', 'binding.inspect'])
+  assert.deepEqual(source.calls[0].payload, { botId: 'bot-a' })
+  assert.deepEqual(source.calls[1].payload, { botId: 'bot-a', refreshOfficialTools: true })
   await f.click('.bp-model-picker-trigger'); await f.click('[data-model-choice="fixture/two"]')
-  assert.equal(source.calls.length, 1, 'choosing a model does not save or execute')
+  assert.equal(source.calls.length, 2, 'choosing a model does not save or execute')
   await f.click('button[type="submit"]')
-  assert.deepEqual(source.calls.map(call => call.action), ['binding.inspect', 'binding.save', 'binding.inspect'])
-  assert.deepEqual(source.calls[1].payload.settings.model, { provider: 'fixture', model: 'two' })
+  assert.deepEqual(source.calls.map(call => call.action), ['binding.inspect', 'binding.inspect', 'binding.save', 'binding.inspect'])
+  assert.deepEqual(source.calls[2].payload.settings.model, { provider: 'fixture', model: 'two' })
   assert.match(f.q('.bb-feedback').textContent, /设置已保存/)
 })
 test('a nested model popover handles Escape before its chat settings dialog, which restores the chat trigger', async t => {
@@ -84,7 +85,7 @@ test('a lost settings read can be retried explicitly without replaying a save', 
   await f.render({ productApi: connection })
   assert.match(f.q('[role="alert"]').textContent, /重新读取/); assert.doesNotMatch(document.body.textContent, /private diagnostic/)
   await f.click('.bp-bot-settings-error button')
-  assert.ok(f.q('.bb-root')); assert.deepEqual(source.calls.map(call => call.action), ['binding.inspect'])
+  assert.ok(f.q('.bb-root')); assert.deepEqual(source.calls.map(call => call.action), ['binding.inspect', 'binding.inspect'])
 })
 
 test('identity is loaded on demand, keyboard tabs work, and switching settings tabs preserves unsaved identity text', async t => {
@@ -95,12 +96,12 @@ test('identity is loaded on demand, keyboard tabs work, and switching settings t
     return source.dispatch(action, payload, signal)
   } }
   await f.render({ productApi: connection })
-  assert.deepEqual(calls, ['binding.inspect'])
+  assert.deepEqual(calls, ['binding.inspect', 'binding.inspect'])
   await f.click('[data-settings-tab="binding"]')
   await f.key(f.q('[data-settings-tab="binding"]'), 'ArrowRight')
   assert.equal(f.q('[data-settings-tab="identity"]').getAttribute('aria-selected'), 'true')
   assert.ok(document.activeElement === f.q('[data-settings-tab="identity"]'))
-  assert.deepEqual(calls, ['binding.inspect', 'botProfile.inspect'])
+  assert.deepEqual(calls, ['binding.inspect', 'binding.inspect', 'botProfile.inspect'])
   const input = f.q('#bp-profile-bot-a-role')
   await f.settle(() => {
     Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, '尚未保存的职责')
@@ -111,7 +112,7 @@ test('identity is loaded on demand, keyboard tabs work, and switching settings t
   await f.click('[data-settings-tab="identity"]')
   assert.equal(f.q('#bp-profile-bot-a-role').value, '尚未保存的职责')
   assert.match(f.q('.bp-profile-save').textContent, /有未保存修改/)
-  assert.deepEqual(calls, ['binding.inspect', 'botProfile.inspect'], 'tab switching never saves, starts a turn or rereads over the draft')
+  assert.deepEqual(calls, ['binding.inspect', 'binding.inspect', 'botProfile.inspect'], 'tab switching never saves, starts a turn or rereads over the draft')
 })
 
 test('identity save rejects a wrong-owner acknowledgement without losing the unsaved edit or retrying', async t => {
@@ -134,7 +135,7 @@ test('identity save rejects a wrong-owner acknowledgement without losing the uns
   assert.equal(f.q('.bp-profile-feedback').dataset.kind, 'error')
   assert.equal(f.q('#bp-profile-bot-a-role').value, '保留这个修改')
   assert.match(f.q('.bp-profile-save').textContent, /有未保存修改/)
-  assert.deepEqual(calls, ['binding.inspect', 'botProfile.inspect', 'botProfile.save'])
+  assert.deepEqual(calls, ['binding.inspect', 'binding.inspect', 'botProfile.inspect', 'botProfile.save'])
 })
 
 test('confirmed identity saves use canonical values and refresh the drawer name without turning untouched changes into a new edit', async t => {
@@ -183,8 +184,8 @@ test('the settings dialog rechecks trusted CLI identities while retaining its un
   await f.click('[data-tool-id="codex"] input[type=checkbox]')
   value.record.catalog.tools[0].reason = '刚刚核验完成。'
   await f.settle(() => [...document.querySelectorAll('button')].find(button => button.textContent === '重新检测').click())
-  assert.deepEqual(calls.map(call => call.action), ['binding.inspect', 'binding.inspect'])
-  assert.deepEqual(calls[1].payload, { botId: 'bot-a', refreshOfficialTools: true })
+  assert.deepEqual(calls.map(call => call.action), ['binding.inspect', 'binding.inspect', 'binding.inspect'])
+  assert.deepEqual(calls[2].payload, { botId: 'bot-a', refreshOfficialTools: true })
   assert.match(f.q('.bp-model-picker-trigger').textContent, /two/)
   assert.equal(f.q('[data-tool-id="codex"] input[type=checkbox]').checked, true)
   assert.match(f.q('.bb-tool-readiness').textContent, /刚刚核验完成/)
@@ -192,4 +193,33 @@ test('the settings dialog rechecks trusted CLI identities while retaining its un
   const saved = calls.find(call => call.action === 'binding.save').payload.settings
   assert.deepEqual(saved.model, { provider: 'fixture', model: 'two' })
   assert.deepEqual(saved.officialTools, [{ toolId: 'codex', cliModel: 'vendor-default', mode: 'read-only' }])
+})
+
+test('a CLI detection that never returns cannot hide the model editor or identity tab, and its UI timeout is recoverable', async t => {
+  const f = await fixture(t), source = api(), calls = []
+  let finishDetection, detectionSignal
+  const connection = { dispatch: (action, payload, signal) => {
+    calls.push({ action, payload })
+    if (payload?.refreshOfficialTools) { detectionSignal = signal; return new Promise(resolve => { finishDetection = resolve }) }
+    if (action === 'botProfile.inspect') return { schemaVersion: 1, bot: { id: 'bot-a', name: '研究伙伴', role: '', instructions: '' }, revision: 1 }
+    return source.dispatch(action, payload, signal)
+  } }
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  await f.render({ productApi: connection })
+  assert.ok(f.q('.bb-root'), 'the first settings read does not await any CLI')
+  assert.match(document.body.textContent, /后台检测/)
+  assert.equal(f.q('button[type=submit]').disabled, false)
+  await f.click('.bp-model-picker-trigger'); await f.click('[data-model-choice="fixture/two"]')
+  await f.click('[data-settings-tab="identity"]')
+  assert.ok(f.q('.bp-profile'))
+  await f.click('[data-settings-tab="binding"]')
+  await f.settle(() => t.mock.timers.tick(15001))
+  assert.equal(detectionSignal.aborted, true)
+  assert.match(document.body.textContent, /可继续编辑设置/)
+  assert.match(f.q('.bp-model-picker-trigger').textContent, /two/)
+  await f.settle(() => finishDetection(data('过期的工具结果')))
+  assert.doesNotMatch(document.body.textContent, /过期的工具结果/)
+  await f.click('button[type=submit]')
+  assert.deepEqual(source.calls.find(call => call.action === 'binding.save').payload.settings.model, { provider: 'fixture', model: 'two' })
+  assert.equal(calls.filter(call => call.payload?.refreshOfficialTools).length, 1)
 })

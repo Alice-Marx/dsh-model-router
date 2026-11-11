@@ -1448,8 +1448,8 @@ export function startBotProduct(ctx, options = {}) {
       ctx.provide('botAuxiliaryModelStream', Object.freeze(auxiliaryStream))
       // Fix the initial history boundary after committed Bots are hydrated,
       // before tools can start new work. A failed read fails startup visibly.
-      await officialCatalog?.refresh()
       await product.rt.load()
+      void officialCatalog?.refresh().catch(() => ctx.logger?.warn?.('Official tool detection is unavailable; Bot settings remain usable.'))
       independentChat = createIndependentChatService({ Database, file: storageFile, lifecycle: product.lifecycle,
         runtime: () => { try { return ctx.get?.('botRuntimeAdapter') ?? null } catch { return null } }, now })
       ctx.provide('botIndependentChat', independentChat)
@@ -1499,9 +1499,9 @@ export function startBotProduct(ctx, options = {}) {
       deferredRouterState?.resolve(funding.state)
       machineHeartbeat = createMachineHeartbeat({ machines: () => machines, preferredBotIds: () => product.lifecycle.committedMainBotIds() })
       machineHeartbeat.start()
-      timer = setInterval(() => { void (async () => { await officialCatalog?.refresh({ fresh: true }); await refresh() })().catch(() => {
+      timer = setInterval(() => { void officialCatalog?.refresh({ fresh: true }).catch(() => {
         ctx.logger?.warn?.('Official tool refresh failed; unavailable CLI grants remain closed.')
-      }) }, refreshIntervalMs)
+      }); void refresh() }, refreshIntervalMs)
       timer.unref()
       return product
     }catch(error){

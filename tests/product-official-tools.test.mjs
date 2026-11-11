@@ -96,3 +96,18 @@ test('official CLI executes through real funded SQLite with a subscription chat 
 })
 
 import { startBotProduct as importStart } from '../packages/orchestration/src/product-composition.mjs'
+
+test('a hung official probe cannot block actual Host boot, base settings, or ordinary Bot model binding', { timeout: 5000 }, async () => {
+  let signal
+  await withProductIndependent(async ({ bind, dispatch }) => {
+    const view = await dispatch('binding.inspect', { botId: 'b' })
+    assert.equal(card(view).status, 'checking')
+    await bind('b', 'beta', 'vendor/two')
+    const usable = await dispatch('binding.inspect', { botId: 'b' })
+    assert.equal(usable.record.status, 'available')
+    assert.ok(usable.record.grant.tools.includes('model/infer'))
+    assert.equal(signal.aborted, false, 'the model read never waits for or authorizes the CLI probe')
+  }, { officialTools: { probeHealth: options => { signal = options.signal; return new Promise(() => {}) },
+    probeCapabilities: () => [], probeReadiness: () => new Promise(() => {}) } })
+  assert.equal(signal.aborted, true, 'Host disposal retires detection without awaiting a hung CLI')
+})

@@ -14,6 +14,7 @@ export function BotSettingsDialog(props) {
 function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
   const [view, setView] = useState(null), [error, setError] = useState(''), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false)
   const [tab, setTab] = useState('binding'), [identityVisited, setIdentityVisited] = useState(false)
+  const [checkingTools, setCheckingTools] = useState(false), [toolNotice, setToolNotice] = useState('')
   const tabId = useId()
   const surface = useRef(null), closeButton = useRef(null)
   const session = useRef({ live: false, epoch: 0, busy: false, requests: new Set() })
@@ -21,8 +22,8 @@ function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
     const current = session.current, controller = new AbortController()
     current.requests.add(controller)
     let cancel
-    const deadline = new Promise((_resolve, reject) => { cancel = () => reject(new Error('REQUEST_ABORTED')); controller.signal.addEventListener('abort', cancel, { once: true }) })
-    const timer = setTimeout(() => controller.abort(), action === 'binding.inspect' && payload?.refreshOfficialTools === true ? 45000 : 10000)
+    const deadline = new Promise((_resolve, reject) => { cancel = () => reject(controller.signal.reason instanceof Error ? controller.signal.reason : new Error('REQUEST_ABORTED')); controller.signal.addEventListener('abort', cancel, { once: true }) })
+    const timer = setTimeout(() => controller.abort(new Error('REQUEST_TIMED_OUT')), action === 'binding.inspect' && payload?.refreshOfficialTools === true ? 15000 : 10000)
     try { return await Promise.race([Promise.resolve().then(() => productApi.dispatch(action, payload, controller.signal)), deadline]) }
     finally { clearTimeout(timer); current.requests.delete(controller); controller.signal.removeEventListener('abort', cancel) }
   }
@@ -43,7 +44,7 @@ function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
     const restore = document.activeElement
     const style = document.createElement('style'); style.dataset.botSettingsDialog = '1'; style.textContent = css; document.head.append(style)
     closeButton.current?.focus()
-    void read(true)
+    void read()
     return () => {
       current.live = false; current.epoch++
       for (const controller of current.requests) controller.abort()
@@ -51,6 +52,24 @@ function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
       if (restore?.isConnected && typeof restore.focus === 'function') restore.focus()
     }
   }, [productApi, botId])
+  const loadedBot = view?.bot?.id
+  useEffect(() => {
+    if (!loadedBot) return
+    const current = session.current, epoch = current.epoch, revision = view.record.revision
+    let live = true
+    setCheckingTools(true); setToolNotice('')
+    void (async () => {
+      try {
+        const value = await call('binding.inspect', { botId, refreshOfficialTools: true })
+        if (!live || !current.live || epoch !== current.epoch) return
+        if (value?.schemaVersion !== 1 || value.bot?.id !== botId || value.record?.botId !== botId || !Array.isArray(value.record.catalog?.tools)) throw new Error('WRONG_BINDING_OWNER')
+        setView(saved => saved?.record.revision === revision ? { ...saved, record: { ...saved.record, catalog: value.record.catalog } } : saved)
+      } catch {
+        if (live && current.live && epoch === current.epoch) setToolNotice('官方工具检测暂未完成，可继续编辑设置，或点“重新检测”。')
+      } finally { if (live && current.live) setCheckingTools(false) }
+    })()
+    return () => { live = false }
+  }, [loadedBot, productApi, botId])
   useEffect(() => {
     const keyboard = event => {
       if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || document.querySelector('.bp-model-popover')) return
@@ -69,6 +88,7 @@ function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
   const dispatch = async (action, payload) => {
     const current = session.current
     if (!current.live || current.busy || !['binding.inspect', 'binding.save', 'funding.account.save'].includes(action) || (action !== 'funding.account.save' && payload?.botId !== botId)) throw new Error('设置暂时无法保存，请重新读取。')
+    if (action === 'binding.inspect') current.epoch++
     current.busy = true; setBusy(true)
     try {
       const result = await call(action, payload)
@@ -78,7 +98,7 @@ function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
       } else if (current.live) await read()
       return result
     } catch (cause) {
-      if (cause?.message === 'REQUEST_ABORTED') {
+      if (['REQUEST_ABORTED', 'REQUEST_TIMED_OUT'].includes(cause?.message)) {
         if (action === 'binding.inspect') throw new Error('工具检测超时或已取消，请重试。')
         if (current.live) setError('保存结果尚未确认，请重新读取后核对。')
         throw new Error('保存结果尚未确认，请重新读取后核对。')
@@ -102,8 +122,10 @@ function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
       </div>
       <div className="bp-page bp-bot-settings-body">
         <div role="tabpanel" id={`${tabId}-binding-panel`} aria-labelledby={`${tabId}-binding`} hidden={tab !== 'binding'}>
-        {loading && !view && <p className="bp-muted" role="status">正在读取 Bot 设置，检测安装、登录与执行能力…</p>}
-        {error && <div className="bp-bot-settings-error" role="alert"><p>{error}</p><button type="button" disabled={busy || loading} onClick={() => void read(true)}>重新读取</button></div>}
+        {loading && !view && <p className="bp-muted" role="status">正在读取 Bot 设置…</p>}
+        {error && <div className="bp-bot-settings-error" role="alert"><p>{error}</p><button type="button" disabled={busy || loading} onClick={() => void read()}>重新读取</button></div>}
+        {view && checkingTools && <p className="bp-muted" role="status">正在后台检测官方工具，模型设置可直接使用。</p>}
+        {view && toolNotice && <p className="bp-muted" role="status">{toolNotice}</p>}
         {view && <BotBindingEditor bot={view.bot} record={view.record} accounts={view.accounts} dispatch={dispatch} hostScope={productApi} busy={busy || loading || Boolean(error)} onOpenTools={onOpenTools}/>}
         </div>
         <div role="tabpanel" id={`${tabId}-identity-panel`} aria-labelledby={`${tabId}-identity`} hidden={tab !== 'identity'}>
