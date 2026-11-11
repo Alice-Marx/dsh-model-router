@@ -18394,7 +18394,12 @@ function useLandOnMainBot(roster, useSessions, actions) {
   }), lastBot = (0, import_react21.useRef)(null);
   (0, import_react21.useEffect)(() => {
     if (!roster.ready || !roster.mainBotId) return;
-    let [id3, blank3] = mainView.split("|"), bot = id3 === "" ? void 0 : roster.byId[id3];
+    let [id3, blank3] = mainView.split("|"), thread = id3 === "" ? void 0 : roster.threadsById?.[id3];
+    if (thread !== void 0) {
+      lastBot.current = { botId: thread.botId, sessionId: id3 };
+      return;
+    }
+    let bot = id3 === "" ? void 0 : roster.byId[id3];
     if (bot !== void 0) {
       lastBot.current = { botId: bot.id, sessionId: id3 }, currentPart(bot) !== id3 && actions.landOn(bot.id);
       return;
@@ -27446,6 +27451,11 @@ function apply(ctx) {
     }
   }, actions = {
     ...teamActions({ call, after, partFor, roster, ui: ui3, live, cards, heldCards, turnClock, panelFolded }),
+    // A newly committed thread must reach both client directories before the
+    // native sidebar decides whether its blank Session is a Bot destination.
+    prepareThreadNavigation: async () => {
+      await pull(), await ctx.sessions.refresh?.();
+    },
     learningAnswer: (id3, approve) => after(call("learning-answer", { id: id3, approve })),
     // The full-pane overlays sit above the conversation, so opening one must dismiss them
     // or the click appears to do nothing.
@@ -40379,7 +40389,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.67.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.67.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -43534,10 +43544,11 @@ function botModelStatus(bot, catalog = []) {
   let selected = ref(bot?.model), applied = ref(bot?.appliedModel), label = (value) => {
     let entry = Array.isArray(catalog) ? catalog.find((item) => entryRef(item) === value) : void 0;
     return typeof entry?.name == "string" && entry.name ? entry.name : typeof entry?.label == "string" && entry.label ? entry.label : value;
-  }, selectedLabel = selected ? label(selected) : null, appliedLabel = applied ? label(applied) : null, different = !!(selected && applied && selected !== applied), title = [
+  }, selectedLabel = selected ? label(selected) : null, appliedLabel = applied ? label(applied) : null, different = !!(selected && applied && selected !== applied), setupPending = bot?.setupPending === !0, title = [
+    setupPending ? "问候正在等待模型、权限与资金绑定保存" : null,
     selected ? `宿主已选：${selected}` : "宿主未指定单独模型",
     applied ? `最近应用：${applied}` : "宿主尚未报告应用记录"
-  ].join("；");
+  ].filter(Boolean).join("；");
   return {
     selected,
     applied,
@@ -43545,7 +43556,8 @@ function botModelStatus(bot, catalog = []) {
     appliedLabel,
     different,
     title,
-    label: selectedLabel ?? appliedLabel ?? "选择模型",
+    setupPending,
+    label: setupPending ? "完成 Bot 设置" : selectedLabel ?? appliedLabel ?? "选择模型",
     appliedText: applied ? `最近应用：${appliedLabel}${different ? " · 与宿主已选模型不同" : ""}` : "宿主尚未报告应用记录"
   };
 }
@@ -45615,6 +45627,15 @@ function exportStatus(value) {
 
 // apps/integration-client/bot-threads-panel.jsx
 var import_react76 = __toESM(require("react"), 1);
+
+// apps/integration-client/thread-request-key.mjs
+function threadRequestKey(source) {
+  if (source !== "head" && source !== "panel") throw new TypeError("INVALID_THREAD_REQUEST_SOURCE");
+  let bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  return `${source}-${[...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+// apps/integration-client/bot-threads-panel.jsx
 var VISIBLE_MS2 = 5e3, FAILED_MS2 = 15e3, REQUEST_MS = 8e3, MAX_NAME = 80, THREAD_ACTIONS = Object.freeze({
   readModel: "threads.readModel",
   list: "threads.list",
@@ -45672,7 +45693,7 @@ function threadFailure(error) {
       return "操作未得到宿主确认，请重试。";
   }
 }
-var submits = (event) => event.key === "Enter" && event.nativeEvent?.isComposing !== !0 && event.keyCode !== 229, scopeKey2 = 0, createSeq = 0;
+var submits = (event) => event.key === "Enter" && event.nativeEvent?.isComposing !== !0 && event.keyCode !== 229, scopeKey2 = 0;
 function BotThreadsPanel(props) {
   let key = (0, import_react76.useMemo)(() => ++scopeKey2, [props.productApi, props.available, props.botId]);
   return /* @__PURE__ */ import_react76.default.createElement(ThreadPanel, { key, ...props });
@@ -45755,7 +45776,7 @@ function ThreadPanel({ productApi, botId, available = !0, onOpenSession }) {
     reloadRef.current?.();
   }, createThread = async () => {
     let name = draft2.trim().slice(0, MAX_NAME);
-    createKey.current === null && (createKey.current = `panel-${botId}-${++createSeq}`);
+    createKey.current === null && (createKey.current = threadRequestKey("panel"));
     let requestKey = createKey.current, threadId = (await write(THREAD_ACTIONS.create, { botId, name: name || void 0, requestKey }))?.thread?.threadId;
     typeof threadId == "string" && (setDraft(""), createKey.current = null, await openThread(threadId, { create: !0 }));
   }, openThread = async (threadId, { create = !1 } = {}) => {
@@ -49508,7 +49529,7 @@ function SettingsDialog2({ productApi, botId, onClose, onOpenTools }) {
 
 // apps/integration-client/bot-thread-header.jsx
 var import_react86 = __toESM(require("react"), 1);
-var REQUEST_MS2 = 8e3, MENU_MS = 2500, MAX_NAME2 = 80, headSeq = 0, submits2 = (event) => event.key === "Enter" && event.nativeEvent?.isComposing !== !0 && event.keyCode !== 229;
+var REQUEST_MS2 = 8e3, MENU_MS = 2500, MAX_NAME2 = 80, submits2 = (event) => event.key === "Enter" && event.nativeEvent?.isComposing !== !0 && event.keyCode !== 229;
 function abortable3(work, signal) {
   let cancel, interrupted = new Promise((_resolve, reject) => {
     cancel = () => reject(new Error("THREAD_REQUEST_ABORTED")), signal.addEventListener("abort", cancel, { once: !0 }), signal.aborted && cancel();
@@ -49559,7 +49580,7 @@ function BotThreadHeader({ sessionId, roster, productApi, actions, onOpenSession
     }, REQUEST_MS2);
     try {
       let result = await abortable3(() => productApi.dispatch(action, payload, controller.signal), controller.signal);
-      return !current2.mounted || controller.signal.aborted || epoch !== void 0 && epoch.current !== mine ? { abandoned: !0 } : { ok: !0, result };
+      return action === THREAD_ACTIONS.open && result?.sessionId && typeof actions?.prepareThreadNavigation == "function" && await abortable3(() => actions.prepareThreadNavigation(), controller.signal), !current2.mounted || controller.signal.aborted || epoch !== void 0 && epoch.current !== mine ? { abandoned: !0 } : { ok: !0, result };
     } catch (error) {
       return !current2.mounted || epoch !== void 0 && epoch.current !== mine ? { abandoned: !0 } : expired2 ? { ok: !1, error: Object.assign(new Error("宿主没有在约定时间内回答。"), { code: "THREAD_REQUEST_ABORTED" }) } : controller.signal.aborted ? { abandoned: !0 } : { ok: !1, error };
     } finally {
@@ -49619,7 +49640,7 @@ function BotThreadHeader({ sessionId, roster, productApi, actions, onOpenSession
     let id3 = outcome.result?.sessionId ?? null;
     typeof id3 == "string" && id3 !== "" ? (closeMenu(), setDraft(""), navigate(id3)) : create && setNote("宿主没有返回这个线程的会话。");
   }, createThread = async () => {
-    createKey.current === null && (createKey.current = `head-${botId}-${++headSeq}`);
+    createKey.current === null && (createKey.current = threadRequestKey("head"));
     let requestKey = createKey.current, name = draft2.trim().slice(0, MAX_NAME2);
     setNote(""), setPending(!0);
     let made = await call2(THREAD_ACTIONS.create, { botId, name: name || void 0, requestKey });

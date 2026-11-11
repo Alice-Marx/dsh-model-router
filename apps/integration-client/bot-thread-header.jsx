@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { UiIcon } from './ui-icons.jsx'
 import { THREAD_ACTIONS, formatThreadAt, isArchivedThread, sortedThreads, threadLabel } from './bot-threads-panel.jsx'
+import { threadRequestKey } from './thread-request-key.mjs'
 
 // The chat-header control for a Bot's threads.
 //
@@ -25,8 +26,6 @@ import { THREAD_ACTIONS, formatThreadAt, isArchivedThread, sortedThreads, thread
 const REQUEST_MS = 8000
 const MENU_MS = 2500
 const MAX_NAME = 80
-
-let headSeq = 0
 
 // An IME composition is not a submission: Enter that confirms a candidate must
 // never create a thread.
@@ -108,6 +107,9 @@ export function BotThreadHeader({ sessionId, roster, productApi, actions, onOpen
     const timeout = setTimeout(() => { expired = true; controller.abort() }, REQUEST_MS)
     try {
       const result = await abortable(() => productApi.dispatch(action, payload, controller.signal), controller.signal)
+      if (action === THREAD_ACTIONS.open && result?.sessionId && typeof actions?.prepareThreadNavigation === 'function') {
+        await abortable(() => actions.prepareThreadNavigation(), controller.signal)
+      }
       if (!current.mounted || controller.signal.aborted || (epoch !== undefined && epoch.current !== mine)) return { abandoned: true }
       return { ok: true, result }
     } catch (error) {
@@ -187,7 +189,7 @@ export function BotThreadHeader({ sessionId, roster, productApi, actions, onOpen
     // outcome followed by another click is the same intent, so the Host answers
     // with the thread it already made instead of a second one. The key is
     // retired only when the create is confirmed or the owner abandons it.
-    if (createKey.current === null) createKey.current = `head-${botId}-${++headSeq}`
+    if (createKey.current === null) createKey.current = threadRequestKey('head')
     const requestKey = createKey.current
     const name = draft.trim().slice(0, MAX_NAME)
     setNote('')

@@ -53,6 +53,7 @@ export function install(rt) {
         ...(thread.createdAt === undefined ? {} : { createdAt: thread.createdAt }),
         ...(thread.archivedAt === undefined || thread.archivedAt === null ? {} : { archivedAt: thread.archivedAt }) })),
       ...(kickoff ? { waiting: true } : {}),
+      ...(kickoff && typeof rt.kickoffReady === 'function' && rt.kickoffReady(bot) !== true ? { setupPending: true } : {}),
     })),
     // `sessionId` is the group's own Session's current part, `ownParts` its earlier
     // ones; `parts` the members' hidden group Sessions and their earlier segments,

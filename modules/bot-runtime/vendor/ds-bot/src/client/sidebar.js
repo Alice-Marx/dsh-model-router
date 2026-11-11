@@ -995,6 +995,14 @@ function useLandOnMainBot(roster, useSessions, actions) {
   useEffect(() => {
     if (!roster.ready || !roster.mainBotId) return undefined
     const [id, blank] = mainView.split('|')
+    // A thread is an intentional destination, including an empty or archived
+    // one. Its Session also maps to the Bot in byId; the rollover check below
+    // applies only to the Bot's default-chat parts.
+    const thread = id === '' ? undefined : roster.threadsById?.[id]
+    if (thread !== undefined) {
+      lastBot.current = { botId: thread.botId, sessionId: id }
+      return undefined
+    }
     const bot = id === '' ? undefined : roster.byId[id]
     if (bot !== undefined) {
       lastBot.current = { botId: bot.id, sessionId: id }

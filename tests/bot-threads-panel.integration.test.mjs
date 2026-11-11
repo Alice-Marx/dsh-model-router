@@ -145,7 +145,7 @@ test('switching, creating, renaming and archiving each go through one Host actio
   assert.equal(created.length, 1)
   assert.equal(created[0].payload.botId, 'bot-a')
   assert.equal(created[0].payload.name, '新的线索')
-  assert.match(created[0].payload.requestKey, /^panel-bot-a-\d+$/)
+  assert.match(created[0].payload.requestKey, /^panel-[a-f0-9]{32}$/)
   assert.equal(f.q('.bp-threads-input').value, '', 'the composer clears once the Host confirms')
   assert.equal(f.q('.bp-thread.is-active')?.getAttribute('data-thread'), 'made-1')
   // The new thread is opened as itself, with the Session the Host made for it.
@@ -370,7 +370,7 @@ test('the header control shows the Bot and its thread, and opens a thread only a
   await f.settle(() => f.q('.bp-threads-menu-new .bp-threads-button').click())
   const created = dispatched.filter(entry => entry.action === 'threads.create')
   assert.equal(created.length, 1)
-  assert.match(created[0].payload.requestKey, /^head-bot-a-\d+$/)
+  assert.match(created[0].payload.requestKey, /^head-[a-f0-9]{32}$/)
   assert.deepEqual(opened, ['sess-2', 'sess-made-1'])
 })
 
@@ -387,6 +387,27 @@ test('the header control reads one Bot on a change, never a repeated full snapsh
     assert.ok(entry.action.startsWith('threads.'), 'the header dispatches nothing but thread actions')
     if (entry.action === 'threads.list') assert.deepEqual(Object.keys(entry.payload), ['botId'], 'one Bot per read, never a snapshot')
   }
+})
+
+test('the header waits for native roster and Session readiness before navigating and retires late preparation', async t => {
+  const f = await fixture(t)
+  const { api } = makeApi([thread('t-1', { active:true, sessionId:'sess-1', sessionState:'owned' }), thread('t-2', {sessionId:'sess-2',sessionState:'owned'})])
+  const roster = {byId:{'sess-1':{id:'bot-a',name:'Acceptance Bot'}},threadsById:{'sess-1':{botId:'bot-a',threadId:'t-1'}},ready:true}
+  const opened=[]
+  let release
+  const actions={prepareThreadNavigation:()=>new Promise(resolve=>{release=resolve})}
+  await f.renderHeader({productApi:api,roster,sessionId:'sess-1',actions,onOpenSession:id=>opened.push(id)})
+  await f.settle(()=>f.q('.bp-threads-head').click())
+  await f.settle(()=>f.q('.bp-threads-menu-row[data-state="open"]:not(.is-active)').click())
+  assert.equal(typeof release,'function')
+  assert.deepEqual(opened,[],'A confirmed Host Session alone is not native client readiness')
+  await f.settle(()=>release())
+  assert.deepEqual(opened,['sess-2'])
+  await f.settle(()=>f.q('.bp-threads-head').click())
+  await f.settle(()=>f.q('.bp-threads-menu-row[data-state="open"]:not(.is-active)').click())
+  await f.unmount()
+  await f.settle(()=>release())
+  assert.deepEqual(opened,['sess-2'],'Preparation after unmount must not move the user')
 })
 
 test('header notes name the Host reason instead of guessing', () => {
@@ -441,7 +462,7 @@ test('the header control holds one create intent until the Host answers, and Ent
   await f.settle(() => f.q('.bp-threads-menu-new .bp-threads-button').click())
   const first = dispatched.filter(entry => entry.action === 'threads.create')
   assert.equal(first.length, 1)
-  assert.match(first[0].payload.requestKey, /^head-bot-a-\d+$/)
+  assert.match(first[0].payload.requestKey, /^head-[a-f0-9]{32}$/)
   // The refusal is reported, and the intent key stands.
   assert.match(f.q('.bp-threads-note[role="alert"]')?.textContent ?? '', /核对/)
   await f.settle(() => f.q('.bp-threads-menu-new .bp-threads-button').click())

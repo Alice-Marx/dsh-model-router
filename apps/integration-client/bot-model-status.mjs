@@ -10,9 +10,11 @@ export function botModelStatus(bot, catalog = []) {
   }
   const selectedLabel = selected ? label(selected) : null, appliedLabel = applied ? label(applied) : null
   const different = Boolean(selected && applied && selected !== applied)
-  const title = [selected ? `宿主已选：${selected}` : '宿主未指定单独模型',
-    applied ? `最近应用：${applied}` : '宿主尚未报告应用记录'].join('；')
+  const setupPending = bot?.setupPending === true
+  const title = [setupPending ? '问候正在等待模型、权限与资金绑定保存' : null,
+    selected ? `宿主已选：${selected}` : '宿主未指定单独模型',
+    applied ? `最近应用：${applied}` : '宿主尚未报告应用记录'].filter(Boolean).join('；')
   return { selected, applied, selectedLabel, appliedLabel, different, title,
-    label: selectedLabel ?? appliedLabel ?? '选择模型',
+    setupPending, label: setupPending ? '完成 Bot 设置' : selectedLabel ?? appliedLabel ?? '选择模型',
     appliedText: applied ? `最近应用：${appliedLabel}${different ? ' · 与宿主已选模型不同' : ''}` : '宿主尚未报告应用记录' }
 }

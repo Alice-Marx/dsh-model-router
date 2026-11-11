@@ -1115,6 +1115,7 @@ export function startBotProduct(ctx, options = {}) {
       product = createBotProduct(ctx, { authority, directory, policy, grantFor, threadHost: () => botThreads,
         modelFrames, fundingFor: bindingFunding,
         independentReadyFor: (botId, route) => Boolean(bindingRoute({ botId, ...route })),
+        kickoffReadyFor: (botId, route) => Boolean(bindingFunding({ botId, ...route })),
         prepareLoopFunding: ({ botId, sessionId, signal, config, previousConfig }) => {
           if (!signal || !product.lifecycle.committedMainBotIds().includes(botId)) return config
           const { provider, model } = config

@@ -11073,6 +11073,11 @@ function useLandOnMainBot(roster, useSessions, actions) {
   (0, import_react21.useEffect)(() => {
     if (!roster.ready || !roster.mainBotId) return void 0;
     const [id, blank3] = mainView.split("|");
+    const thread = id === "" ? void 0 : roster.threadsById?.[id];
+    if (thread !== void 0) {
+      lastBot.current = { botId: thread.botId, sessionId: id };
+      return void 0;
+    }
     const bot = id === "" ? void 0 : roster.byId[id];
     if (bot !== void 0) {
       lastBot.current = { botId: bot.id, sessionId: id };
@@ -22454,6 +22459,12 @@ function apply(ctx) {
   };
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui: ui2, live, cards, heldCards, turnClock, panelFolded }),
+    // A newly committed thread must reach both client directories before the
+    // native sidebar decides whether its blank Session is a Bot destination.
+    prepareThreadNavigation: async () => {
+      await pull();
+      await ctx.sessions.refresh?.();
+    },
     learningAnswer: (id, approve) => after(call("learning-answer", { id, approve })),
     // The full-pane overlays sit above the conversation, so opening one must dismiss them
     // or the click appears to do nothing.

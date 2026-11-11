@@ -21,7 +21,7 @@
     {
       "path": "src/client/sidebar.js",
       "kind": "patched",
-      "summary": "Renders the product's sidebarAddon (the router panel navigation) under the team list.",
+      "summary": "Renders the product's sidebarAddon under the team list and preserves an intentionally selected thread Session instead of redirecting it to the Bot's default chat.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "6c3fec6a4d648c29edf01ac72ff18c5233945d9bd54e2fe09254f5c39e538d09"
@@ -30,7 +30,7 @@
     {
       "path": "src/client/index.js",
       "kind": "patched",
-      "summary": "Opens a thread Session as itself in partFor — resolved before the Bot, because a thread Session also resolves to its Bot — keeps homeToMainBot from bouncing an open thread to Main, and refreshes thread projections.",
+      "summary": "Opens each thread's own Session, keeps homeToMainBot from redirecting known threads, refreshes thread projections and supplies bounded header navigation with native roster and Session readiness.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "4fd22b26d817ca3ae5454e5a8042c1c4b806ff4ae78c9e38f90ee5ee3c996b9a"
@@ -66,7 +66,7 @@
     {
       "path": "src/host/roster.js",
       "kind": "patched",
-      "summary": "Adds the trusted thread records addThreadSession/renameThread/setThreadArchived (one save each, the Bot model and permission preset applied, no notice or turn), keeps updateBotProfile untouched, and archives thread Sessions on Bot delete.",
+      "summary": "Adds trusted thread records and archives their Sessions on Bot delete; automatic greetings wait for committed model, capability, funding and runtime readiness.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "0a06730a0ce2ecf6b67d82319ef9b7fc127b3b2c2170b6e50d3d77ce4c866e32"
@@ -129,7 +129,7 @@
     {
       "path": "src/host/channel.js",
       "kind": "patched",
-      "summary": "Projects a Bot threads to the client and refuses input aimed at an archived thread instead of redirecting it to the default chat.",
+      "summary": "Projects Bot threads and pending initial setup to the client; archived thread input is refused instead of redirected to default chat.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "0e05d9a424b188fe338f7102404a9fb295069d0ece241d63cc4f87be18947d03"

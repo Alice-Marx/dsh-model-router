@@ -208,6 +208,13 @@ export function install(rt) {
       }
       await rt.save()
       await scopeTools()
+      // A selected model is not a committed execution binding. Keep the
+      // automatic greeting dormant until the product confirms readiness.
+      if (typeof rt.kickoffReady === 'function' && rt.kickoffReady(bot) !== true) {
+        bot.kickoff = greeting
+        await rt.save()
+        return bot
+      }
       // The greeting runs on the Bot's own model, once its provider is registered.
       void rt.waitForModel(bot)
         .then(() => rt.applyModel(bot).catch(error => rt.warn('ds-bot: model for %s not applied: %s', cleanName, error)))
@@ -231,6 +238,13 @@ export function install(rt) {
   // again (turns.js), to go out once the user has fixed that.
   const sentKickoffs = new Map()
   function sendKickoff(bot, greeting) {
+    if (typeof rt.kickoffReady === 'function' && rt.kickoffReady(bot) !== true) {
+      if (rt.botOf(bot.id) === bot && bot.kickoff === undefined) {
+        bot.kickoff = greeting
+        void rt.save().catch(error => rt.warn('ds-bot: holding kickoff failed: %s', error))
+      }
+      return false
+    }
     sentKickoffs.set(bot.id, greeting)
     const text = greeting.afterUser ? `${AFTER_USER} ${writeIn(rt.uiLanguage?.())}\n${OWN_RULES}` : greeting.text
     void rt.deliver({ fromId: greeting.from ?? undefined, toId: bot.id, text, role: 'kickoff' })
@@ -243,6 +257,7 @@ export function install(rt) {
   async function releaseKickoff(bot) {
     const greeting = bot.kickoff
     if (greeting === undefined || !bot.model) return false
+    if (releasing.has(bot.id) || (typeof rt.kickoffReady === 'function' && rt.kickoffReady(bot) !== true)) return false
     delete bot.kickoff
     releasing.add(bot.id)
     await rt.save().catch((error) => { releasing.delete(bot.id); throw error })

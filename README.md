@@ -16,7 +16,7 @@ This is a community plugin. It reuses Harness model configuration and Host servi
 
 **Current stable version: 0.67.0 · Windows Remote Agent: 0.1.2**
 
-**Release 0.67.0.** This release brings the Bot-centred workspace, secure device pairing, persistent team delegation and native-tool activity records. Local validation uses isolated data and offline providers; full OpenMausBot parity and live user Host/device acceptance remain incomplete.
+**Release 0.67.1.** This release brings the Bot-centred workspace, secure device pairing, persistent team delegation and native-tool activity records. Local validation uses isolated data and offline providers; full OpenMausBot parity and live user Host/device acceptance remain incomplete.
 
 **Workspace interface:** the full Bot edition now includes a redesigned workspace overview, task inbox, searchable team directory, task boards, and workspace search (**Ctrl/Cmd K** on product pages). Goals move into the existing review-and-confirm flow; display preferences offer Host-following, light, dark, and compact layouts. [Implementation and verification](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-workspace-upgrade.md).
 
@@ -49,6 +49,8 @@ While a reply is running, independent chat polls a live text preview marked as u
 API-funded calls require model capacity metadata from the Host. The saved input allowance must cover the model's full declared context window, and admission reserves against that allowance. A request above the output allowance must be reduced before sending or granted a larger allowance; a request that cannot be changed is refused. Missing model metadata is reported explicitly. Committed adapter identities are rechecked around preparation and dispatch; an incompatible configuration change is refused.
 
 The chat header switches between a Bot's threads and its original conversation while keeping the Bot's model, memory, computer, voice and attachment controls. Archived or revoked threads refuse new model calls. Thread-directory saves retry a transient local sharing violation and roll back failed writes; an unreadable catalog stops sending and explains how to recover, without repeating Session creation.
+
+Release 0.67.1 fixes thread navigation returning to the default chat and create-request identifiers repeating after a client reload. The client preserves thread selection, refreshes the native roster before opening a newly created thread, and gives each new create intent a unique bounded identifier while retaining the same identifier for retries. A new Bot's automatic greeting waits until the owner saves its committed model, inference permission and funding binding; its model button shows **Complete Bot setup** while waiting. Live validation on 2026-11-11 covered one configured subscription model, thread chat, memory, CSV/SQL/chart/export, and a separate local Agent's encrypted pairing and file API. Cross-computer desktop and full feature acceptance remain pending.
 
 [Choose an edition](#editions) · [Install](#install) · [First task](#quick-evaluation) · [Bot delegation](#bot-routing) · [Remote computers](#computers) · [Support](#troubleshooting)
 
@@ -89,8 +91,8 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.67.0`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.67.0`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.67.1`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.67.1`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. Configure provider credentials and models in the official Harness **Models** settings. Open the Bot workspace for the full edition, or **Model Router** in the sidebar for the routing-only edition.
 
@@ -98,10 +100,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.67.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.67.1
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.67.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.67.1
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -236,7 +238,7 @@ The Main Bot can also call `bot_route_task` or its alias `bot_dispatch`. Both di
 
 **On the computer to control:**
 
-1. Download the [complete Windows Agent 0.1.2 package](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.67.0/dsh-remote-agent-0.1.2-windows-x64.zip), extract it into a permanent directory, and run `start.cmd`. Keep the interactive Windows user signed in.
+1. Download the [complete Windows Agent 0.1.2 package](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.67.1/dsh-remote-agent-0.1.2-windows-x64.zip), extract it into a permanent directory, and run `start.cmd`. Keep the interactive Windows user signed in.
 2. In the setup wizard, configure the accessible address, port, approved work directories, and optional command/browser capabilities. It registers the Agent and desktop helper for the current user and generates `private/pairing.private.json` without storing a Windows password. Subsequent runs retain the existing configuration.
 
 **In Harness:**

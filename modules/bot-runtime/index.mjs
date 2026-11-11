@@ -108,6 +108,23 @@ export function createBotProduct(ctx, options = {}) {
     try { refresh(); extra = onBind?.(agent, grant) } catch (error) { off(); offAssembly(); offRequest(); release(); throw error }
     return () => { off(); offAssembly(); offRequest(); release(); extra?.() }
   } })
+  // Creation may select a model before the owner has committed its binding.
+  // A greeting is an automatic model call, so it waits for the same committed
+  // identity, route, capability, funding and runtime used by ordinary turns.
+  rt.kickoffReady = bot => {
+    try {
+      const saved = lifecycle.committedBot(bot?.id)
+      if (!saved?.model || saved.model !== bot.model) return false
+      const at = saved.model.indexOf('/')
+      if (at < 1) return false
+      const route = { provider: saved.model.slice(0, at), model: saved.model.slice(at + 1) }
+      const subject = directory.forBot(saved.id)
+      authority.assertTool(subject, 'model/infer')
+      authority.assertModel(subject, route.provider, route.model)
+      serving.assertMode(saved.id, 'integration')
+      return typeof options.kickoffReadyFor !== 'function' || options.kickoffReadyFor(saved.id, route) === true
+    } catch { return false }
+  }
   const offAgent = ctx.on('agent/created', ({ agent }) => lifecycle.observeAgent(agent))
   // The independent loop's turns run in a frame only this Host can build: the committed Bot, the
   // model that Bot has saved, the Bot policy and the one money stream. It is published once, before

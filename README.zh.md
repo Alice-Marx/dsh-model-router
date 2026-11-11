@@ -16,7 +16,7 @@
 
 **当前正式版：0.67.0 · Windows Remote Agent：0.1.2**
 
-**0.67.0 正式版。** 本版提供以 Bot 联系人与聊天为中心的工作空间、安全设备配对、持久团队委派和原生工具活动记录。本地验收使用隔离数据与离线模型；全部 OpenMausBot 功能对齐、真实用户 Host 与设备验收仍未完成。
+**0.67.1 正式版。** 本版提供以 Bot 联系人与聊天为中心的工作空间、安全设备配对、持久团队委派和原生工具活动记录。本地验收使用隔离数据与离线模型；全部 OpenMausBot 功能对齐、真实用户 Host 与设备验收仍未完成。
 
 **工作空间界面：**完整 Bot 版本新增重新设计的工作空间总览、任务待办、可搜索的团队目录、任务看板和工作空间搜索（产品页内 **Ctrl/Cmd K**）。目标会带入已有的预览与确认流程；外观支持跟随宿主、浅色、深色和紧凑布局。[实现与验证说明](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-workspace-upgrade.md)。
 
@@ -49,6 +49,8 @@ Bot 对话引擎与任务 CLI 工具分别迁移。源码目录已记录上游�
 API 资金调用需要 Host 提供模型容量信息。保存的输入额度需覆盖模型声明的完整上下文窗口，准入时按该输入额度预占。请求输出超过额度时，需要先降低实际请求上界，或授予更高额度；无法修改的请求会被拒绝。模型容量信息缺失会明确报告。调用准备与发送前后会重新核验已提交的适配器身份，不兼容的配置变更将被拒绝。
 
 聊天头部可切换 Bot 的线程与默认聊天，线程内保留该 Bot 的模型、记忆、电脑、语音和附件入口。已归档或撤销授权的线程会拒绝新的模型调用。线程目录保存遇到短暂共享锁会重试本次本地提交，写入失败则回滚；目录不可读时停止发送并说明恢复方式，不会重复创建会话。
+
+0.67.1 修复了线程打开后跳回默认聊天、客户端刷新后重复使用创建请求编号的问题。客户端会保持线程选择，在打开新建线程前同步原生会话目录，并为每个新建意图生成长度受限的唯一编号；同一请求重试仍沿用原编号。新 Bot 的自动问候会等待所有者保存已提交的模型、推理权限与资金绑定，等待时模型按钮显示“完成 Bot 设置”。2026-11-11 真实验证覆盖一条已配置的订阅模型、线程聊天、记忆、CSV/SQL/图表/导出，以及独立本机 Agent 的加密配对与文件 API；跨电脑桌面及完整功能验收仍未完成。
 
 [选择版本](#editions) · [安装](#install) · [第一个任务](#quick-evaluation) · [Bot 分工](#bot-routing) · [远程电脑](#computers) · [问题反馈](#troubleshooting)
 
@@ -89,8 +91,8 @@ API 资金调用需要 Host 提供模型容量信息。保存的输入额度需�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.67.0`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.67.0`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.67.1`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.67.1`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 在 Harness 官方 **模型** 设置中配置 Provider 凭据和模型。完整版本进入 Bot 工作区；纯路由版本从侧栏打开 **模型路由**。
 
@@ -98,10 +100,10 @@ API 资金调用需要 Host 提供模型容量信息。保存的输入额度需�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.67.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.67.1
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.67.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.67.1
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -236,7 +238,7 @@ Main Bot 也可调用 `bot_route_task` 或同义工具 `bot_dispatch`；两者�
 
 **在被控制的电脑上：**
 
-1. 下载 [Windows Agent 0.1.2 完整包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.67.0/dsh-remote-agent-0.1.2-windows-x64.zip)，解压到长期保留的目录，运行 `start.cmd`，并保持 Windows 交互用户已登录。
+1. 下载 [Windows Agent 0.1.2 完整包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.67.1/dsh-remote-agent-0.1.2-windows-x64.zip)，解压到长期保留的目录，运行 `start.cmd`，并保持 Windows 交互用户已登录。
 2. 在向导中设置可访问的地址、端口、允许工作目录及可选命令/浏览器能力。向导为当前用户注册 Agent 与桌面 helper，生成 `private/pairing.private.json`，不保存 Windows 密码；再次运行会保留已有配置。
 
 **在 Harness 中：**

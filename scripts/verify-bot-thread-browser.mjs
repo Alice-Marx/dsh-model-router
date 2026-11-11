@@ -52,7 +52,7 @@ try {
   await page.locator('.bp-threads-button').first().click()
   const created = await page.evaluate(() => window.__threadFixture.calls.find(call => call.action === 'threads.create'))
   assert.equal(created.payload.name, '新的排查线索')
-  assert.match(created.payload.requestKey, /^panel-bot-a-\d+$/)
+  assert.match(created.payload.requestKey, /^panel-[a-f0-9]{32}$/)
   await page.locator('.bp-thread[data-thread="t-3"] [aria-label="恢复线程"]').click()
   assert.ok(await dispatched('threads.unarchive'))
   await capture('threads-created')

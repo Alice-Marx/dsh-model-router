@@ -25,7 +25,7 @@
     {
       "path": "src/client/sidebar.js",
       "kind": "patched",
-      "summary": "Renders the product's sidebarAddon (the router panel navigation) under the team list.",
+      "summary": "Renders the product's sidebarAddon under the team list and preserves an intentionally selected thread Session instead of redirecting it to the Bot's default chat.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "6c3fec6a4d648c29edf01ac72ff18c5233945d9bd54e2fe09254f5c39e538d09"
@@ -34,7 +34,7 @@
     {
       "path": "src/client/index.js",
       "kind": "patched",
-      "summary": "Opens a thread Session as itself in partFor — resolved before the Bot, because a thread Session also resolves to its Bot — keeps homeToMainBot from bouncing an open thread to Main, and refreshes thread projections.",
+      "summary": "Opens each thread's own Session, keeps homeToMainBot from redirecting known threads, refreshes thread projections and supplies bounded header navigation with native roster and Session readiness.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "4fd22b26d817ca3ae5454e5a8042c1c4b806ff4ae78c9e38f90ee5ee3c996b9a"
@@ -70,7 +70,7 @@
     {
       "path": "src/host/roster.js",
       "kind": "patched",
-      "summary": "Adds the trusted thread records addThreadSession/renameThread/setThreadArchived (one save each, the Bot model and permission preset applied, no notice or turn), keeps updateBotProfile untouched, and archives thread Sessions on Bot delete.",
+      "summary": "Adds trusted thread records and archives their Sessions on Bot delete; automatic greetings wait for committed model, capability, funding and runtime readiness.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "0a06730a0ce2ecf6b67d82319ef9b7fc127b3b2c2170b6e50d3d77ce4c866e32"
@@ -133,7 +133,7 @@
     {
       "path": "src/host/channel.js",
       "kind": "patched",
-      "summary": "Projects a Bot threads to the client and refuses input aimed at an archived thread instead of redirecting it to the default chat.",
+      "summary": "Projects Bot threads and pending initial setup to the client; archived thread input is refused instead of redirected to default chat.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "0e05d9a424b188fe338f7102404a9fb295069d0ece241d63cc4f87be18947d03"
@@ -238,8 +238,8 @@
     {
       "path": "vendor/ds-bot/client.js",
       "sourcePath": "ds-bot/client.js",
-      "sha256": "4cbc9dab369ad584735430f8f599ff42f95cc25187ae613b3e249a7038927e19",
-      "gitBlob": "83f416cb587bd0eeaca083627fe963fa86b3c7d3",
+      "sha256": "e0f2496608583df9d761b269d7e08bacd4fbbaeb6e9cc516b631072fe30f0e7d",
+      "gitBlob": "b7b10c26100781b6e6dbb14a608b4cf4a8f71029",
       "origin": "generated"
     },
     {
@@ -854,8 +854,8 @@
     {
       "path": "vendor/ds-bot/src/client/index.js",
       "sourcePath": "ds-bot/src/client/index.js",
-      "sha256": "85b9eae74c40ccd1f746c1b9e4afcde30ff7bf48efa3d5e6621f8282a37e33a0",
-      "gitBlob": "b06262af6a875788b740a737a52b738cfcd43002",
+      "sha256": "58d1abfaed5ef2401949c7227dcbdfc3b9e3cf38c882a374741b8f91fc10e7e2",
+      "gitBlob": "207c8c39bf56dbafb07a7e281118f660dbc2615c",
       "origin": "overlay"
     },
     {
@@ -1036,8 +1036,8 @@
     {
       "path": "vendor/ds-bot/src/client/sidebar.js",
       "sourcePath": "ds-bot/src/client/sidebar.js",
-      "sha256": "5ab83905618e6e822d64a2fe15bb237e9c00785fa6a346399b8f0c5db4dd49dd",
-      "gitBlob": "3e368ee517d921dde8254439fff23f3e491d488d",
+      "sha256": "ccf4bc78f2bde177a36bd05574bc27014118f9c600cb8232237fcd8b1ccff0d6",
+      "gitBlob": "9325f20e3dde79429efa2c51266478cc8f127a54",
       "origin": "overlay"
     },
     {
@@ -1260,8 +1260,8 @@
     {
       "path": "vendor/ds-bot/src/host/channel.js",
       "sourcePath": "ds-bot/src/host/channel.js",
-      "sha256": "363ba4779753b18b350233959358af2ff27efe8158828c2b2bc03295e5a66e0e",
-      "gitBlob": "b2d2a764e2338c8fac5c44cea4cc57dd474269a2",
+      "sha256": "73a13abd41e5eb7014c3d2acdcac224d86fc15a8feefb9c671992589aafbcb53",
+      "gitBlob": "40605b115a00dcd4afc2c3288408c08be8e39ded",
       "origin": "overlay"
     },
     {
@@ -1463,8 +1463,8 @@
     {
       "path": "vendor/ds-bot/src/host/roster.js",
       "sourcePath": "ds-bot/src/host/roster.js",
-      "sha256": "7eaa83caa98b08be978ce58ad754e58c5de9ed2290ee577bcd8225a578bdeb58",
-      "gitBlob": "f2d9ae2f853f1223b52e9c589bcc5cc316252940",
+      "sha256": "9aa250c8c26aaaad95ed5b22bee516d7c20582c70dfe87dd9c76d681eef0a2b1",
+      "gitBlob": "f0ac0730075279edaba18a6ba64a4b36f60f3d3c",
       "origin": "overlay"
     },
     {

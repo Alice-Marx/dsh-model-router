@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { UiIcon } from './ui-icons.jsx'
+import { threadRequestKey } from './thread-request-key.mjs'
 
 // The thread panel: several independent conversation threads under one Bot.
 //
@@ -92,7 +93,6 @@ export function threadFailure(error) {
 const submits = event => event.key === 'Enter' && event.nativeEvent?.isComposing !== true && event.keyCode !== 229
 
 let scopeKey = 0
-let createSeq = 0
 export function BotThreadsPanel(props) {
   const key = useMemo(() => ++scopeKey, [props.productApi, props.available, props.botId])
   return <ThreadPanel key={key} {...props} />
@@ -239,7 +239,7 @@ function ThreadPanel({ productApi, botId, available = true, onOpenSession }) {
   }
   const createThread = async () => {
     const name = draft.trim().slice(0, MAX_NAME)
-    if (createKey.current === null) createKey.current = `panel-${botId}-${++createSeq}`
+    if (createKey.current === null) createKey.current = threadRequestKey('panel')
     const requestKey = createKey.current
     const made = await write(THREAD_ACTIONS.create, { botId, name: name || undefined, requestKey })
     const threadId = made?.thread?.threadId
