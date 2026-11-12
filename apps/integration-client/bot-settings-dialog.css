@@ -1,6 +1,6 @@
 html body[data-bot-product-ui] .bp-bot-settings-backdrop { position: fixed; inset: 0; z-index: 9900; display: flex; justify-content: flex-end; background: #0005; color: var(--bp-ink); font-family: var(--bp-font, system-ui); }
 html body[data-bot-product-ui] .bp-bot-settings-dialog { display: flex; flex-direction: column; width: min(620px, 100vw); min-width: 0; height: 100%; background: var(--bp-bg); box-shadow: -12px 0 45px #0002; border-left: 1px solid var(--bp-border); }
-html body[data-bot-product-ui] .bp-bot-settings-header { display: flex; align-items: center; flex: none; gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--bp-border); background: var(--bp-surface); }
+html body[data-bot-product-ui] .bp-bot-settings-header { display: flex; align-items: center; flex: none; gap: 12px; padding: 42px 22px 18px; border-bottom: 1px solid var(--bp-border); background: var(--bp-surface); }
 html body[data-bot-product-ui] .bp-bot-settings-header h2 { margin: 0; font-size: 17px; font-weight: 600; }
 html body[data-bot-product-ui] .bp-bot-settings-header p { margin: 4px 0 0; font-size: 12px; color: var(--bp-muted); }
 html body[data-bot-product-ui] .bp-bot-settings-header button { display: grid; place-items: center; flex: none; margin-left: auto; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: var(--bp-ink); cursor: pointer; }
@@ -14,5 +14,5 @@ html body[data-bot-product-ui] .bp-bot-settings-body > [hidden] { display: none;
 html body[data-bot-product-ui] .bp-bot-settings-error { padding: 12px; margin-bottom: 14px; border: 1px solid var(--bp-border); border-radius: 10px; color: var(--bp-ink); background: var(--bp-surface); font-size: 13px; }
 html body[data-bot-product-ui] .bp-bot-settings-error button { padding: 6px 12px; color: inherit; background: var(--bp-subtle); border: 1px solid var(--bp-border); border-radius: 7px; cursor: pointer; }
 html body[data-bot-product-ui] .bp-bot-settings-dialog button:focus-visible { outline: 2px solid var(--bp-focus); outline-offset: -2px; }
-@media (max-width: 520px) { html body[data-bot-product-ui] .bp-bot-settings-body { padding: 16px; } html body[data-bot-product-ui] .bp-bot-settings-header { padding: 14px 16px; } }
+@media (max-width: 520px) { html body[data-bot-product-ui] .bp-bot-settings-body { padding: 16px; } html body[data-bot-product-ui] .bp-bot-settings-header { padding: 42px 16px 14px; } }
 html body[data-bot-product-ui]:has(.bp-bot-settings-backdrop) { overflow: hidden; }

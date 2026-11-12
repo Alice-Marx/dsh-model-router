@@ -178,7 +178,7 @@
     {
       "path": "src/client/turn-error.js",
       "kind": "patched",
-      "summary": "A turn failure inside a thread keeps its sign-in and model-move affordances, exactly as the Bot's default chat does.",
+      "summary": "Thread repair actions and historical failure attribution use the failed request or active Host block; a new model selection cannot relabel old authentication failures.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "4ed1e99fb3fe66be3a55176389e1ab08e282070e23e9e06089a20f6dbec3b59b"
@@ -238,8 +238,8 @@
     {
       "path": "vendor/ds-bot/client.js",
       "sourcePath": "ds-bot/client.js",
-      "sha256": "e0f2496608583df9d761b269d7e08bacd4fbbaeb6e9cc516b631072fe30f0e7d",
-      "gitBlob": "b7b10c26100781b6e6dbb14a608b4cf4a8f71029",
+      "sha256": "70be8d5bcb54ac4209de80970771e5260836296becda2582ccd97d171d70fbb3",
+      "gitBlob": "ecfd4545477a5bb6c0c22b9c24c06748b6228a2a",
       "origin": "generated"
     },
     {
@@ -1099,8 +1099,8 @@
     {
       "path": "vendor/ds-bot/src/client/turn-error.js",
       "sourcePath": "ds-bot/src/client/turn-error.js",
-      "sha256": "07bfc99a2c11b144cfcbcf7951237a5ad0e853c0e48988382fc39d92afe96b47",
-      "gitBlob": "7f34129a2dcb28e377c669d6b510703fd5781131",
+      "sha256": "844aea556096bb3bb3081f8b9d37ae85e6dc2b7e34492601011f06b783c3bd70",
+      "gitBlob": "f36ef7f3583e0efe3e3337bf1e7bfb8260e5f2ca",
       "origin": "overlay"
     },
     {

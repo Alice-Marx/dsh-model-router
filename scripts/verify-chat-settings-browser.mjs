@@ -47,7 +47,16 @@ try {
   assert.deepEqual(profileCalls[5].payload.profile, { role: '梳理研究证据', instructions: '先核对原始来源；有疑问时说明。' })
   checks.push('the actual settings drawer lazily loads identity, retains unsaved text across tabs, and explicitly saves only edited profile fields')
   await page.getByRole('tab', { name: '模型与工具' }).click()
+  await page.evaluate(() => {
+    const caption = document.createElement('div'); caption.id = 'native-caption-fixture'
+    Object.assign(caption.style, { position: 'fixed', top: '0', right: '0', width: '140px', height: '40px', zIndex: '99999' })
+    caption.onclick = () => { throw new Error('Settings close hit the native window caption') }
+    document.body.append(caption)
+  })
+  assert.equal(await page.getByLabel('关闭 Bot 设置').evaluate(node => node.getBoundingClientRect().top >= 40), true)
   await page.getByLabel('关闭 Bot 设置').click()
+  await page.locator('#native-caption-fixture').evaluate(node => node.remove())
+  checks.push('the settings close button stays below a simulated 40px Windows caption and closes only the drawer')
   assert.equal(await page.locator('[data-chat-command="model"]').evaluate(node => document.activeElement === node), true)
   await page.setViewportSize({ width: 375, height: 900 })
   await page.locator('[data-chat-command="model"]').click(); await page.locator('.bb-root').waitFor()

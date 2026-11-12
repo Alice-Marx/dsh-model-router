@@ -93,7 +93,11 @@ async function waitProcessGone(engine, timeoutMs = 15_000) {
 }
 
 const sawEvent = async (events, name) => {
-  try { await once(events, name, { signal: AbortSignal.timeout(20_000) }); return true }
+  // Native Windows bootstrap/protection can take over 30 seconds before the
+  // fixture emits anything. Stay within the engine's 90s lifetime and still
+  // require a real event before testing revoke/stop; this never proves a stop.
+  const startupWaitMs = process.platform === 'win32' ? 60_000 : 20_000
+  try { await once(events, name, { signal: AbortSignal.timeout(startupWaitMs) }); return true }
   catch { return false }
 }
 

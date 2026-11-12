@@ -37,7 +37,7 @@ import { fundingForMainRoute } from './main-model-routes.mjs'
 import { parseModelProfilesJson } from '../../../.dsh-plugin/shared/model-profiles.mjs'
 import { openFundingAccounts } from './funding-accounts.mjs'
 import { createModelAccounting } from './model-accounting.mjs'
-import { createModelBoundResolver } from './model-request-bounds.mjs'
+import { createModelBoundResolver, resolveModelRouteBounds, withRequestOutputDefault } from './model-request-bounds.mjs'
 import { createModelFrameStore } from './model-prepared-generation.mjs'
 import { createTaskService } from './task-service.mjs'
 import { inspectProductTask, projectProductTask, readProductAttention } from './task-product.mjs'
@@ -1146,20 +1146,27 @@ export function startBotProduct(ctx, options = {}) {
         modelFrames, fundingFor: bindingFunding,
         independentReadyFor: (botId, route) => Boolean(bindingRoute({ botId, ...route })),
         kickoffReadyFor: (botId, route) => Boolean(bindingFunding({ botId, ...route })),
-        prepareLoopFunding: ({ botId, sessionId, signal, config, previousConfig }) => {
-          if (!signal || !product.lifecycle.committedMainBotIds().includes(botId)) return config
+        prepareLoopFunding: async ({ botId, sessionId, signal, config, previousConfig }) => {
+          if (!signal || !product.lifecycle.committedBot(botId)) return config
           const { provider, model } = config
-          const quote = bindingFunding({ botId, provider, model })
-          loopFunding.set(signal, { sessionId, provider, model, revision: quote?.fundingRevision ?? null })
-          if (!quote?.fundingRevision) return config
+          const main = product.lifecycle.committedMainBotIds().includes(botId)
+          const quote = main ? bindingFunding({ botId, provider, model }) : null
+          if (main) loopFunding.set(signal, { sessionId, provider, model, revision: quote?.fundingRevision ?? null })
           const switched = previousConfig && (previousConfig.provider !== config.provider || previousConfig.model !== config.model)
           // AgentLoop seeds the new proposal from the last request header. Its
           // previous route's output cap must not follow a deliberate switch.
-          if (switched && previousConfig.maxTokens === config.maxTokens && config.maxTokens !== undefined) {
+          if (quote?.fundingRevision && switched && previousConfig.maxTokens === config.maxTokens && config.maxTokens !== undefined) {
             const { maxTokens: _previousCap, ...selected } = config
             config = selected
           }
-          if (quote.funding !== 'api') return config
+          if (config.maxTokens === undefined) {
+            // This sets a request control before the SDK prepares and logs it. It
+            // does not price a lookup generation: admission still requires the
+            // actual prepared Session frame, including after a registration swap.
+            try { config = withRequestOutputDefault(config, await resolveModelRouteBounds({ llm: ctx.llm, provider, model, signal })) }
+            catch { signal.throwIfAborted(); /* normal preparation/admission reports unknown capacity */ }
+          }
+          if (!quote?.fundingRevision || quote.funding !== 'api') return config
           if (config.maxTokens !== undefined && (!Number.isSafeInteger(config.maxTokens) || config.maxTokens < 1)) return config
           const maxTokens = config.maxTokens === undefined ? quote.maxOutputTokens : Math.min(config.maxTokens, quote.maxOutputTokens)
           return { ...config, maxTokens }
@@ -1337,6 +1344,18 @@ export function startBotProduct(ctx, options = {}) {
           ...(botSettings ? {
             'binding.inspect': ownerOnly((payload, context) => inspectProductBinding({ runtime: product.rt, lifecycle: product.lifecycle, botSettings, fundingAccounts, refreshOfficialTools: () => officialCatalog?.refresh({ fresh: true }), signal: context?.signal }, payload)),
             'binding.save': ownerOnly(async (payload, context) => {
+            const selected = payload.settings?.model
+            if (typeof selected?.provider === 'string' && typeof selected?.model === 'string') {
+              let bounds
+              const timeout = AbortSignal.timeout(2000)
+              try { bounds = await Promise.race([
+                resolveModelRouteBounds({ llm: ctx.llm, ...selected, signal: context?.signal ? AbortSignal.any([context.signal, timeout]) : timeout }),
+                new Promise(resolve => timeout.addEventListener('abort', () => resolve(null), { once: true })),
+              ]) } catch { context?.signal?.throwIfAborted() }
+              if (bounds?.defaultMaxTokens >= bounds?.contextWindow) throw Object.assign(new Error(
+                `${selected.provider}/${selected.model} 的默认输出上限 ${bounds.defaultMaxTokens} 已占满上下文 ${bounds.contextWindow}。请先在宿主模型配置中降低 maxTokens，为输入和压缩预留空间，再保存 Bot 绑定。`
+              ), { code: 'MODEL_DEFAULT_OUTPUT_INVALID' })
+            }
             if (payload.settings?.officialTools?.length) { await officialCatalog?.refresh({ fresh: true }); context?.signal?.throwIfAborted() }
             // A Bot holds its greeting until its model is picked, and the model change releases it
             // immediately. Saving a binding changes both the model and its authority, so hold the

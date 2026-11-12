@@ -174,7 +174,7 @@
     {
       "path": "src/client/turn-error.js",
       "kind": "patched",
-      "summary": "A turn failure inside a thread keeps its sign-in and model-move affordances, exactly as the Bot's default chat does.",
+      "summary": "Thread repair actions and historical failure attribution use the failed request or active Host block; a new model selection cannot relabel old authentication failures.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "4ed1e99fb3fe66be3a55176389e1ab08e282070e23e9e06089a20f6dbec3b59b"

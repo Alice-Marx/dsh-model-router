@@ -19765,11 +19765,7 @@ function accountModel(roster) {
   let models = (roster.models ?? []).filter((model) => model.provider === ACCOUNT);
   return (models.find((model) => model.ref === roster.defaultModel) ?? models[0])?.ref;
 }
-var providerOf = (bot, roster) => {
-  let ref2 = bot?.model ?? bot?.appliedModel;
-  if (ref2)
-    return (roster.models ?? []).find((model) => model.ref === ref2)?.provider ?? ref2.split("/")[0];
-}, KNOWN_PROVIDERS = { "deepseek-official": "DeepSeek", "deepseek-account": "DeepSeek account" }, providerName = (roster, provider) => provider === void 0 ? t("The model service") : (roster.models ?? []).find((model) => model.provider === provider)?.providerName ?? (KNOWN_PROVIDERS[provider] ? t(KNOWN_PROVIDERS[provider]) : provider);
+var failureProvider = (data, blocked) => typeof data.provider == "string" ? data.provider : typeof blocked?.provider == "string" ? blocked.provider : void 0, KNOWN_PROVIDERS = { "deepseek-official": "DeepSeek", "deepseek-account": "DeepSeek account" }, providerName = (roster, provider) => provider === void 0 ? t("The model service") : (roster.models ?? []).find((model) => model.provider === provider)?.providerName ?? (KNOWN_PROVIDERS[provider] ? t(KNOWN_PROVIDERS[provider]) : provider);
 function failureFacts(data, blocked) {
   let facts = [];
   return data.code && facts.push(["Code", t("Code"), data.code]), blocked?.status !== void 0 && facts.push(["HTTP status", t("HTTP status"), String(blocked.status)]), blocked?.requestId && facts.push(["Request ID", t("Request ID"), blocked.requestId]), data.code !== "AUTH" && data.message && facts.push(["Message", t("Provider message"), data.message]), facts;
@@ -19794,7 +19790,7 @@ function TechnicalDetails({ facts }) {
   );
 }
 function FailureCell({ node, sessionId, useRoster, useTurnClock, actions }) {
-  let roster = useRoster((value) => value), data = node?.data ?? {}, bot = roster.byId?.[sessionId], later = useTurnClock((state) => Object.keys(state[sessionId] ?? {}).some((turn) => Number(turn) > data.turn)), account = useAccountView(actions), signedIn = account?.status === "credential-stored", topUp = topUpOf(account), [keying, setKeying] = (0, import_react26.useState)(!1), [retry, setRetry] = (0, import_react26.useState)("idle"), [error, setError] = (0, import_react26.useState)(""), [joining, setJoining] = (0, import_react26.useState)(null), blocked = bot?.blocked?.code === data.code ? bot.blocked : void 0, provider = blocked?.provider ?? providerOf(bot, roster), text8 = failureText2(data.code, { name: bot?.name ?? t("This Bot"), provider: providerName(roster, provider), status: blocked?.status }), facts = failureFacts(data, blocked), current = bot !== void 0 && isOwnChatOf(bot, sessionId) && !later, moveToAccount = () => {
+  let roster = useRoster((value) => value), data = node?.data ?? {}, bot = roster.byId?.[sessionId], later = useTurnClock((state) => Object.keys(state[sessionId] ?? {}).some((turn) => Number(turn) > data.turn)), account = useAccountView(actions), signedIn = account?.status === "credential-stored", topUp = topUpOf(account), [keying, setKeying] = (0, import_react26.useState)(!1), [retry, setRetry] = (0, import_react26.useState)("idle"), [error, setError] = (0, import_react26.useState)(""), [joining, setJoining] = (0, import_react26.useState)(null), blocked = !later && bot?.blocked?.code === data.code ? bot.blocked : void 0, provider = failureProvider(data, blocked), text8 = failureText2(data.code, { name: bot?.name ?? t("This Bot"), provider: providerName(roster, provider), status: blocked?.status }), facts = failureFacts(data, blocked), current = bot !== void 0 && isOwnChatOf(bot, sessionId) && !later, moveToAccount = () => {
     let model = accountModel(roster);
     if (model === void 0) {
       actions.showDetails?.(sessionId);
@@ -40389,7 +40385,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.68.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.68.2", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -49471,7 +49467,7 @@ function BotProfileIdentity({ productApi, botId, busy = !1, onSaved }) {
 // apps/integration-client/bot-settings-dialog.css
 var bot_settings_dialog_default = `html body[data-bot-product-ui] .bp-bot-settings-backdrop { position: fixed; inset: 0; z-index: 9900; display: flex; justify-content: flex-end; background: #0005; color: var(--bp-ink); font-family: var(--bp-font, system-ui); }
 html body[data-bot-product-ui] .bp-bot-settings-dialog { display: flex; flex-direction: column; width: min(620px, 100vw); min-width: 0; height: 100%; background: var(--bp-bg); box-shadow: -12px 0 45px #0002; border-left: 1px solid var(--bp-border); }
-html body[data-bot-product-ui] .bp-bot-settings-header { display: flex; align-items: center; flex: none; gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--bp-border); background: var(--bp-surface); }
+html body[data-bot-product-ui] .bp-bot-settings-header { display: flex; align-items: center; flex: none; gap: 12px; padding: 42px 22px 18px; border-bottom: 1px solid var(--bp-border); background: var(--bp-surface); }
 html body[data-bot-product-ui] .bp-bot-settings-header h2 { margin: 0; font-size: 17px; font-weight: 600; }
 html body[data-bot-product-ui] .bp-bot-settings-header p { margin: 4px 0 0; font-size: 12px; color: var(--bp-muted); }
 html body[data-bot-product-ui] .bp-bot-settings-header button { display: grid; place-items: center; flex: none; margin-left: auto; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: var(--bp-ink); cursor: pointer; }
@@ -49485,7 +49481,7 @@ html body[data-bot-product-ui] .bp-bot-settings-body > [hidden] { display: none;
 html body[data-bot-product-ui] .bp-bot-settings-error { padding: 12px; margin-bottom: 14px; border: 1px solid var(--bp-border); border-radius: 10px; color: var(--bp-ink); background: var(--bp-surface); font-size: 13px; }
 html body[data-bot-product-ui] .bp-bot-settings-error button { padding: 6px 12px; color: inherit; background: var(--bp-subtle); border: 1px solid var(--bp-border); border-radius: 7px; cursor: pointer; }
 html body[data-bot-product-ui] .bp-bot-settings-dialog button:focus-visible { outline: 2px solid var(--bp-focus); outline-offset: -2px; }
-@media (max-width: 520px) { html body[data-bot-product-ui] .bp-bot-settings-body { padding: 16px; } html body[data-bot-product-ui] .bp-bot-settings-header { padding: 14px 16px; } }
+@media (max-width: 520px) { html body[data-bot-product-ui] .bp-bot-settings-body { padding: 16px; } html body[data-bot-product-ui] .bp-bot-settings-header { padding: 42px 16px 14px; } }
 html body[data-bot-product-ui]:has(.bp-bot-settings-backdrop) { overflow: hidden; }
 `;
 

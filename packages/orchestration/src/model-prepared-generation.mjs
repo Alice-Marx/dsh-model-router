@@ -25,6 +25,8 @@
 // ordinary llm.stream re-entry would lose the SDK's prepared dispatch. The immutable
 // frame therefore includes both the exact route and its original request identity.
 
+import { withRequestOutputDefault } from './model-request-bounds.mjs'
+
 const fail = (code, detail) => { throw Object.assign(new Error(code), { code, ...detail }) }
 const positive = value => Number.isSafeInteger(value) && value > 0 ? value : null
 
@@ -139,10 +141,11 @@ export function createPreparedModelDispatch({ llm = null, frames = null, funding
     const configure = (controls, info) => {
       contextWindow = positive(info.context?.contextWindow)
       defaultMaxTokens = positive(info.defaultMaxTokens)
+      controls = withRequestOutputDefault(controls, { contextWindow, defaultMaxTokens })
       const plan = planConfiguredOutput({ requested: controls.maxTokens ?? null, allowance, adapterDefault: defaultMaxTokens })
       if (!plan.ok) fail(plan.code)
-      // Unpriced (a subscription), or already within the bound: leave the controls untouched,
-      // so the SDK materializes the adapter's own default exactly as it would with no Host.
+      // Keep valid adapter defaults or the materialized conservative request limit
+      // for subscriptions; priced requests additionally obey their output allowance.
       if (allowance === null || !plan.clamp) return controls
       // Above the allowance, or nothing declared at all: lower the dispatched bound to the
       // allowance. This is the only safe dispatch, and it lands because `configure` returns

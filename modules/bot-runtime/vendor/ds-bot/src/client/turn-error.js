@@ -103,11 +103,9 @@ export function accountModel(roster) {
   return (models.find(model => model.ref === roster.defaultModel) ?? models[0])?.ref
 }
 
-const providerOf = (bot, roster) => {
-  const ref = bot?.model ?? bot?.appliedModel
-  if (!ref) return undefined
-  return (roster.models ?? []).find(model => model.ref === ref)?.provider ?? ref.split('/')[0]
-}
+// A saved failure belongs to its failed request, never a later Bot selection.
+export const failureProvider = (data, blocked) => typeof data.provider === 'string'
+  ? data.provider : (typeof blocked?.provider === 'string' ? blocked.provider : undefined)
 // A provider without a key may not be in the catalog yet, so DeepSeek's own two routes
 // keep a readable name instead of their id.
 const KNOWN_PROVIDERS = { 'deepseek-official': 'DeepSeek', 'deepseek-account': 'DeepSeek account' }
@@ -154,8 +152,8 @@ export function FailureCell({ node, sessionId, useRoster, useTurnClock, actions 
   const [error, setError] = useState('')
   // A sign-in started here to leave a failing key route, with the model the Bot was on.
   const [joining, setJoining] = useState(null)
-  const blocked = bot?.blocked?.code === data.code ? bot.blocked : undefined
-  const provider = blocked?.provider ?? providerOf(bot, roster)
+  const blocked = !later && bot?.blocked?.code === data.code ? bot.blocked : undefined
+  const provider = failureProvider(data, blocked)
   const text = failureText(data.code, { name: bot?.name ?? t('This Bot'), provider: providerName(roster, provider), status: blocked?.status })
   const facts = failureFacts(data, blocked)
   const current = bot !== undefined && isOwnChatOf(bot, sessionId) && !later

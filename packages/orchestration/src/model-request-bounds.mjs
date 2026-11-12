@@ -67,6 +67,16 @@ export function createModelBoundResolver({llm=null}={}){
   return Object.freeze({bounds,inputBound:async({provider,model,signal=null})=>(await bounds({provider,model,signal})).contextWindow})
 }
 
+/** Materialize a conservative request default when the adapter has none usable.
+ * This is an output request limit, never a claim about a model's capacity.
+ * Explicit caller controls and unknown context remain subject to normal admission.
+ */
+export function withRequestOutputDefault(config, { contextWindow, defaultMaxTokens } = {}) {
+  if (config.maxTokens !== undefined || positive(contextWindow) === null) return config
+  if (positive(defaultMaxTokens) !== null && defaultMaxTokens < contextWindow) return config
+  return { ...config, maxTokens: Math.min(8192, Math.max(1, Math.floor(contextWindow / 4))) }
+}
+
 /**
  * The output bound one request will actually dispatch with, or the refusal that
  * keeps it out of the ledger.

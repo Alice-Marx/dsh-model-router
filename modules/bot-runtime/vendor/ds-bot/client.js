@@ -12865,11 +12865,7 @@ function accountModel(roster) {
   const models = (roster.models ?? []).filter((model) => model.provider === ACCOUNT);
   return (models.find((model) => model.ref === roster.defaultModel) ?? models[0])?.ref;
 }
-var providerOf = (bot, roster) => {
-  const ref = bot?.model ?? bot?.appliedModel;
-  if (!ref) return void 0;
-  return (roster.models ?? []).find((model) => model.ref === ref)?.provider ?? ref.split("/")[0];
-};
+var failureProvider = (data, blocked) => typeof data.provider === "string" ? data.provider : typeof blocked?.provider === "string" ? blocked.provider : void 0;
 var KNOWN_PROVIDERS = { "deepseek-official": "DeepSeek", "deepseek-account": "DeepSeek account" };
 var providerName = (roster, provider) => provider === void 0 ? t("The model service") : (roster.models ?? []).find((model) => model.provider === provider)?.providerName ?? (KNOWN_PROVIDERS[provider] ? t(KNOWN_PROVIDERS[provider]) : provider);
 function failureFacts(data, blocked) {
@@ -12911,8 +12907,8 @@ function FailureCell({ node, sessionId, useRoster, useTurnClock, actions }) {
   const [retry, setRetry] = (0, import_react26.useState)("idle");
   const [error, setError] = (0, import_react26.useState)("");
   const [joining, setJoining] = (0, import_react26.useState)(null);
-  const blocked = bot?.blocked?.code === data.code ? bot.blocked : void 0;
-  const provider = blocked?.provider ?? providerOf(bot, roster);
+  const blocked = !later && bot?.blocked?.code === data.code ? bot.blocked : void 0;
+  const provider = failureProvider(data, blocked);
   const text = failureText2(data.code, { name: bot?.name ?? t("This Bot"), provider: providerName(roster, provider), status: blocked?.status });
   const facts = failureFacts(data, blocked);
   const current = bot !== void 0 && isOwnChatOf(bot, sessionId) && !later;
