@@ -7,7 +7,7 @@ export const providerFundingId=provider=>`provider-${createHash('sha256').update
 const cap=value=>value===null||typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=1e9
 
 /** Local policy scopes for Harness provider routes; these are not vendor balances. */
-export function openFundingAccounts({Database,file,providers,onCommitted=()=>{},onSuspended=()=>{},now=Date.now}){
+export function openFundingAccounts({Database,file,providers,labelFor=provider=>provider,sourceFor=()=> 'harness-provider',onCommitted=()=>{},onSuspended=()=>{},now=Date.now}){
   if(file!==':memory:')mkdirSync(dirname(file),{recursive:true})
   const db=new Database(file);let closed=false
   try{
@@ -23,7 +23,7 @@ export function openFundingAccounts({Database,file,providers,onCommitted=()=>{},
       if(row&&row.provider!==provider)fail('FUNDING_SCOPE_CONFLICT')
       const value=row?JSON.parse(row.payload):{enabled:false,dailyLimitUsd:null,monthlyLimitUsd:null,updatedAt:null}
       if(typeof value.enabled!=='boolean'||!cap(value.dailyLimitUsd)||!cap(value.monthlyLimitUsd)||value.enabled&&(value.dailyLimitUsd===null||value.monthlyLimitUsd===null))fail('FUNDING_POLICY_CORRUPT')
-      return{id,provider,label:provider,revision:row?.revision??0,...value,mode:'api',scopeKind:'harness-provider',balanceKnown:false}
+      return{id,provider,label:labelFor(provider),revision:row?.revision??0,...value,mode:'api',scopeKind:sourceFor(provider),balanceKnown:false}
     })
   }
   const get=id=>{const value=catalog().find(item=>item.id===id);if(!value)fail('FUNDING_SCOPE_UNAVAILABLE');return value}

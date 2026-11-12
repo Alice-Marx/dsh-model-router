@@ -54,6 +54,7 @@ import { createWebPanelActions } from './web-panel-actions.mjs'
 import { createDataEngine } from './bot-data-engine.mjs'
 import { createProductDataAccess } from './data-product-access.mjs'
 import { inspectProductBinding } from './binding-product.mjs'
+import { openAiProviders } from './ai-providers.mjs'
 import { inspectProductBotProfile, saveProductBotProfile } from './bot-profile.mjs'
 import { openUiHostNamespace } from './ui-host-namespace.mjs'
 import { registerDataTools } from './bot-data-tools.mjs'
@@ -455,7 +456,7 @@ export function startBotProduct(ctx, options = {}) {
   let conversationEngines
   const engineCredentialStamps = new Map()
   const engineLeaseId = `native-${randomUUID()}`
-  let machines, nativeRemoteActions, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat, securePairing, desktopProxy, desktopHttp
+  let machines, nativeRemoteActions, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat, securePairing, desktopProxy, desktopHttp, aiProviders
   let journal, taskService, taskBackends, releaseTaskTools, cliSessionFactory, remoteCliBackend, sharedAdmission, taskRunnerWatchdog, notifications, dataEngine, dataAccess, releaseDataTools, uiNamespace, nativeActivity, botThreads, webPanelStore, webPanelActions, independentChat, teamCoordination, releaseTeamTools, releaseTeamGuard, releaseTeamStop
   const grantRefresh = createGrantRefreshQueue({ lifecycle: () => product?.lifecycle,
     onError: () => ctx.logger?.warn?.('Bot grant refresh failed; grants remain suspended until a successful committed-state refresh.') })
@@ -543,15 +544,21 @@ export function startBotProduct(ctx, options = {}) {
   const committedBots = new Map()
   let ownerCatalogStamp=''
   let routes = new Set(), hydrated = false, refreshing = false, lastRefresh = 0, timer = null
+  const publishRoutes = async discovered => {
+    routes = new Set([...discovered].filter(key => !aiProviders?.owns(key.slice(0, key.indexOf('/')))))
+    for (const route of aiProviders?.routes() ?? []) routes.add(`${route.provider}/${route.model}`)
+    hydrated = true
+    const ownerRoutes = [...routes].sort().map(key => { const slash = key.indexOf('/'); return { provider: key.slice(0, slash), model: key.slice(slash + 1) } }).filter(route => route.provider && route.model)
+    const stamp = JSON.stringify(ownerRoutes)
+    if (stamp !== ownerCatalogStamp) { policy.replaceOwnerGrant({ tools: ownerTools, modelRoutes: ownerRoutes }); ownerCatalogStamp = stamp }
+    if (product) await product.lifecycle.refreshGrants()
+  }
   const refresh = async () => {
     if (refreshing) return
     refreshing = true
     try {
-      routes = new Set((await catalog()).map(route => `${route.provider}/${route.model}`)); hydrated = true
-      const ownerRoutes=[...routes].sort().map(key=>{const slash=key.indexOf('/');return {provider:key.slice(0,slash),model:key.slice(slash+1)}}).filter(route=>route.provider&&route.model)
-      const stamp=JSON.stringify(ownerRoutes)
-      if(stamp!==ownerCatalogStamp){policy.replaceOwnerGrant({tools:ownerTools,modelRoutes:ownerRoutes});ownerCatalogStamp=stamp}
-      if(product)await product.lifecycle.refreshGrants()
+      aiProviders?.sync()
+      await publishRoutes((await catalog()).map(route => `${route.provider}/${route.model}`))
     }
     catch { /* keep the last snapshot; the interval retries */ }
     finally { refreshing = false; lastRefresh = now() }
@@ -631,6 +638,8 @@ export function startBotProduct(ctx, options = {}) {
   const settingsCatalog = () => {
     const models = [...routes].map(key => { const slash = key.indexOf('/'); return { provider: key.slice(0, slash), model: key.slice(slash + 1), label: key, cliModels: [] } })
     for (const model of models) {
+      const independent = aiProviders?.metadata(model.provider)
+      if (independent) { model.label = `${independent.name} · ${model.model}`; model.providerName = independent.name; model.source = 'plugin'; model.fundingModes = ['api'] }
       const profile = engineProfiles.find(item => item.provider === model.provider && item.model === model.model)
       if (profile) { model.label = `${profile.name} · 仅文字 · ${model.model}`; model.fundingModes = ['subscription'] }
     }
@@ -903,6 +912,12 @@ export function startBotProduct(ctx, options = {}) {
           }, { signal })
         },
       }))
+      aiProviders = openAiProviders({ Database, file: storageFile, llm: ctx.llm, credentials: () => ctx.get?.('credentials'), now,
+        usedBy: route => (product?.lifecycle.committedBots() ?? []).filter(bot => bot.model?.startsWith(route + '/')
+          || botSettings?.get(bot.id, { publishChange: false }).settings?.mainRoutes?.routes?.some(item => item.provider === route)).map(bot => ({ id: bot.id, name: bot.name })),
+        onChanged: async () => { product?.rt.dropCatalog(); await publishRoutes(routes); botSettings?.refresh() } })
+      ctx.provide?.('botAiProviders', aiProviders)
+      await publishRoutes(routes)
       routingSettings = openBotRoutingSettings({ Database, file: storageFile, initial: () => config.botRouting, now })
       uiNamespace = openUiHostNamespace({ Database, file: storageFile })
       nativeActivity = createNativeActivityService({ Database, file: storageFile, namespace: uiNamespace.read().hostId,
@@ -934,6 +949,8 @@ export function startBotProduct(ctx, options = {}) {
       if (deferredRouterState) {
         fundingAccounts = openFundingAccounts({ Database, file: storageFile,
           providers: () => [...new Set([...routes].map(key => key.slice(0, key.indexOf('/'))))],
+          labelFor: provider => aiProviders?.metadata(provider)?.name ?? provider,
+          sourceFor: provider => aiProviders?.metadata(provider) ? 'plugin-provider' : 'harness-provider',
           onCommitted: () => { try { botSettings?.refresh() } catch { /* the interval retries */ } },
           onSuspended: () => { try { botSettings?.refresh() } catch { /* the interval retries */ } }, now })
         botSettings = openBotSettings({ Database, file: storageFile,
@@ -1163,7 +1180,11 @@ export function startBotProduct(ctx, options = {}) {
             // This sets a request control before the SDK prepares and logs it. It
             // does not price a lookup generation: admission still requires the
             // actual prepared Session frame, including after a registration swap.
-            try { config = withRequestOutputDefault(config, await resolveModelRouteBounds({ llm: ctx.llm, provider, model, signal })) }
+            try {
+              const bounds = await resolveModelRouteBounds({ llm: ctx.llm, provider, model, signal })
+              config = withRequestOutputDefault(config, bounds)
+              if (aiProviders?.metadata(provider) && config.maxTokens === undefined && bounds.defaultMaxTokens) config = { ...config, maxTokens: bounds.defaultMaxTokens }
+            }
             catch { signal.throwIfAborted(); /* normal preparation/admission reports unknown capacity */ }
           }
           if (!quote?.fundingRevision || quote.funding !== 'api') return config
@@ -1343,6 +1364,17 @@ export function startBotProduct(ctx, options = {}) {
           }),
           ...(botSettings ? {
             'binding.inspect': ownerOnly((payload, context) => inspectProductBinding({ runtime: product.rt, lifecycle: product.lifecycle, botSettings, fundingAccounts, refreshOfficialTools: () => officialCatalog?.refresh({ fresh: true }), signal: context?.signal }, payload)),
+            'aiProviders.list': ownerOnly((_payload, context) => aiProviders.list(context)),
+            'aiProviders.suggestions': ownerOnly((payload, context) => aiProviders.suggestions(payload, context)),
+            'aiProviders.save': ownerOnly((payload, context) => aiProviders.save(payload, context)),
+            'aiProviders.remove': ownerOnly((payload, context) => aiProviders.remove(payload, context)),
+            'aiProviders.check': ownerOnly((payload, context) => aiProviders.probe(payload, context)),
+            'aiProviders.cliStatus': ownerOnly(async (payload, context) => {
+              if (!payload || Object.keys(payload).some(key => key !== 'refresh') || payload.refresh !== undefined && typeof payload.refresh !== 'boolean') throw Object.assign(new Error('无效的 CLI 检查请求。'), { code: 'AI_PROVIDER_INVALID' })
+              if (payload.refresh) await officialCatalog?.refresh({ fresh: true })
+              context?.signal?.throwIfAborted()
+              return officialCatalog?.snapshot() ?? { status: 'unavailable', tools: [] }
+            }),
             'binding.save': ownerOnly(async (payload, context) => {
             const selected = payload.settings?.model
             if (typeof selected?.provider === 'string' && typeof selected?.model === 'string') {
@@ -1538,7 +1570,7 @@ export function startBotProduct(ctx, options = {}) {
       desktopHttp?.close()
       releaseDataTools?.()
       await dataEngine?.closeAll().catch(() => {})
-      for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close()])try{cleanup()}catch{}
+      for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close(),()=>aiProviders?.close()])try{cleanup()}catch{}
       if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
       if(taskService)await taskService.close().catch(()=>{})
       else journal?.close()
@@ -1584,7 +1616,7 @@ export function startBotProduct(ctx, options = {}) {
         desktopHttp?.close()
         releaseDataTools?.()
         await dataEngine?.closeAll().catch(() => {})
-        for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close()])try{cleanup()}catch{}
+        for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close(),()=>aiProviders?.close()])try{cleanup()}catch{}
         if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
         if(taskService)await taskService.close().catch(()=>{})
         else journal?.close()

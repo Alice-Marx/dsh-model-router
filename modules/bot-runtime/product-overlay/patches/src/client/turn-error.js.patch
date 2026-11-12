@@ -42,3 +42,15 @@
    // The key route never takes the account's credential, so a sign-in alone leaves the Bot
    // failing; it moves onto the account route. With no account model listed yet, the
    // user picks one.
+@@ -186,8 +185,9 @@
+   if (!current) return settled()
+   const official = provider === OFFICIAL
+   const canSignIn = typeof actions.signIn === 'function' && actions.canSignIn?.() === true
+-  const keyHere = typeof actions.setProviderKey === 'function' && provider !== undefined
+-  const keyElsewhere = official && actions.openHarnessOnboarding ? () => actions.openHarnessOnboarding(OFFICIAL) : manageModels(actions)
++  const independent = provider?.startsWith('bot-ai-') && typeof globalThis.__dshBotAiProvidersUi?.openSettings === 'function'
++  const keyHere = !independent && typeof actions.setProviderKey === 'function' && provider !== undefined
++  const keyElsewhere = independent ? () => globalThis.__dshBotAiProvidersUi.openSettings() : official && actions.openHarnessOnboarding ? () => actions.openHarnessOnboarding(OFFICIAL) : manageModels(actions)
+   const viaAccount = () => {
+     if (signedIn) { moveToAccount(); return }
+     setJoining({ from: bot.model })

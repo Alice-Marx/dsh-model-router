@@ -25,7 +25,7 @@ import {
  * The official-tools module is a separate region because granting a CLI execution
  * path is a different decision from choosing the model this Bot talks with.
  */
-export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostScope, onOpenTools }) {
+export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostScope, onOpenTools, onOpenAi }) {
   const connection = hostScope ?? dispatch
   const draftConnection = useRef(connection)
   const [inspectedCatalog, setInspectedCatalog] = useState(null)
@@ -172,7 +172,7 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostSc
   const fundingMode = FUNDING_MODES.find(item => item.value === form.fundingMode) ?? FUNDING_MODES[0]
   const summary = [
     ['准确模型', savedRoute || '未选择'],
-    ['资金范围', mainRoutes ? `${mainRoutes.routes.filter(route => route.enabled).length} 条路线 · 共享限额` : account ? `${account.provider} · ${form.fundingMode === 'api' ? 'API' : '订阅'}${account.enabled ? '' : '（未启用）'}` : '未匹配'],
+    ['资金范围', mainRoutes ? `${mainRoutes.routes.filter(route => route.enabled).length} 条路线 · 共享限额` : account ? `${(account.label ?? account.provider)} · ${form.fundingMode === 'api' ? 'API' : '订阅'}${account.enabled ? '' : '（未启用）'}` : '未匹配'],
     ['工作区', machine && root ? workspaceLabel(machine, root) : '未选择'],
     ['官方工具', form.officialTools.length ? form.officialTools.map(tool => `${tool.toolId}/${tool.cliModel}·${MODE_LABEL[tool.mode] ?? tool.mode}`).join('，') : bot?.main ? 'Main 全权限 · 待配置默认执行方式' : '未授予'],
     ['绑定状态', record.status === 'available' ? '已启用' : '未启用'],
@@ -182,6 +182,7 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostSc
     <header className="bb-head">
       <p className="bb-eyebrow">Bot 绑定 · {bot?.name ?? ''}</p>
       <h3 className="bb-title">模型与工具</h3>
+      {onOpenAi && <button type="button" className="bb-link" disabled={busy} onClick={onOpenAi}><UiIcon name="spark" size={15}/>管理 AI 提供方</button>}
       <p className="bb-sub">{bot?.main ? '配置 Main 的模型路线、默认模型与官方工具。' : '选择默认模型，为这个 Bot 添加官方工具。'}</p>
       {bot?.main && <p className="bb-note" role="note"><strong>Main · 全权限主控</strong> 可使用宿主全部已接入模型路线与工具。下方配置默认模型、工作区和资金。</p>}
       <details className="bb-overview"><summary>配置概览<span>{form.enabled ? '已启用' : '未启用'}</span></summary><dl className="bb-summary">{summary.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></details>
@@ -204,25 +205,25 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostSc
         onDefault={route => edit({ provider: route.provider, model: routeOf(route) })}
         onEnableAccount={enableAccount}
         onSingleRoute={() => edit({ ...mainDefaultFields(mainRoutes, form.model), mainRoutes: null })} /> :
-      <details className="bb-budget-config"><summary><UiIcon name="chart" size={16}/>费用与预算<span className="bb-pill">{account?.provider ?? '待配置'}</span></summary>
+      <details className="bb-budget-config"><summary><UiIcon name="chart" size={16}/>费用与预算<span className="bb-pill">{(account?.label ?? account?.provider) ?? '待配置'}</span></summary>
       <ol className="bb-steps">
         <li className="bb-step" data-state={model && account?.enabled ? 'done' : 'blocked'}>
           <div className="bb-step-head"><UiIcon name="chart" size={17}/>
             <div><strong>资金范围</strong><p>{fundingMode.help}</p></div>
-            <span className="bb-step-state"><span className="bb-pill" data-tone={account?.enabled ? 'current' : 'warn'}>{account ? `${account.provider}${account.enabled ? '' : ' · 未启用'}` : '无匹配范围'}</span></span></div>
+            <span className="bb-step-state"><span className="bb-pill" data-tone={account?.enabled ? 'current' : 'warn'}>{account ? `${(account.label ?? account.provider)}${account.enabled ? '' : ' · 未启用'}` : '无匹配范围'}</span></span></div>
           <div className="bb-step-body">
             <div className="bb-row">{FUNDING_MODES.map(item => <button key={item.value} type="button" className="bb-option bb-option-inline"
               aria-pressed={form.fundingMode === item.value} disabled={Boolean(model?.fundingModes && !model.fundingModes.includes(item.value))} onClick={() => edit({ fundingMode: item.value })}>{item.label}</button>)}</div>
             {!model && <p className="bb-note">先选择模型，宿主才能给出这个提供商的资金范围。</p>}
             {model && !account && <p className="bb-warn">宿主目录里没有 {model.provider} 的资金范围。请刷新宿主或改选模型；未匹配范围时无法启用绑定。</p>}
             {model && account && !account.enabled && <aside className="bp-blocked">
-              <strong>资金范围尚未启用</strong><p>{account.provider} 需要本地预算上限；它不是厂商余额。</p>
+              <strong>资金范围尚未启用</strong><p>{(account.label ?? account.provider)} 需要本地预算上限；它不是厂商余额。</p>
               <div className="bb-fields">
                 <label className="bb-field"><span>账户每日上限（USD）</span><input type="number" min="0" step="0.01" value={form.accountDaily} onChange={event => edit({ accountDaily: event.target.value })} /></label>
                 <label className="bb-field"><span>账户每月上限（USD）</span><input type="number" min="0" step="0.01" value={form.accountMonthly} onChange={event => edit({ accountMonthly: event.target.value })} /></label>
               </div>
               <div className="bb-row"><button type="button" disabled={busy || Boolean(working) || !accountLimitsReady} onClick={() => enableAccount(account, numberOrNull(form.accountDaily), numberOrNull(form.accountMonthly))}>
-                {working === 'funding' ? '启用中…' : `启用 ${account.provider} 资金范围`}</button>
+                {working === 'funding' ? '启用中…' : `启用 ${(account.label ?? account.provider)} 资金范围`}</button>
                 {!accountLimitsReady && <small className="bb-note">留空表示未配置，宿主会拒绝启用；0 表示禁止付费。</small>}</div>
             </aside>}
             {model && account?.enabled && scope && !scopeAllows(scope, form.fundingMode, routeOf(model)) && <p className="bb-warn">宿主发布该资金范围时不包含当前渠道或准确模型，保存会被拒绝。</p>}

@@ -10,6 +10,7 @@ export const WORKSPACE_SECTIONS = Object.freeze([
   { section: 'data', title: '数据', label: '数据与图表', icon: 'chart', group: '资源', description: '把资料变成可查询的数据，制作图表并导出结果。' },
   { section: 'routine', title: '例行工作', label: '例行任务', icon: 'repeat', group: '资源', description: '演示、保存、再次运行，让重复的工作少一点。' },
   { section: 'usage', title: '费用与用量', label: '费用与用量', icon: 'chart', group: '管理', description: '用真实收据了解团队使用情况和每笔费用。' },
+  { section: 'ai', title: 'AI', label: 'AI 提供方', icon: 'spark', group: '管理', description: '独立管理 AI 连接、账号与模型，再为 Bot 选择合适的提供方。' },
   { section: 'webPanel', title: '常用网页', label: '网页面板', icon: 'board', group: '工作', description: '把常用的本地仪表盘或看板固定在这里，一键打开；列表保存在宿主，重启后仍在。' },
 ])
 

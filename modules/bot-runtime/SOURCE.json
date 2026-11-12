@@ -183,6 +183,20 @@
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "4ed1e99fb3fe66be3a55176389e1ab08e282070e23e9e06089a20f6dbec3b59b"
       }
+    },
+    {
+      "path": "src/client/settings.js",
+      "kind": "patched",
+      "summary": "The AI settings page renders the plugin-owned provider manager without modifying Harness provider settings.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "40bf74852d5fbdc5998dd112049df5d6ceeab26437d030b22be84c62fdadc287"
+      }
+    },
+    {
+      "path": "src/client/product-ai-settings.js",
+      "kind": "product-file",
+      "summary": "The product-owned React settings bridge exposes no credentials or model authority."
     }
   ],
   "files": [
@@ -238,8 +252,8 @@
     {
       "path": "vendor/ds-bot/client.js",
       "sourcePath": "ds-bot/client.js",
-      "sha256": "70be8d5bcb54ac4209de80970771e5260836296becda2582ccd97d171d70fbb3",
-      "gitBlob": "ecfd4545477a5bb6c0c22b9c24c06748b6228a2a",
+      "sha256": "6c44503d5fbfbe47416c56dcacea9ef06ae492de9c1c18cbaf356212c4804581",
+      "gitBlob": "3a6c870164aa36a7b2dc67ce1db7e6193367b1ac",
       "origin": "generated"
     },
     {
@@ -964,6 +978,13 @@
       "origin": "upstream"
     },
     {
+      "path": "vendor/ds-bot/src/client/product-ai-settings.js",
+      "sourcePath": "ds-bot/src/client/product-ai-settings.js",
+      "sha256": "bed3098af20166dbfd7c29c2b68bc19711b10080f8a8dc6ceed8dcc3e3c8eaea",
+      "gitBlob": "edc6202de8b8b9a6beb303fc344edbb0fb59cf40",
+      "origin": "overlay"
+    },
+    {
       "path": "vendor/ds-bot/src/client/providers-page.js",
       "sourcePath": "ds-bot/src/client/providers-page.js",
       "sha256": "9b3f56e39185adc5755d4469b747c938ce6fcb3a7fec5a55351d43005eb96fd5",
@@ -1008,9 +1029,9 @@
     {
       "path": "vendor/ds-bot/src/client/settings.js",
       "sourcePath": "ds-bot/src/client/settings.js",
-      "sha256": "40bf74852d5fbdc5998dd112049df5d6ceeab26437d030b22be84c62fdadc287",
-      "gitBlob": "a8770bfcaafcc3090e77e029761e3d9993fabef0",
-      "origin": "upstream"
+      "sha256": "e39551503143fc6a170b258714e4f750c8a0457451fc29dea76005e1d0f6204e",
+      "gitBlob": "01bf32a251c87ac5a2ee47ef6491b30304843bb1",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/shared-map.js",
@@ -1099,8 +1120,8 @@
     {
       "path": "vendor/ds-bot/src/client/turn-error.js",
       "sourcePath": "ds-bot/src/client/turn-error.js",
-      "sha256": "844aea556096bb3bb3081f8b9d37ae85e6dc2b7e34492601011f06b783c3bd70",
-      "gitBlob": "f36ef7f3583e0efe3e3337bf1e7bfb8260e5f2ca",
+      "sha256": "b0c3e7b53542d19283993072a94cb4fb4399779339d24a9c20fd96075d349150",
+      "gitBlob": "a501d5ad112a0961c51b5764e9b17233d9df47fe",
       "origin": "overlay"
     },
     {

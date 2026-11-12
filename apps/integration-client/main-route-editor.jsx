@@ -23,7 +23,7 @@ function EnableAccount({ account, onEnable }) {
       <NumberField label="账户每月上限（USD）" value={monthly} onChange={setMonthly} />
     </div>
     <button type="button" disabled={day === null || month === null || day < 0 || month < 0}
-      onClick={() => onEnable(account, day, month)}>启用 {account.provider} 资金范围</button>
+      onClick={() => onEnable(account, day, month)}>启用 {(account.label ?? account.provider)} 资金范围</button>
   </div>
 }
 
@@ -68,8 +68,8 @@ export function MainRouteEditor({ draft, defaultRoute, catalog, accounts, busy, 
                   .map(mode => <option value={mode.value} key={mode.value}>{mode.label}</option>)}
               </select>
             </label>
-            <p className="bb-note">{account?.id === funding.scopeId ? `${account.provider} · ${account.enabled ? '资金范围已启用' : '资金范围未启用'}` : '需要重新选择此提供商的资金范围。'}</p>
-            {account && account.id !== funding.scopeId && <button type="button" className="bb-link" onClick={() => changeFunding({ scopeId: account.id })}>选择 {account.provider} 资金范围</button>}
+            <p className="bb-note">{account?.id === funding.scopeId ? `${(account.label ?? account.provider)} · ${account.enabled ? '资金范围已启用' : '资金范围未启用'}` : '需要重新选择此提供商的资金范围。'}</p>
+            {account && account.id !== funding.scopeId && <button type="button" className="bb-link" onClick={() => changeFunding({ scopeId: account.id })}>选择 {(account.label ?? account.provider)} 资金范围</button>}
             {account && !account.enabled && <EnableAccount key={`${account.id}:${account.revision}`} account={account} onEnable={onEnableAccount} />}
             {funding.mode === 'api' && <>
               <div className="bb-fields">{PRICES.map(([key, label]) => <NumberField key={key} label={`${label}（USD / 百万 Token）`} value={funding.pricing?.[key]}

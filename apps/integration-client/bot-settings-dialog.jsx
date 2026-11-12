@@ -11,7 +11,7 @@ export function BotSettingsDialog(props) {
   return <SettingsDialog key={key} {...props}/>
 }
 
-function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
+function SettingsDialog({ productApi, botId, onClose, onOpenTools, onOpenAi }) {
   const [view, setView] = useState(null), [error, setError] = useState(''), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false)
   const [tab, setTab] = useState('binding'), [identityVisited, setIdentityVisited] = useState(false)
   const [checkingTools, setCheckingTools] = useState(false), [toolNotice, setToolNotice] = useState('')
@@ -126,7 +126,7 @@ function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
         {error && <div className="bp-bot-settings-error" role="alert"><p>{error}</p><button type="button" disabled={busy || loading} onClick={() => void read()}>重新读取</button></div>}
         {view && checkingTools && <p className="bp-muted" role="status">正在后台检测官方工具，模型设置可直接使用。</p>}
         {view && toolNotice && <p className="bp-muted" role="status">{toolNotice}</p>}
-        {view && <BotBindingEditor bot={view.bot} record={view.record} accounts={view.accounts} dispatch={dispatch} hostScope={productApi} busy={busy || loading || Boolean(error)} onOpenTools={onOpenTools}/>}
+        {view && <BotBindingEditor bot={view.bot} record={view.record} accounts={view.accounts} dispatch={dispatch} hostScope={productApi} busy={busy || loading || Boolean(error)} onOpenTools={onOpenTools} onOpenAi={onOpenAi}/>}
         </div>
         <div role="tabpanel" id={`${tabId}-identity-panel`} aria-labelledby={`${tabId}-identity`} hidden={tab !== 'identity'}>
           {identityVisited && <BotProfileIdentity productApi={productApi} botId={botId} busy={busy} onSaved={bot => setView(current => current && bot.id === botId ? { ...current, bot: { ...current.bot, name: bot.name, role: bot.role } } : current)}/>}

@@ -121,6 +121,7 @@ function catalogOf(input) {
     if (item.fundingModes !== undefined && (!Array.isArray(item.fundingModes) || !item.fundingModes.length || item.fundingModes.length > 2
       || item.fundingModes.some(mode => !['api', 'subscription'].includes(mode)) || new Set(item.fundingModes).size !== item.fundingModes.length)) fail('BOT_SETTINGS_CATALOG_INVALID', '宿主模型资金渠道目录无效。')
     return { provider: item.provider, model: item.model, label: String(item.label ?? item.model).slice(0, 256),
+      ...(item.source === 'plugin' ? { source: 'plugin', providerName: String(item.providerName ?? item.provider).slice(0, 100) } : {}),
       ...(item.fundingModes === undefined ? {} : { fundingModes: [...item.fundingModes] }),
       ...(item.pricing === undefined ? {} : { pricing: normalizeFunding({ pricing: item.pricing }).pricing }),
       cliModels: (item.cliModels ?? []).filter(mapping => registry.has(mapping.toolId) && token(mapping.model)).map(mapping => ({ toolId: mapping.toolId, model: mapping.model })) }

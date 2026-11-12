@@ -142,7 +142,7 @@ function ChatConversation({ productApi, hostId, bot, readOnly, nativeActivityAva
       </form>
       <p className="ic-capability-note">此入口发送文字；附件、语音与记忆视图请打开原生会话。<button type="button" onClick={() => openPanel?.('bot-product-machines')}>电脑</button></p>
     </div>
-    {settings && <BotSettingsDialog productApi={productApi} botId={bot.id} onClose={() => setSettings(false)} onOpenTools={typeof openPanel === 'function' ? async () => { requestWorkbenchView('tools'); await openPanel('model-router-galgame'); setSettings(false) } : undefined}/>} 
+    {settings && <BotSettingsDialog productApi={productApi} botId={bot.id} onClose={() => setSettings(false)} onOpenAi={typeof openPanel === 'function' ? () => { setSettings(false); openPanel('bot-product-ai') } : undefined} onOpenTools={typeof openPanel === 'function' ? async () => { requestWorkbenchView('tools'); await openPanel('model-router-galgame'); setSettings(false) } : undefined}/>} 
   </>
 }
 

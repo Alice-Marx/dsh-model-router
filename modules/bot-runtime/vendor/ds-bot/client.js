@@ -12950,8 +12950,9 @@ function FailureCell({ node, sessionId, useRoster, useTurnClock, actions }) {
   if (!current) return settled();
   const official = provider === OFFICIAL;
   const canSignIn = typeof actions.signIn === "function" && actions.canSignIn?.() === true;
-  const keyHere = typeof actions.setProviderKey === "function" && provider !== void 0;
-  const keyElsewhere = official && actions.openHarnessOnboarding ? () => actions.openHarnessOnboarding(OFFICIAL) : manageModels(actions);
+  const independent = provider?.startsWith("bot-ai-") && typeof globalThis.__dshBotAiProvidersUi?.openSettings === "function";
+  const keyHere = !independent && typeof actions.setProviderKey === "function" && provider !== void 0;
+  const keyElsewhere = independent ? () => globalThis.__dshBotAiProvidersUi.openSettings() : official && actions.openHarnessOnboarding ? () => actions.openHarnessOnboarding(OFFICIAL) : manageModels(actions);
   const viaAccount = () => {
     if (signedIn) {
       moveToAccount();
@@ -17835,288 +17836,17 @@ body:not([data-bt-motion=quiet]) .bt-about-mark:hover .bt-mark[data-live][data-s
 @media (prefers-reduced-motion:reduce){.bt-star:hover .bt-star-icon,.bt-star-count{animation:none}}
 `;
 
-// src/client/providers-page.js
+// src/client/product-ai-settings.js
 var import_react46 = require("react");
-var PROTOCOL_NAMES = { "openai-completions": "OpenAI Chat Completions", "openai-responses": "OpenAI Responses", "anthropic-messages": "Anthropic Messages" };
-var ENDPOINT_HINTS = { "anthropic-messages": "https://gateway.example" };
-var SHOWN_MODELS = 8;
-var translated = (promise) => Promise.resolve(promise).catch((failure) => {
-  throw new Error(hostText(failure?.message ?? String(failure)));
-});
-function ProvidersPage({ actions, run: run2, Section }) {
-  const [view, setView] = (0, import_react46.useState)(null);
-  const [open, setOpen] = (0, import_react46.useState)(null);
-  const [adding, setAdding] = (0, import_react46.useState)(false);
-  const apply2 = (promise) => run2(translated(promise).then((next) => {
-    if (next?.providers) setView(next);
-  }));
-  (0, import_react46.useEffect)(() => {
-    void apply2(actions.providers());
-  }, []);
-  if (view === null) return null;
-  if (!view.available) return (0, import_react46.createElement)("p", { className: "bt-set-hint" }, t("This DSH cannot set up model providers."));
-  return [
-    (0, import_react46.createElement)(
-      Section,
-      { key: "list", title: t("Model providers · {count}", { count: view.providers.length }) },
-      view.providers.map((provider) => (0, import_react46.createElement)(ProviderRow, {
-        key: provider.id,
-        provider,
-        apply: apply2,
-        actions,
-        open: open === provider.id,
-        onToggle: () => setOpen(open === provider.id ? null : provider.id)
-      })),
-      adding ? (0, import_react46.createElement)(AddProvider, { key: "add", view, apply: apply2, actions, onDone: () => setAdding(false) }) : null
-    ),
-    adding ? null : (0, import_react46.createElement)("div", { key: "add", className: "bt-actions" }, (0, import_react46.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: () => setAdding(true) }, t("Add a provider")))
-  ];
+function ProductAiSettings(props) {
+  const bridge2 = globalThis.__dshBotAiProvidersUi;
+  return typeof bridge2?.renderSettings === "function" ? bridge2.renderSettings(props) : (0, import_react46.createElement)("p", { role: "status" }, "请启用完整插件以管理独立 AI 提供方。");
 }
-function keyState(key) {
-  if (key === null) return null;
-  if (!key.configured) return ["missing", t("Needs an API key")];
-  return key.writable ? ["set", t("Key set")] : ["outside", t("Key set outside DS Bot")];
-}
-function ProviderRow({ provider, apply: apply2, actions, open, onToggle }) {
-  const [confirm, setConfirm] = (0, import_react46.useState)(false);
-  (0, import_react46.useEffect)(() => {
-    if (!open) setConfirm(false);
-  }, [open]);
-  const state = keyState(provider.key);
-  const shown = provider.models.slice(0, SHOWN_MODELS);
-  const hint = provider.error ?? (provider.models.length === 0 ? t("No models") : t("{count} models", { count: provider.models.length }));
-  return (0, import_react46.createElement)(
-    "div",
-    { className: "bt-secret-item bt-provider", "data-open": open ? "" : void 0 },
-    (0, import_react46.createElement)(
-      "button",
-      { type: "button", className: "bt-set-row bt-secret-summary", "aria-expanded": open, onClick: onToggle },
-      (0, import_react46.createElement)(
-        "span",
-        { className: "bt-set-copy" },
-        (0, import_react46.createElement)("span", { className: "bt-secret-title" }, provider.name, provider.name !== provider.id ? (0, import_react46.createElement)("span", { className: "bt-provider-id" }, provider.id) : null),
-        (0, import_react46.createElement)("span", { className: "bt-set-hint", "data-error": provider.error ? "" : void 0 }, hint)
-      ),
-      state ? (0, import_react46.createElement)("span", { className: "bt-set-control" }, (0, import_react46.createElement)("span", { className: "bt-provider-state", "data-state": state[0] }, state[1])) : null
-    ),
-    open ? (0, import_react46.createElement)(
-      "div",
-      { className: "bt-secret-edit" },
-      provider.key?.writable ? (0, import_react46.createElement)(KeyEditor, { provider, apply: apply2, actions }) : null,
-      provider.key && !provider.key.writable ? (0, import_react46.createElement)("div", { className: "bt-set-hint" }, t("This key comes from outside DS Bot, such as an environment variable, and cannot be changed here.")) : null,
-      provider.models.length > 0 ? (0, import_react46.createElement)(
-        "div",
-        { className: "bt-secret-edit-block" },
-        (0, import_react46.createElement)("div", { className: "bt-secret-edit-label" }, t("Models")),
-        (0, import_react46.createElement)(
-          "div",
-          { className: "bt-provider-models" },
-          shown.map((model) => (0, import_react46.createElement)("span", { key: model.ref, className: "bt-tag", title: model.ref }, model.name)),
-          provider.models.length > shown.length ? (0, import_react46.createElement)("span", { className: "bt-set-hint" }, t("and {count} more", { count: provider.models.length - shown.length })) : null
-        )
-      ) : null,
-      provider.removable ? (0, import_react46.createElement)(
-        "div",
-        { className: "bt-secret-row-actions" },
-        confirm ? [
-          (0, import_react46.createElement)("span", { key: "q", className: "bt-set-hint" }, t("Remove {name}? Bots on its models need another model.", { name: provider.name })),
-          (0, import_react46.createElement)("button", { key: "no", type: "button", className: "bt-soft bt-soft-sm", onClick: () => setConfirm(false) }, t("Keep")),
-          (0, import_react46.createElement)("button", { key: "yes", type: "button", className: "bt-soft bt-soft-sm bt-secret-danger", onClick: () => apply2(actions.removeProvider(provider.id)) }, t("Remove"))
-        ] : (0, import_react46.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm bt-secret-danger", onClick: () => setConfirm(true) }, (0, import_react46.createElement)(TrashIcon), t("Remove provider"))
-      ) : null
-    ) : null
-  );
-}
-function KeyEditor({ provider, apply: apply2, actions }) {
-  const [value, setValue] = (0, import_react46.useState)("");
-  const [saved, setSaved] = (0, import_react46.useState)(false);
-  const ready = value.trim() !== "";
-  const save = () => {
-    if (!ready) return;
-    void apply2(actions.setProviderKey(provider.id, value)).then((ok) => {
-      if (ok) {
-        setValue("");
-        setSaved(true);
-      }
-    });
-  };
-  const edit = (next) => {
-    setValue(next);
-    setSaved(false);
-  };
-  const label = t("{provider} API key", { provider: provider.name });
-  return (0, import_react46.createElement)(
-    "div",
-    { className: "bt-secret-edit-block" },
-    (0, import_react46.createElement)("div", { className: "bt-secret-edit-label" }, provider.key.configured ? t("Replace the API key") : t("API key")),
-    (0, import_react46.createElement)(
-      "div",
-      { className: "bt-secret-inline" },
-      (0, import_react46.createElement)("label", { className: "bt-q-field bt-secret-field" }, (0, import_react46.createElement)(KeyIcon), (0, import_react46.createElement)(MaskedInput, { value, onChange: edit, onEnter: save, label })),
-      (0, import_react46.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", disabled: !ready, onClick: save }, t("Save")),
-      provider.key.configured ? (0, import_react46.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm bt-secret-danger", onClick: () => apply2(actions.setProviderKey(provider.id, null)) }, t("Remove key")) : null
-    ),
-    saved ? (0, import_react46.createElement)("div", { className: "bt-set-hint bt-secret-ok", role: "status" }, (0, import_react46.createElement)(CheckIcon), t("Saved.")) : null
-  );
-}
-function AddProvider({ view, apply: apply2, actions, onDone }) {
-  const [mode, setMode] = (0, import_react46.useState)(view.addable.length > 0 ? "known" : "custom");
-  return (0, import_react46.createElement)(
-    "div",
-    { className: "bt-set-row bt-set-paste bt-provider-add" },
-    (0, import_react46.createElement)(
-      Segmented,
-      { label: t("Kind of provider"), value: mode },
-      [["known", t("Known provider")], ["custom", t("Custom API")]].map(([id, label]) => (0, import_react46.createElement)("button", {
-        key: id,
-        type: "button",
-        "aria-pressed": mode === id,
-        disabled: id === "known" && view.addable.length === 0,
-        onClick: () => setMode(id)
-      }, label))
-    ),
-    // Both forms stay mounted, so switching keeps what is typed in the other.
-    (0, import_react46.createElement)("div", { hidden: mode !== "known" }, (0, import_react46.createElement)(KnownForm, { view, apply: apply2, actions, onDone })),
-    (0, import_react46.createElement)("div", { hidden: mode !== "custom" }, (0, import_react46.createElement)(CustomForm, { view, apply: apply2, actions, onDone }))
-  );
-}
-function KnownForm({ view, apply: apply2, actions, onDone }) {
-  const [provider, setProvider] = (0, import_react46.useState)("");
-  const [key, setKey] = (0, import_react46.useState)("");
-  const options = [...view.addable].sort((a, b) => a.name.localeCompare(b.name));
-  const add = () => {
-    if (provider === "") return;
-    void apply2(actions.addProvider({ provider, key })).then((ok) => {
-      if (ok) onDone();
-    });
-  };
-  return (0, import_react46.createElement)(
-    "div",
-    { className: "bt-provider-form" },
-    (0, import_react46.createElement)(
-      "select",
-      { className: "bt-select", "aria-label": t("Provider"), value: provider, onChange: (event) => setProvider(event.target.value) },
-      (0, import_react46.createElement)("option", { value: "", disabled: true }, t("Choose a provider")),
-      options.map((option) => (0, import_react46.createElement)("option", { key: option.id, value: option.id }, option.name))
-    ),
-    (0, import_react46.createElement)("label", { className: "bt-q-field bt-secret-field" }, (0, import_react46.createElement)(KeyIcon), (0, import_react46.createElement)(MaskedInput, { value: key, onChange: setKey, onEnter: add, label: t("API key") })),
-    (0, import_react46.createElement)(FormActions, { onCancel: onDone, onAdd: add, ready: provider !== "" })
-  );
-}
-function CustomForm({ view, apply: apply2, actions, onDone }) {
-  const [draft, setDraft] = (0, import_react46.useState)({ provider: "", name: "", baseURL: "", api: view.protocols[0], key: "", typed: "" });
-  const [found, setFound] = (0, import_react46.useState)(null);
-  const [picked, setPicked] = (0, import_react46.useState)([]);
-  const [asking, setAsking] = (0, import_react46.useState)(false);
-  const set = (field, value) => setDraft((current) => ({ ...current, [field]: value }));
-  const typed = draft.typed.split(/[\s,]+/).map((id) => id.trim()).filter(Boolean);
-  const models = [...(found ?? []).filter((model) => picked.includes(model.id)), ...typed.filter((id) => !picked.includes(id)).map((id) => ({ id }))];
-  const ready = draft.provider.trim() !== "" && draft.baseURL.trim() !== "" && models.length > 0;
-  const fetchModels = () => {
-    setAsking(true);
-    void apply2(Promise.resolve(actions.providerModels({ baseURL: draft.baseURL, api: draft.api, key: draft.key })).then((list) => {
-      setFound(list);
-      setPicked([]);
-    })).finally(() => setAsking(false));
-  };
-  const toggle = (id) => setPicked((list) => list.includes(id) ? list.filter((item) => item !== id) : [...list, id]);
-  const add = () => {
-    if (!ready) return;
-    void apply2(actions.addProvider({ custom: true, provider: draft.provider.trim(), name: draft.name, baseURL: draft.baseURL, api: draft.api, key: draft.key, models })).then((ok) => {
-      if (ok) onDone();
-    });
-  };
-  const input = (field, label, placeholder) => (0, import_react46.createElement)("input", {
-    className: "bt-input",
-    "aria-label": label,
-    placeholder,
-    value: draft[field],
-    spellCheck: false,
-    autoComplete: "off",
-    onChange: (event) => set(field, event.target.value)
-  });
-  return (0, import_react46.createElement)(
-    "div",
-    { className: "bt-provider-form" },
-    (0, import_react46.createElement)(
-      "div",
-      { className: "bt-provider-pair" },
-      input("provider", t("Provider ID"), t("Provider ID, e.g. my-gateway")),
-      input("name", t("Name"), t("Name (optional)"))
-    ),
-    (0, import_react46.createElement)(
-      "div",
-      { className: "bt-provider-pair" },
-      input("baseURL", t("Endpoint"), ENDPOINT_HINTS[draft.api] ?? "https://gateway.example/v1"),
-      (0, import_react46.createElement)(
-        "select",
-        { className: "bt-select", "aria-label": t("Protocol"), value: draft.api, onChange: (event) => set("api", event.target.value) },
-        view.protocols.map((api) => (0, import_react46.createElement)("option", { key: api, value: api }, PROTOCOL_NAMES[api] ?? api))
-      )
-    ),
-    (0, import_react46.createElement)("label", { className: "bt-q-field bt-secret-field" }, (0, import_react46.createElement)(KeyIcon), (0, import_react46.createElement)(MaskedInput, { value: draft.key, onChange: (value) => set("key", value), label: t("API key") })),
-    (0, import_react46.createElement)(
-      "div",
-      { className: "bt-secret-edit-block" },
-      (0, import_react46.createElement)(
-        "div",
-        { className: "bt-provider-models-head" },
-        (0, import_react46.createElement)("span", { className: "bt-secret-edit-label" }, t("Models")),
-        (0, import_react46.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", disabled: asking || draft.baseURL.trim() === "", onClick: fetchModels }, asking ? t("Asking…") : t("Fetch models"))
-      ),
-      found !== null && found.length === 0 ? (0, import_react46.createElement)("div", { className: "bt-set-hint" }, t("The endpoint lists no models. Enter their ids below.")) : null,
-      found !== null && found.length > 0 ? (0, import_react46.createElement)("div", { className: "bt-secret-bots bt-provider-found" }, found.map((model) => (0, import_react46.createElement)("button", {
-        key: model.id,
-        type: "button",
-        className: "bt-secret-bot",
-        "aria-pressed": picked.includes(model.id),
-        title: model.name && model.name !== model.id ? model.name : void 0,
-        onClick: () => toggle(model.id)
-      }, (0, import_react46.createElement)("code", null, model.id), picked.includes(model.id) ? (0, import_react46.createElement)(CheckIcon) : null))) : null,
-      input("typed", t("Model ids"), t("Model ids, separated by commas"))
-    ),
-    (0, import_react46.createElement)(FormActions, { onCancel: onDone, onAdd: add, ready })
-  );
-}
-function FormActions({ onCancel, onAdd, ready }) {
-  return (0, import_react46.createElement)(
-    "div",
-    { className: "bt-secret-row-actions" },
-    (0, import_react46.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: onCancel }, t("Cancel")),
-    (0, import_react46.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", disabled: !ready, onClick: onAdd }, t("Add"))
-  );
-}
-var PROVIDERS_CSS = `
-.bt-provider-id{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;color:var(--bt-ink-3)}
-.bt-provider .bt-set-hint[data-error]{color:var(--bt-danger)}
-.bt-provider-state{display:inline-flex;align-items:center;gap:6px;font-size:12px;line-height:16px;color:var(--bt-ink-2);white-space:nowrap}
-.bt-provider-state::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--bt-ink-3)}
-.bt-provider-state[data-state=set]::before{background:var(--bt-green)}
-.bt-provider-state[data-state=missing]{color:var(--bt-danger)}
-.bt-provider-state[data-state=missing]::before{background:var(--bt-danger)}
-.bt-provider .bt-secret-field{align-items:center;gap:8px}
-.bt-provider .bt-secret-field>svg,.bt-provider-form .bt-secret-field>svg{flex:none;color:var(--bt-ink-3)}
-.bt-provider-models{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
-.bt-provider-models .bt-tag{max-width:220px}
-.bt-provider-add{gap:12px;animation:bt-q-in ${SPRING_SHAPE.duration}ms ${SPRING_SHAPE.easing} backwards,bt-veil-in .2s ease-out backwards}
-.bt-provider-add .bt-seg{align-self:flex-start}
-.bt-provider-add .bt-seg button{flex:none;padding:0 14px;white-space:nowrap}
-.bt-provider-add .bt-seg button:disabled{opacity:.45;cursor:default}
-.bt-provider-form{display:flex;flex-direction:column;gap:10px}
-.bt-provider-form .bt-secret-field{min-height:36px;align-items:center;gap:8px}
-.bt-provider-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.bt-provider-models-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-/* Room for the pills' focus rings inside the scroll box; the margin keeps them in line with the fields. */
-.bt-provider-found{max-height:180px;overflow-y:auto;scrollbar-width:thin;padding:3px;margin:-3px}
-.bt-provider-found code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px}
-.bt-provider-found .bt-secret-bot{padding:0 10px}
-@media (prefers-reduced-motion:reduce){.bt-provider-add{animation:none}}
-`;
 
 // src/client/settings.js
 var import_react47 = require("react");
 var capitalize2 = (word) => word[0].toUpperCase() + word.slice(1);
-var SETTINGS_PAGES = [["general", "General"], ["models", "Models"], ["bots", "Bots"], ["groups", "Group chats"], ["connectors", "Connectors"], ["capabilities", "Capabilities"], ["browser", "Browser"], ["schedules", "Scheduled tasks"], ["usage", "Usage"], ["secrets", "Secrets"], ["feedback", "Feedback"], ["about", "About DS Bot"]];
+var SETTINGS_PAGES = [["general", "General"], ["models", "AI"], ["bots", "Bots"], ["groups", "Group chats"], ["connectors", "Connectors"], ["capabilities", "Capabilities"], ["browser", "Browser"], ["schedules", "Scheduled tasks"], ["usage", "Usage"], ["secrets", "Secrets"], ["feedback", "Feedback"], ["about", "About DS Bot"]];
 var PAGE_ICONS = { ...SETTINGS_ICONS, models: SlidersIcon, connectors: ConnectorIcon, capabilities: PlugIcon, browser: ConnectorIcon, schedules: ClockIcon, secrets: KeyIcon, feedback: FeedbackIcon, about: InfoIcon };
 function SetSection({ title, className = "", children }) {
   return (0, import_react47.createElement)("section", { className: `bt-set-section ${className}`.trim() }, (0, import_react47.createElement)("h3", null, title), (0, import_react47.createElement)("div", { className: "bt-set-card" }, children));
@@ -18499,7 +18229,7 @@ function SettingsDialog({ page, id, roster, actions, useUpdate, leaving = false 
           { key: pageKey, className: "bt-settings-scroll bt-settings-page", "data-move": last.current.move },
           errorLine,
           shown === "general" ? (0, import_react47.createElement)(GeneralPage, { roster, actions, run: run2 }) : null,
-          shown === "models" ? (0, import_react47.createElement)(ProvidersPage, { actions, run: run2, Section: SetSection }) : null,
+          shown === "models" ? (0, import_react47.createElement)(ProductAiSettings, { onClose: close }) : null,
           bot ? (0, import_react47.createElement)("div", { className: "bt-settings-form" }, (0, import_react47.createElement)(BotSettingsForm, { key: bot.id, bot, roster, actions, run: run2 })) : null,
           shown === "bots" && !bot ? (0, import_react47.createElement)(BotsPage, { roster, actions, run: run2 }) : null,
           room2 ? (0, import_react47.createElement)("div", { className: "bt-settings-form" }, (0, import_react47.createElement)(GroupSettingsForm, { key: room2.id, room: room2, roster, actions, run: run2 })) : null,

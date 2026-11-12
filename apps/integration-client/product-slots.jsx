@@ -6,6 +6,7 @@ import { WebPanelPinsLive } from './web-panel-pins-live.jsx'
 import { workspaceNavigation, PRODUCT_PANELS } from './workspace-navigation.mjs'
 import { requestWorkbenchView } from '../../.dsh-plugin/client/workbench-state.mjs'
 import { openIndependentChat } from './independent-chat-navigation.mjs'
+import { UiIcon } from './ui-icons.jsx'
 
 /** Native slot identities stay intact so their registration watchers cannot select their own replacement. */
 export function createProductSlots(slots,openPanel,productApi,TeamSidebar,client={}){
@@ -29,6 +30,7 @@ export function createProductSlots(slots,openPanel,productApi,TeamSidebar,client
         const sidebarAddon=useMemo(()=>function Footer({wide}){
           const go=id=>{props.actions?.setLeftDrawer?.(false);return openPanel(id)}
           return <>
+            <button type="button" className="bp-ai-sidebar" onClick={() => go(PRODUCT_PANELS.ai)} title="AI 提供方" aria-label="AI 提供方"><UiIcon name="spark" size={16}/>{wide ? 'AI 提供方' : null}</button>
             <ContactAttentionNavigation productApi={productApi} compact={!wide}
               onNavigate={input=>{workspaceNavigation(productApi).navigate(input);return go(PRODUCT_PANELS[input.section])}}
               onOpenAdvanced={()=>go('model-router-galgame')}/>

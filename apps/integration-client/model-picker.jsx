@@ -8,6 +8,7 @@ const labelOf = value => value?.label && value.label !== routeOf(value) ? value.
 
 /** OpenMausBot-style compact picker: provider rail, searchable models, explicit choice. */
 export function BotModelPicker({ models = [], value = '', onSelect, disabled = false, label = '默认模型', note = '此选择用于当前 Bot，保存配置后生效。' }) {
+  const providerName = provider => models.find(model => model.provider === provider)?.providerName ?? provider
   const selected = models.find(model => routeOf(model) === value)
   const providers = useMemo(() => [...new Set(models.map(model => model.provider))], [models])
   const [open, setOpen] = useState(false), [provider, setProvider] = useState(''), [query, setQuery] = useState('')
@@ -62,8 +63,8 @@ export function BotModelPicker({ models = [], value = '', onSelect, disabled = f
       if (open) { close(); return }
       setProvider(selected?.provider ?? ''); setQuery(''); setOpen(true)
     }}>
-      <span className="bp-model-provider-mark" aria-hidden="true">{(selected?.provider ?? '?').slice(0, 2).toUpperCase()}</span>
-      <span className="bp-model-current"><strong>{selected ? labelOf(selected) : value || '选择模型'}</strong><small>{selected?.provider ?? (value ? '当前模型暂不可用' : '选择提供商和模型')}</small></span>
+      <span className="bp-model-provider-mark" aria-hidden="true">{(selected ? providerName(selected.provider) : '?').slice(0, 2).toUpperCase()}</span>
+      <span className="bp-model-current"><strong>{selected ? labelOf(selected) : value || '选择模型'}</strong><small>{selected ? providerName(selected.provider) : (value ? '当前模型暂不可用' : '选择提供商和模型')}</small></span>
       <UiIcon name="chevron" size={15}/>
     </button>
     {!models.length && <p className="bp-model-picker-note">还没有可用模型，请先在模型设置中连接提供商。</p>}
@@ -71,10 +72,10 @@ export function BotModelPicker({ models = [], value = '', onSelect, disabled = f
     {open && createPortal(<div ref={panel} className="bp-model-popover" role="dialog" aria-modal="true" aria-label="选择 Bot 模型" style={placement ?? { visibility: 'hidden' }} onKeyDown={onKey}>
       <header className="bp-model-search"><UiIcon name="search" size={17}/><input ref={search} aria-label="搜索可用模型" placeholder="搜索模型或提供商…" value={query} onChange={event => setQuery(event.target.value)}/><button type="button" aria-label="关闭模型选择" onClick={() => close()}><UiIcon name="close" size={16}/></button></header>
       <div className="bp-model-options">
-        <nav className="bp-model-provider-rail" aria-label="模型提供商"><button type="button" aria-pressed={!provider} onClick={() => setProvider('')}>全部提供商</button>{providers.map(id => <button type="button" data-provider={id} aria-pressed={provider === id} key={id} onClick={() => setProvider(id)}><span aria-hidden="true">{id.slice(0, 2).toUpperCase()}</span>{id}</button>)}</nav>
-        <div className="bp-model-results" role="group" aria-label="可用模型"><p className="bp-model-results-caption">{provider || '全部模型'}<span>{filtered.length}</span></p>{filtered.length ? filtered.map(model => {
+        <nav className="bp-model-provider-rail" aria-label="模型提供商"><button type="button" aria-pressed={!provider} onClick={() => setProvider('')}>全部提供商</button>{providers.map(id => <button type="button" data-provider={id} aria-pressed={provider === id} key={id} onClick={() => setProvider(id)}><span aria-hidden="true">{providerName(id).slice(0, 2).toUpperCase()}</span>{providerName(id)}</button>)}</nav>
+        <div className="bp-model-results" role="group" aria-label="可用模型"><p className="bp-model-results-caption">{provider ? providerName(provider) : '全部模型'}<span>{filtered.length}</span></p>{filtered.length ? filtered.map(model => {
           const route = routeOf(model)
-          return <button key={route} data-model-choice={route} data-route={route} className="bp-model-option" type="button" aria-pressed={route === value} onClick={() => choose(model)}><span><strong>{labelOf(model)}</strong><small>{model.provider} · {model.model}</small></span>{route === value && <UiIcon name="check" size={16}/>}</button>
+          return <button key={route} data-model-choice={route} data-route={route} className="bp-model-option" type="button" aria-pressed={route === value} onClick={() => choose(model)}><span><strong>{labelOf(model)}</strong><small>{providerName(model.provider)} · {model.model}</small></span>{route === value && <UiIcon name="check" size={16}/>}</button>
         }) : <p className="bp-model-empty">没有匹配的模型，试试其他关键词或提供商。</p>}</div>
       </div>
       <footer>{note}</footer>

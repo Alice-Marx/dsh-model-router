@@ -185,8 +185,9 @@ export function FailureCell({ node, sessionId, useRoster, useTurnClock, actions 
   if (!current) return settled()
   const official = provider === OFFICIAL
   const canSignIn = typeof actions.signIn === 'function' && actions.canSignIn?.() === true
-  const keyHere = typeof actions.setProviderKey === 'function' && provider !== undefined
-  const keyElsewhere = official && actions.openHarnessOnboarding ? () => actions.openHarnessOnboarding(OFFICIAL) : manageModels(actions)
+  const independent = provider?.startsWith('bot-ai-') && typeof globalThis.__dshBotAiProvidersUi?.openSettings === 'function'
+  const keyHere = !independent && typeof actions.setProviderKey === 'function' && provider !== undefined
+  const keyElsewhere = independent ? () => globalThis.__dshBotAiProvidersUi.openSettings() : official && actions.openHarnessOnboarding ? () => actions.openHarnessOnboarding(OFFICIAL) : manageModels(actions)
   const viaAccount = () => {
     if (signedIn) { moveToAccount(); return }
     setJoining({ from: bot.model })

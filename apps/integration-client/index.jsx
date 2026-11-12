@@ -22,6 +22,9 @@ import { installWorkspaceAppearance } from './workspace-ui.jsx'
 import { IndependentChatPage } from './independent-chat-page.jsx'
 import { INDEPENDENT_CHAT_PANEL } from './independent-chat-navigation.mjs'
 import independentChatCss from './independent-chat.css'
+import { AiProvidersPage } from './ai-providers.jsx'
+import aiProvidersCss from './ai-providers.css'
+import { requestWorkbenchView } from '../../.dsh-plugin/client/workbench-state.mjs'
 
 export const inject = [...new Set([...dsInject, 'remote'])]
 export { ProductPage, ProductNavigation, PRODUCT_PANELS }
@@ -34,12 +37,23 @@ export async function apply(ctx) {
   const api = createProductApi()
   ctx.effect(() => installDesktopBridge(api, props => <DesktopPane {...props} />), 'bot-product: desktop bridge')
   const openPanel = id => ctx.layout.selectPanel(id)
+  ctx.effect(() => {
+    const previous = globalThis.__dshBotAiProvidersUi
+    const bridge = Object.freeze({
+      openSettings: () => openPanel(PRODUCT_PANELS.ai),
+      renderSettings: ({ onClose } = {}) => <AiProvidersPage productApi={api}
+        onOpenTools={() => { onClose?.(); requestWorkbenchView('tools'); openPanel('model-router-galgame') }}
+        onOpenBindings={() => { onClose?.(); openPanel(PRODUCT_PANELS.bindings) }}/>,
+    })
+    globalThis.__dshBotAiProvidersUi = bridge
+    return () => { if (globalThis.__dshBotAiProvidersUi === bridge) { if (previous) globalThis.__dshBotAiProvidersUi = previous; else delete globalThis.__dshBotAiProvidersUi } }
+  }, 'bot-product: AI settings')
   const slots = productSlots(ctx.slots, openPanel, api, { sessionBindingOf: id => ctx.sessions.binding(id), openSession: id => ctx.uiWorkspace.openSession(id) })
   const dsContext = new Proxy(ctx, { get: (target, key) => key === 'slots' ? slots : Reflect.get(target, key, target) })
   ctx.effect(() => {
     const previous = document.body.getAttribute('data-bot-product-ui')
     document.body.setAttribute('data-bot-product-ui', '1')
-    const style = document.createElement('style'); style.dataset.botProduct = '1'; style.textContent = `${css}\n${workspaceCss}\n${chatCss}\n${desktopCss}\n${usageCss}\n${notificationsCss}\n${dataCss}\n${botThreadsCss}\n${webPanelCss}\n${composerDraftCss}\n${botThreadHeaderCss}\n${independentChatCss}`; document.head.append(style)
+    const style = document.createElement('style'); style.dataset.botProduct = '1'; style.textContent = `${css}\n${workspaceCss}\n${chatCss}\n${desktopCss}\n${usageCss}\n${notificationsCss}\n${dataCss}\n${botThreadsCss}\n${webPanelCss}\n${composerDraftCss}\n${botThreadHeaderCss}\n${independentChatCss}\n${aiProvidersCss}`; document.head.append(style)
     const disposeAppearance = installWorkspaceAppearance(window)
     return () => {
       disposeAppearance()

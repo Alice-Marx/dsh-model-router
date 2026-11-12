@@ -19,6 +19,7 @@ import { openIndependentChat } from './independent-chat-navigation.mjs'
 import { requestWorkbenchView } from '../../.dsh-plugin/client/workbench-state.mjs'
 import { routingSubmissions, submissionCode } from './routing-submissions.mjs'
 import { WORKSPACE_SECTIONS, workspaceNavigation } from './workspace-navigation.mjs'
+import { AiProvidersPage } from './ai-providers.jsx'
 import { TeamDirectory, WorkspaceCommandPalette, WorkspaceHome, WorkspaceInbox, WorkspaceToolbar } from './workspace-ui.jsx'
 
 const NAV_EVENT = 'bot-product:navigation'
@@ -960,6 +961,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
       {section === 'library' && <Library snapshot={snapshot} dispatch={dispatch} busy={disabled} focus={focus} />}
       {section === 'data' && <DataPanel snapshot={snapshot} dispatch={dispatch} busy={disabled || !snapshot.availableActions?.includes('data.catalog')} focus={focus} transport={desktopTransport} scope={productApi} />}
       {section === 'usage' && <Usage snapshot={snapshot} dispatch={dispatch} busy={disabled} scope={productApi} openAdvanced={() => openPanel('model-router-galgame')} />}
+      {section === 'ai' && !snapshotStale && snapshotApi.current === productApi && <AiProvidersPage productApi={productApi} onOpenTools={() => { requestWorkbenchView('tools'); openPanel('model-router-galgame') }} onOpenBindings={() => onNavigate({ section: 'bindings' })}/>}
       <footer className="bp-page-footer bp-muted">上次同步 {new Date(snapshot.observedAt).toLocaleString('zh-CN')}</footer></>}
     </div></div>
   </main><WorkspaceCommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} snapshot={snapshotApi.current === productApi ? snapshot : null} onNavigate={onNavigate} openSession={snapshotApi.current === productApi ? openSession : undefined} /></div>

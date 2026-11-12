@@ -18,7 +18,7 @@ import { BrowserPage } from './browser-settings.js'
 import { SchedulesPage } from './schedules.js'
 import { FeedbackIcon, FeedbackPage } from './feedback.js'
 import { AboutPage } from './about.js'
-import { ProvidersPage } from './providers-page.js'
+import { ProductAiSettings } from './product-ai-settings.js'
 import { FolderMenu } from './folder-menu.js'
 import { ModelMenu } from './model-menu.js'
 import { t } from './i18n.js'
@@ -28,7 +28,7 @@ const capitalize = word => word[0].toUpperCase() + word.slice(1)
 // Settings dialog: a 198px page list beside the page. Bots and group chats each list
 // their members, and one opens on its own settings form. Usage widens the dialog.
 // Models is there wherever the host serves the model providers, beside DSH's own settings.
-const SETTINGS_PAGES = [['general', 'General'], ['models', 'Models'], ['bots', 'Bots'], ['groups', 'Group chats'], ['connectors', 'Connectors'], ['capabilities', 'Capabilities'], ['browser', 'Browser'], ['schedules', 'Scheduled tasks'], ['usage', 'Usage'], ['secrets', 'Secrets'], ['feedback', 'Feedback'], ['about', 'About DS Bot']]
+const SETTINGS_PAGES = [['general', 'General'], ['models', 'AI'], ['bots', 'Bots'], ['groups', 'Group chats'], ['connectors', 'Connectors'], ['capabilities', 'Capabilities'], ['browser', 'Browser'], ['schedules', 'Scheduled tasks'], ['usage', 'Usage'], ['secrets', 'Secrets'], ['feedback', 'Feedback'], ['about', 'About DS Bot']]
 const PAGE_ICONS = { ...SETTINGS_ICONS, models: SlidersIcon, connectors: ConnectorIcon, capabilities: PlugIcon, browser: ConnectorIcon, schedules: ClockIcon, secrets: KeyIcon, feedback: FeedbackIcon, about: InfoIcon }
 
 function SetSection({ title, className = '', children }) {
@@ -291,7 +291,7 @@ export function SettingsDialog({ page, id, roster, actions, useUpdate, leaving =
         shown === 'usage' ? null : h('div', { key: pageKey, className: 'bt-settings-scroll bt-settings-page', 'data-move': last.current.move },
           errorLine,
           shown === 'general' ? h(GeneralPage, { roster, actions, run }) : null,
-          shown === 'models' ? h(ProvidersPage, { actions, run, Section: SetSection }) : null,
+          shown === 'models' ? h(ProductAiSettings, { onClose: close }) : null,
           bot ? h('div', { className: 'bt-settings-form' }, h(BotSettingsForm, { key: bot.id, bot, roster, actions, run })) : null,
           shown === 'bots' && !bot ? h(BotsPage, { roster, actions, run }) : null,
           room ? h('div', { className: 'bt-settings-form' }, h(GroupSettingsForm, { key: room.id, room, roster, actions, run })) : null,

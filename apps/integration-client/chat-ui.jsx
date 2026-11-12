@@ -170,6 +170,6 @@ export function ConversationTools({ sessionId, bot, room, roster, actions, runni
     {isBot && canDetails && <button type="button" className="bp-conversation-computer" data-chat-command="desktop" aria-label={`查看 ${name} 的电脑`} title="电脑与桌面" disabled={action.pending} onClick={() => action.run('打开电脑', () => details(session, 'desktop'))}><UiIcon name="computer" size={18} /></button>}
     {buttons.length > 0 && <><div className="bp-conversation-shortcuts">{buttons.map(row => shortcut(row))}</div><details ref={overflow} className="bp-conversation-overflow"><summary title="更多聊天工具" aria-label="更多聊天工具"><UiIcon name="settings" size={18} /></summary><div className="bp-conversation-menu" role="group" aria-label="更多聊天工具">{buttons.map(row => shortcut(row, true))}</div></details></>}
     <ActionError error={action.error} onDismiss={action.dismiss} />
-    {settingsOpen && isBot && <BotSettingsDialog productApi={productApi} botId={botId} onClose={() => setSettingsOpen(false)} onOpenTools={typeof onOpenTools === 'function' ? async () => { await onOpenTools(); setSettingsOpen(false) } : undefined}/>}
+    {settingsOpen && isBot && <BotSettingsDialog productApi={productApi} botId={botId} onClose={() => setSettingsOpen(false)} onOpenAi={typeof onNavigate === 'function' ? () => { setSettingsOpen(false); onNavigate({ section: 'ai' }) } : undefined} onOpenTools={typeof onOpenTools === 'function' ? async () => { await onOpenTools(); setSettingsOpen(false) } : undefined}/>}
   </div>
 }

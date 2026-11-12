@@ -177,6 +177,8 @@
       "tests/product-independent-streaming.test.mjs",
       "tests/product-independent-funding.test.mjs",
       "tests/product-model-bounds*.test.mjs",
+      "tests/ai-providers*.test.mjs",
+      "tests/product-ai-providers.test.mjs",
       "tests/product-model-generation*.test.mjs",
       "tests/product-model-loop-frame*.test.mjs",
       "tests/product-loop-composition*.test.mjs",

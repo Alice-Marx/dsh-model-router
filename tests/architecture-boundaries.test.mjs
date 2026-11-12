@@ -6,8 +6,8 @@ import {fileURLToPath} from 'node:url'
 
 // Layering that only exists in a document is layering that erodes. Each rule
 // below is enforced over the real tree, and every exception is a frozen entry
-// with a reason: adding one fails, and removing the code fails too, so the list
-// can only shrink on purpose.
+// with a reason: adding an undeclared import fails, and removing a declared
+// import fails too. Changes require an exact entry and a stated reason.
 //
 // This is a ratchet, not a proof: it reads import specifiers, so a dynamic
 // import built from a variable is invisible to it.
@@ -102,6 +102,10 @@ const VENDOR_IMPORTERS_ALLOWED = [
   {file: 'packages/orchestration/src/migration-supporting-domains.mjs', spec: '../../../modules/bot-runtime/vendor/ds-bot/src/host/memory.js'},
   {file: 'packages/orchestration/src/migration-supporting-domains.mjs', spec: '../../../modules/bot-runtime/vendor/ds-bot/src/host/capabilities.js'},
   {file: 'tests/fixtures/migration-legacy-ds-writer.mjs', spec: '../../modules/bot-runtime/vendor/ds-bot/src/host/store.js'},
+  // Verification only: mount the actual pinned SettingsDialog and its shell
+  // styles to prove the product AI bridge works inside the native settings UI.
+  {file: 'tests/fixtures/ai-providers-preview.jsx', spec: '../../modules/bot-runtime/vendor/ds-bot/src/client/settings.js'},
+  {file: 'tests/fixtures/ai-providers-preview.jsx', spec: '../../modules/bot-runtime/vendor/ds-bot/src/client/styles.js'},
 ]
 
 test('boundaries: the vendored runtime is imported only where it is declared', () => {
