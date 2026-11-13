@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 // not through model tools. A UI test with a stub dispatch cannot see the difference, so this reads
 // the composition source and checks that every action the panels call is registered there.
 const source = readFileSync(new URL('../packages/orchestration/src/product-composition.mjs', import.meta.url), 'utf8')
-const panel = ['panels.jsx', 'tasks-panel.jsx', 'notifications-panel.jsx'].map(name => readFileSync(new URL(`../apps/integration-client/${name}`, import.meta.url), 'utf8')).join('\n')
+const panel = ['panels.jsx', 'tasks-panel.jsx', 'notifications-panel.jsx', 'official-tool-setup.jsx'].map(name => readFileSync(new URL(`../apps/integration-client/${name}`, import.meta.url), 'utf8')).join('\n')
 
 /** Action names the panels dispatch, in call order, de-duplicated. */
 const dispatched = [...new Set([...panel.matchAll(/dispatch\('([a-zA-Z][\w.]*)'/g)].map(match => match[1]))]
@@ -25,6 +25,14 @@ test('product channel: the routing actions exist on both doors', () => {
   // Same service behind the owner RPC, so a preview cannot disagree with a dispatch.
   assert.ok(source.includes("'botRouting.dispatch'"), 'dispatch action is registered')
   assert.ok(source.includes("'botRouting.status'"), 'the owner-only submission lookup is registered')
+})
+
+test('CLI configuration and repair pass both the read-model allowlist and the owner-only composition',()=>{
+ const door=readFileSync(new URL('../modules/bot-runtime/read-model.mjs',import.meta.url),'utf8')
+ const actions=JSON.parse(readFileSync(new URL('../contracts/product-action/v1/actions.json',import.meta.url),'utf8')).actions
+ for(const action of ['cliProviders.setup','cliProviders.repair']){
+  assert.ok(door.includes(`'${action}'`));assert.match(source,new RegExp(`'${action.replaceAll('.','\\.')}':\\s*ownerOnly\\(`));assert.equal(actions[action].caller,'owner')
+ }
 })
 
 test('product channel: a task action declares that it belongs to the owner console', () => {

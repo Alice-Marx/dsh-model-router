@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { createCodexEngine } from '../packages/bot-engines/src/codex-engine.mjs'
 import { createPiEngine } from '../packages/bot-engines/src/pi-engine.mjs'
+import { createStepEngine } from '../packages/bot-engines/src/step-engine.mjs'
 import { createFixtureNativeLauncher, nativeRpcFixtureEntry } from './helpers/native-rpc-fixture-launcher.mjs'
 import { Context } from '@deepseek-ai/cordis'
 import { LlmRuntime } from '@deepseek-ai/dsh-llm'
@@ -16,20 +17,21 @@ async function setup(driver, work, patch = {}) {
   const home = await mkdtemp(join(root, driver + '-')), workspace = join(home, 'workspace'); await mkdir(workspace)
   let revision = 1, launches = 0
   const settlements = [], admissions = [], deltas = []
-  const authority = { describe: () => ({ botId: 'fixture-bot', revision }), assertModel(_subject, provider, model) { assert.equal(provider, 'fixture'); assert.equal(model, driver === 'codex' ? 'gpt-fixture' : 'fixture/model') } }
+  const expectedModel=driver==='stepAgent'?'step/model':driver === 'codex' ? 'gpt-fixture' : 'fixture/model'
+  const authority = { describe: () => ({ botId: 'fixture-bot', revision }), assertModel(_subject, provider, model) { assert.equal(provider, 'fixture'); assert.equal(model, expectedModel) } }
   const options = { authority, subject: {}, binding: { taskId: 'task', attemptId: 'attempt', machineId: 'machine', workspaceId: 'workspace', location: 'local' },
     operationId: 'fixture-op', entry: await nativeRpcFixtureEntry(fixture), runtimeRoot: home, workspace,
-    model: { catalogProvider: 'fixture', catalogModel: driver === 'codex' ? 'gpt-fixture' : 'fixture/model' }, deadlineMs: 15_000,
+    model: { catalogProvider: 'fixture', catalogModel: expectedModel }, deadlineMs: 15_000,
     launcher: createFixtureNativeLauncher({ onLaunch() { launches++ } }),
     hooks: { onBeforeRequest: async value => { admissions.push(value) }, onSettle: async value => { settlements.push(value) } },
     ...patch }
-  const engine = await (driver === 'codex' ? createCodexEngine : createPiEngine)(options)
+  const engine = await (driver==='stepAgent'?createStepEngine:driver === 'codex' ? createCodexEngine : createPiEngine)(options)
   engine.events.on('delta', event => deltas.push(event))
   try { await work({ engine, settlements, admissions, deltas, workspace, launches: () => launches, revoke: () => revision++ }) }
   finally { await engine.stop() }
 }
 
-for (const driver of ['codex', 'pi']) test(`${driver}: two real native RPC turns retain one process and session with exact model and honest usage`, async () => {
+for (const driver of ['codex', 'pi', 'stepAgent']) test(`${driver}: two real native RPC turns retain one process and session with exact model and honest usage`, async () => {
   const original = process.env.NATIVE_CHAT_TEST_AMBIENT; process.env.NATIVE_CHAT_TEST_AMBIENT = 'must-not-be-inherited'
   try {
     await setup(driver, async ({ engine, settlements, deltas, launches, workspace }) => {
@@ -60,6 +62,16 @@ for (const driver of ['codex', 'pi']) test(`${driver}: duplicate submit does not
     assert.equal(admissions.length, 1); assert.equal(settlements.length, 1); assert.equal(launches(), 1)
     assert.equal(engine.snapshot().process, null)
   })
+})
+
+test('Step Code settled failure cannot be reported as a completed answer',async()=>{
+ await setup('stepAgent',async({engine,workspace})=>{
+  const result=await engine.submitTurn({text:'settled-failure'})
+  assert.equal(result.ok,false);assert.notEqual(result.outcome,'succeeded')
+  const launch=JSON.parse((await readFile(join(workspace,'native-fixture-evidence.jsonl'),'utf8')).split('\n')[0])
+  for(const flag of ['--no-tools','--no-extensions','--no-context-files','--no-approve','--include-live-events'])assert.ok(launch.argv.includes(flag))
+  assert.ok(launch.argv.includes('deny'))
+ })
 })
 
 test('native chat rejects extra authority, unsupported Host tools and unsafe credential environment before launch', async () => {

@@ -65,6 +65,7 @@ export function openCliProviders({ Database, file, credentials, drivers, inspect
     const driver = driverList().find(driver => driver.id === input.driver)
     if (!driver?.implemented || driver.available === false) fail('CLI_CHAT_DRIVER_UNAVAILABLE', driver?.reason ?? '此驱动尚不可用。')
     if (input.driver === 'deepseekAgent') deepseekWireModel(input.model)
+    if (input.driver === 'stepAgent' && !/^step\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(input.model)) fail('CLI_CHAT_INVALID', 'Step Code 模型 ID 请填写 step/模型名。')
     if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0 || typeof input.name !== 'string' || !input.name.trim() || input.name.length > 100 || /\p{Cc}/u.test(input.name)
       || typeof input.model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,239}$/.test(input.model) || typeof input.enabled !== 'boolean'
       || input.id !== undefined && !token(input.id) || input.clearCredential !== undefined && typeof input.clearCredential !== 'boolean'

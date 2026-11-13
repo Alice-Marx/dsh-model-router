@@ -5,6 +5,7 @@ export const CLI_CHAT_DRIVERS = Object.freeze([
   spec('claude', 'Claude Code', 'stream-json', 'claude', '单独保存 Claude 订阅的 OAuth 认证资料。'),
   spec('codex', 'Codex CLI', 'app-server', 'codex', '使用 ChatGPT 账号的 auth.json；不接受按量 OpenAI API Key。'),
   spec('pi', 'Pi', 'rpc', 'pi', '模型 ID 使用 provider/model；认证资料仅接受该提供方的 OAuth 账号。'),
+  spec('stepAgent', 'Step Code', 'rpc', 'step', '使用 Step Plan / Step Plan Oversea 的 OAuth 账号。模型 ID 使用 step/模型名；按量 API Key 请在模型 API 区配置。'),
   spec('museCode', 'Muse Code', 'msp', 'muse', '需要已安装、已核验的 Muse CLI 和自己的账号资料。'),
   spec('antigravityAgent', 'Google Gemini · Antigravity', 'acp', 'antigravity-acp', '使用官方 OAuth 登录资料，并同时核验 runtime 和 harness 文件。'),
   spec('grokAgent', 'Grok Build', 'acp', 'grok', '使用 Grok 账号的 .grok/auth.json；不接受 XAI_API_KEY。'),

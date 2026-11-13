@@ -5,6 +5,7 @@ import { createClaudeEngine } from './claude-engine.mjs'
 import { createAcpChatEngine } from './acp-chat-engine.mjs'
 import { createCodexEngine } from './codex-engine.mjs'
 import { createPiEngine } from './pi-engine.mjs'
+import { createStepEngine } from './step-engine.mjs'
 import { createMuseEngine } from './muse-engine.mjs'
 import { cliDriver } from './cli-driver-specs.mjs'
 import { normalizeCliCredential, provisionCliCredential } from './cli-credentials.mjs'
@@ -91,6 +92,7 @@ export async function mountConversationEngines({ llm, profiles = [], runtimeRoot
   const add = async profile => {
       if (profile.hostTools && typeof toolsFor !== 'function') fail('CONVERSATION_ENGINE_TOOL_HOST_REQUIRED')
       const createEngine = profile.driver === 'claude' ? createClaudeEngine : profile.driver === 'codex' ? createCodexEngine : profile.driver === 'pi' ? createPiEngine
+        : profile.driver === 'stepAgent' ? createStepEngine
         : profile.driver === 'museCode' ? createMuseEngine : options => createAcpChatEngine(profile, options)
       const engineFactory = async options => {
         const engine = await createEngine(options)

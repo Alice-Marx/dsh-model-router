@@ -15,12 +15,14 @@ export function CliChatProviders(props) {
   return <CliChatConnections key={key} {...props}/>
 }
 
-function CliChatConnections({ productApi, onOpenTools, onOpenBindings }) {
+function CliChatConnections({ productApi, onOpenTools, onOpenBindings, initialSetup, onSaved }) {
   const [view, setView] = useState(null), [draft, setDraft] = useState(null)
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState('')
   const scope = useRef({ live: false, requests: new Set(), loadEpoch: 0, operation: null, busy: false }), draftVersion = useRef(0)
+  const setupOpened=useRef(false)
   const mutationPending = busy === 'save' || busy === 'remove'
-  const drivers = view?.drivers ?? [], driver = drivers.find(item => item.id === draft?.driver)
+  const drivers = (view?.drivers ?? []).filter(item=>!initialSetup||item.id===initialSetup.driver), driver = drivers.find(item => item.id === draft?.driver)
+  const visibleProfiles=(view?.profiles??[]).filter(item=>!initialSetup||item.driver===initialSetup.driver)
   const call = async (action, payload, operation = false) => {
     const current = scope.current, controller = new AbortController()
     current.requests.add(controller)
@@ -48,6 +50,10 @@ function CliChatConnections({ productApi, onOpenTools, onOpenBindings }) {
       if (!current.live || epoch !== current.loadEpoch) return
       if (result?.schemaVersion !== 1 || !Array.isArray(result.drivers) || !Array.isArray(result.profiles)) throw new Error('此插件连接尚不支持 CLI 聊天配置，请更新完整插件。')
       setView(result); setError('')
+      if(initialSetup&&!setupOpened.current){setupOpened.current=true
+        const selected=result.drivers.find(item=>item.id===initialSetup.driver&&item.implemented&&item.available!==false)
+        if(selected&&!result.profiles.some(item=>item.driver===selected.id))setDraft({...freshDraft(selected),entry:entryView(initialSetup.entry)})
+      }
     } catch (failure) { if (current.live && epoch === current.loadEpoch) setError(errorText(failure)) }
   }
   useEffect(() => {
@@ -78,9 +84,9 @@ function CliChatConnections({ productApi, onOpenTools, onOpenBindings }) {
     setDraft({ ...profile, entry: entryView(profile.entry), credentialJson: '', clearCredential: false, importLocalAccount: false })
   }
   const add = () => {
-    const first = drivers.find(item => item.implemented && item.available !== false)
+    const first = drivers.find(item => item.implemented && item.available !== false && (!initialSetup||item.id===initialSetup.driver))
     if (!first) return
-    draftVersion.current++; setError(''); setNotice(''); setDraft(freshDraft(first))
+    draftVersion.current++; setError(''); setNotice(''); setDraft({...freshDraft(first),...(initialSetup?{entry:entryView(initialSetup.entry)}:{})})
   }
   const inspect = () => run('inspect', async () => {
     const version = draftVersion.current
@@ -99,7 +105,7 @@ function CliChatConnections({ productApi, onOpenTools, onOpenBindings }) {
     const result = await call('cliProviders.save', payload, true)
     if (!scope.current.live) return
     if (!result || typeof result.id !== 'string' || !Number.isSafeInteger(result.revision)) throw new Error('未取得保存回执，请刷新配置确认结果。')
-    draftVersion.current++; setDraft(null); setNotice(`CLI 聊天连接已保存。请在 Bot 模型设置中选择该路线，并使用${draft.driver === 'deepseekAgent' ? '按量 API' : '订阅'}资金配置。`); await load()
+    draftVersion.current++; setDraft(null); setNotice(`CLI 聊天连接已保存。请在 Bot 模型设置中选择该路线，并使用${draft.driver === 'deepseekAgent' ? '按量 API' : '订阅'}资金配置。`); await load();onSaved?.(result)
   })
   const remove = () => run('remove', async () => {
     const result = await call('cliProviders.remove', { id: draft.id, expectedRevision: draft.revision }, true)
@@ -122,15 +128,15 @@ function CliChatConnections({ productApi, onOpenTools, onOpenBindings }) {
         <label>聊天驱动<select aria-label="CLI 聊天驱动" value={draft.driver} disabled={mutationPending || Boolean(draft.id)} onChange={event => {
           const selected = drivers.find(item => item.id === event.target.value)
           if (selected) change(freshDraft(selected))
-        }}>{drivers.map(item => <option value={item.id} key={item.id} disabled={!item.implemented || item.available === false}>{item.name}{!item.implemented ? ' · 尚未适配' : item.available === false ? ' · 当前不可用' : ''}</option>)}</select></label>
+        }}>{drivers.filter(item=>!initialSetup||item.id===initialSetup.driver).map(item => <option value={item.id} key={item.id} disabled={!item.implemented || item.available === false}>{item.name}{!item.implemented ? ' · 尚未适配' : item.available === false ? ' · 当前不可用' : ''}</option>)}</select></label>
         <label>连接名称<input aria-label="CLI 连接名称" value={draft.name} maxLength={100} disabled={mutationPending} onChange={event => change({ name: event.target.value })}/></label>
-        <label className="bp-ai-wide">模型 ID<input aria-label="CLI 模型 ID" value={draft.model} maxLength={240} disabled={mutationPending} placeholder="填写此 CLI 账号中可用的模型 ID" onChange={event => change({ model: event.target.value })}/></label>
+        <label className="bp-ai-wide">模型 ID<input aria-label="CLI 模型 ID" value={draft.model} maxLength={240} disabled={mutationPending} placeholder={initialSetup?.modelHint??'填写此 CLI 账号中可用的模型 ID'} onChange={event => change({ model: event.target.value })}/></label>
         <label className="bp-ai-wide">可执行文件路径<input aria-label="CLI 可执行文件路径" value={draft.entry.executable} maxLength={4096} disabled={mutationPending} placeholder="完整路径，例如 C:\\Tools\\agent.exe" onChange={event => change({ entry: { ...draft.entry, executable: event.target.value } })}/></label>
         <label>CLI 版本<input aria-label="CLI 版本" value={draft.entry.version} maxLength={64} disabled={mutationPending} placeholder="填写 --version 显示的版本号" onChange={event => change({ entry: { ...draft.entry, version: event.target.value } })}/></label>
         <label>入口脚本（可选）<input aria-label="CLI 入口脚本" value={draft.entry.script} maxLength={4096} disabled={mutationPending} placeholder="Node / Python 入口脚本的完整路径" onChange={event => change({ entry: { ...draft.entry, script: event.target.value } })}/></label>
         {draft.driver === 'antigravityAgent' && <label className="bp-ai-wide">Antigravity harness 文件<input aria-label="Antigravity harness 文件" value={draft.entry.harness} maxLength={4096} disabled={mutationPending} placeholder="同版本发行包中 harness 文件的完整路径" onChange={event => change({ entry: { ...draft.entry, harness: event.target.value } })}/></label>}
       </div>
-      <div className="bp-cli-chat-entry-actions"><button type="button" disabled={Boolean(busy) || !draft.entry.executable.trim() || !draft.entry.version.trim()} onClick={inspect}>{busy === 'inspect' ? '正在核验版本…' : '核验安装入口'}</button>{onOpenTools && <button type="button" onClick={onOpenTools}>安装与登录<UiIcon name="arrow" size={14}/></button>}</div>
+      <div className="bp-cli-chat-entry-actions">{initialSetup?.entry&&<button type="button" disabled={Boolean(busy)} onClick={()=>change({entry:entryView(initialSetup.entry)})}>使用检测到的入口</button>}<button type="button" disabled={Boolean(busy) || !draft.entry.executable.trim() || !draft.entry.version.trim()} onClick={inspect}>{busy === 'inspect' ? '正在核验版本…' : '核验安装入口'}</button>{onOpenTools && <button type="button" onClick={onOpenTools}>安装与登录<UiIcon name="arrow" size={14}/></button>}</div>
       <p className="bp-ai-hint">脚本方式需要同时指定 Node 或 Python 的可执行文件及脚本路径。更改安装后，请重新核验并保存连接。</p>
       <h4 className="bp-cli-chat-auth-title">此连接的登录资料</h4>
       {driver?.credentialHint && <p className="bp-ai-hint">{driver.credentialHint}</p>}
@@ -143,15 +149,15 @@ function CliChatConnections({ productApi, onOpenTools, onOpenBindings }) {
       {draft.usedBy?.length > 0 && <p className="bp-ai-hint">正在使用：{draft.usedBy.map(bot => bot.name).join('、')}。删除前请先为这些 Bot 切换模型。</p>}
       <footer className="bp-ai-save">{draft.id && <button type="button" className="bp-ai-danger" disabled={Boolean(busy) || draft.usedBy?.length > 0} onClick={remove}>删除 CLI 连接</button>}<button type="button" className="bp-ai-primary" disabled={Boolean(busy)} onClick={save}>{busy === 'save' ? '正在保存…' : '保存 CLI 聊天连接'}</button></footer>
     </div> : view && <>
-      <div className="bp-ai-provider-list">{view.profiles.map(profile => <article className="bp-ai-provider" data-cli-profile={profile.id} key={profile.id}>
+      <div className="bp-ai-provider-list">{visibleProfiles.map(profile => <article className="bp-ai-provider" data-cli-profile={profile.id} key={profile.id}>
         <div className="bp-ai-mark" aria-hidden="true"><UiIcon name="bot" size={20}/></div><div className="bp-ai-copy"><h4>{profile.name}</h4>
           <p className="bp-ai-state" data-state={profile.state}><span/>{stateLabels[profile.state] ?? '状态未确认'}</p>
           <small>{drivers.find(item => item.id === profile.driver)?.name ?? profile.driver} · {profile.model}</small>
           <small>{profile.hostTools || drivers.find(item => item.id === profile.driver)?.hostTools ? '原生聊天 · 可使用已授权工具' : '原生文本聊天'}</small>
           {profile.reason && <small>{profile.reason}</small>}</div>
         <button type="button" onClick={() => edit(profile)}>管理 CLI 聊天</button>
-      </article>)}{view.profiles.length === 0 && <div className="bp-cli-chat-empty"><p>还没有 CLI 聊天连接</p><small>添加已适配的驱动、安装入口和独立账号，再为 Bot 选择这条聊天路线。</small></div>}</div>
-      {drivers.length > 0 && <p className="bp-ai-hint bp-cli-chat-availability">已适配 {drivers.filter(item => item.implemented).length} 种聊天驱动。驱动已适配仍需要本机安装、登录，并完成实际对话验证。</p>}
+      </article>)}{visibleProfiles.length === 0 && <div className="bp-cli-chat-empty"><p>还没有 CLI 聊天连接</p><small>添加已适配的驱动、安装入口和独立账号，再为 Bot 选择这条聊天路线。</small></div>}</div>
+      {!initialSetup&&drivers.length > 0 && <p className="bp-ai-hint bp-cli-chat-availability">已适配 {drivers.filter(item => item.implemented).length} 种聊天驱动。驱动已适配仍需要本机安装、登录，并完成实际对话验证。</p>}
       {view.profiles.length > 0 && onOpenBindings && <button type="button" className="bp-ai-bot-link" onClick={onOpenBindings}>为 Bot 选择 CLI 模型<UiIcon name="chevron" size={15}/></button>}
     </>}
   </section>

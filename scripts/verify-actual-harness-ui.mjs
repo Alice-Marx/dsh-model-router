@@ -13,12 +13,12 @@ const connection=JSON.parse(await readFile(join(run,'connection.private.json'),'
 assert.equal(new URL(connection.origin).hostname,'127.0.0.1')
 const output=join(base,'verified');await mkdir(output,{recursive:true})
 const browser=await chromium.launch({headless:true}),page=await browser.newPage({viewport:{width:1360,height:1000}})
-const errors=[],actions=[],checks=[],images=[],clientBundles=[],resources=[]
+const errors=[],actions=[],checks=[],images=[],clientBundles=[],resources=[],repairStarts=[]
 const expectedClient=await readFile(join(source,'.dsh-plugin/client.js'))
 const sanitized=text=>text.replace(/([?&]token=)[^\s&]+/g,'$1[REDACTED]')
 page.on('pageerror',e=>errors.push(sanitized(e.message)))
 page.on('request',request=>{
- if(request.method()==='POST'&&new URL(request.url()).pathname==='/api/bot-product')try{actions.push(JSON.parse(request.postData()).action)}catch{}
+ if(request.method()==='POST'&&new URL(request.url()).pathname==='/api/bot-product')try{const input=JSON.parse(request.postData());actions.push(input.action);if(input.action==='cliProviders.repair'&&input.payload?.operation==='start')repairStarts.push(input.payload.toolId)}catch{}
 })
 page.on('response',async response=>{
  const path=new URL(response.url()).pathname,type=response.headers()['content-type']??''
@@ -59,6 +59,30 @@ try{
  assert.ok(actions.includes('cliProviders.list'))
  await page.getByRole('button',{name:'Bot 设置',exact:true}).click();await page.locator('.bp-bot-settings-dialog .bb-root').waitFor()
  await capture('harness-bot-settings-light')
+ if(process.argv.includes('--cli-setup')){
+  for(const [toolId,driver,name]of [['stepcode','stepAgent','step'],['gemini','geminiAgent','gemini'],['dsh-tui','deepseekAgent','deepseek']]){
+   const row=page.locator(`.bp-bot-settings-dialog details[data-tool-id="${toolId}"]`)
+   if(!await row.evaluate(node=>node.open))await row.locator('summary').first().click()
+   await row.getByRole('button',{name:'配置与修复',exact:true}).click()
+   const setup=row.locator('.bp-cli-setup')
+   await setup.getByLabel('CLI 聊天驱动',{exact:true}).waitFor({timeout:35000})
+   assert.equal(await setup.getByLabel('CLI 聊天驱动',{exact:true}).inputValue(),driver)
+   assert.equal(await setup.getByLabel('CLI 模型 ID',{exact:true}).inputValue(),'')
+   assert.equal(await setup.getByLabel('CLI 登录资料 JSON',{exact:true}).inputValue(),'')
+   if(driver!=='deepseekAgent')assert.equal(await setup.getByLabel('使用本机已登录账号',{exact:true}).isChecked(),false)
+   if(driver==='deepseekAgent')assert.ok((await setup.innerText()).includes('按量'))
+   await setup.evaluate(node=>{const pane=node.closest('.bp-bot-settings-body');pane.scrollTop+=node.getBoundingClientRect().top-pane.getBoundingClientRect().top-8})
+   await noOverflow();await capture(`harness-${name}-setup-light`)
+   if(toolId==='stepcode'){
+    await page.setViewportSize({width:390,height:844});await noOverflow();await capture('harness-step-setup-phone')
+    await page.setViewportSize({width:1360,height:1000})
+   }
+   await setup.getByLabel('关闭工具配置').click()
+  }
+  assert.deepEqual(repairStarts,[])
+  assert.equal(actions.includes('cliProviders.save'),false)
+  checks.push('real Bot settings open Step, Gemini and DeepSeek configuration; detection starts no installer, imports no credentials and saves no chat/binding')
+ }
  await page.getByLabel('关闭 Bot 设置').click()
  checks.push('the production toolbar opens AI and the committed Main Bot settings through real owner actions')
  const appearance=page.locator('.bp-workspace-toolbar .bp-appearance')

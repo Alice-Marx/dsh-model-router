@@ -12,7 +12,7 @@ const files = Object.freeze({
   grokAgent: ['.grok/auth.json'], geminiAgent: ['.gemini/oauth_creds.json'], kimiAgent: ['.kimi-code/credentials/kimi-code.json'],
   droidAgent: ['.factory/auth.v2.file'], cursorAgent: [], opencodeGo: ['data/opencode/auth.json'], qwenAgent: ['.qwen/oauth_creds.json'],
   hermesAgent: ['.hermes/auth.json'], clineAgent: ['.cline/data/settings/providers.json'], copilotAgent: [], commandCodeAgent: ['.commandcode/auth.json'], customAcp: [],
-  antigravityAgent: ['.gemini/antigravity-acp/acp_token.json'], deepseekAgent: [],
+  antigravityAgent: ['.gemini/antigravity-acp/acp_token.json'], deepseekAgent: [], stepAgent: ['.stepcode/auth.json'],
 })
 const envNames = Object.freeze({ cursorAgent: ['CURSOR_AUTH_TOKEN'], copilotAgent: ['COPILOT_GITHUB_TOKEN'], deepseekAgent: ['DEEPSEEK_API_KEY'] })
 function inspect(value, driver, depth = 0) {
@@ -45,6 +45,14 @@ export function normalizeCliCredential(driverId, raw) {
         || !plain(settings.auth) || typeof settings.auth.accessToken !== 'string' || !settings.auth.accessToken
         || Object.keys(settings.auth).some(key => !['accessToken', 'refreshToken', 'expiresAt'].includes(key))) fail('Cline 只接受选定 OAuth 提供方的最小账号与模型配置。')
       inspect(settings.auth, driverId)
+    } else if (driverId === 'stepAgent') {
+      const account=content.step
+      const legacy=typeof content.apiKey==='string'&&content.apiKey&&['step_plan','step_plan_oversea'].includes(content.profile)
+        &&Object.keys(content).every(key=>['apiKey','profile','uid'].includes(key))
+      if(!legacy&&(Object.keys(content).length!==1 || !plain(account) || account.type!=='oauth'
+        || !['step_plan','step_plan_oversea'].includes(account.profile) || typeof account.access!=='string' || !account.access
+        || Object.keys(account).some(key=>!['type','access','refresh','expires','profile','uid'].includes(key)))) fail('Step Code 需要带 Step Plan 区域标记的 OAuth 账号；不接受按量平台账号。')
+      inspect(legacy?{access:content.apiKey,profile:content.profile,uid:content.uid}:account,driverId)
     } else inspect(content, driverId)
     if (driverId === 'opencodeGo' || driverId === 'pi') {
       if (Object.values(content).some(account => !plain(account) || account.type !== 'oauth')) fail('只接受明确标为 OAuth 的套餐账号。')
@@ -64,6 +72,7 @@ export function cliCredentialTemplate(driver) {
   if (driver === 'claude') account = { claudeAiOauth: { accessToken: 'YOUR_ACCOUNT_ACCESS_TOKEN', refreshToken: 'YOUR_ACCOUNT_REFRESH_TOKEN', expiresAt: 0 } }
   if (driver === 'codex') account = { tokens: { access_token: 'YOUR_ACCOUNT_ACCESS_TOKEN', refresh_token: 'YOUR_ACCOUNT_REFRESH_TOKEN', account_id: 'YOUR_ACCOUNT_ID' } }
   if (driver === 'opencodeGo' || driver === 'pi') account = { provider: { type: 'oauth', access: 'YOUR_ACCOUNT_ACCESS_TOKEN', refresh: 'YOUR_ACCOUNT_REFRESH_TOKEN', expires: 0 } }
+  if (driver === 'stepAgent') account = { step: { type: 'oauth', access: 'YOUR_ACCOUNT_ACCESS_TOKEN', refresh: 'YOUR_ACCOUNT_REFRESH_TOKEN', expires: 0, profile: 'step_plan' } }
   if (driver === 'clineAgent') account = { version: 1, lastUsedProvider: 'cline', providers: { cline: { settings: { provider: 'cline', model: 'YOUR_NATIVE_MODEL_ID', auth: { accessToken: 'YOUR_ACCOUNT_ACCESS_TOKEN' } } } } }
   return { schemaVersion: 1, billing: driver === 'customAcp' ? 'local' : driver === 'deepseekAgent' ? 'api' : 'subscription', files: path ? { [path]: account } : {},
     env: Object.fromEntries((envNames[driver] ?? []).map(name => [name, 'YOUR_ACCOUNT_TOKEN'])) }
@@ -78,9 +87,10 @@ export async function provisionCliCredential(home, profile, resolveSecret) {
   const env = { ...value.env }
   const directories = { grokAgent: ['GROK_HOME', '.grok'], kimiAgent: ['KIMI_CODE_HOME', '.kimi-code'],
     cursorAgent: ['CURSOR_CONFIG_DIR', '.cursor'], pi: ['PI_CODING_AGENT_DIR', '.pi/agent'],
-    hermesAgent: ['HERMES_HOME', '.hermes'], clineAgent: ['CLINE_DIR', '.cline'] }
+    hermesAgent: ['HERMES_HOME', '.hermes'], clineAgent: ['CLINE_DIR', '.cline'], stepAgent: ['STEP_CODING_AGENT_DIR', '.stepcode/agent'] }
   const directory = directories[profile.driver]
   if (directory) { env[directory[0]] = join(home, ...directory[1].split('/')); await mkdir(env[directory[0]], { recursive: true, mode: 0o700 }) }
+  if (profile.driver === 'stepAgent') env.STEPCODE_AUTH_PATH=join(home,'.stepcode/auth.json')
   if (profile.driver === 'geminiAgent') {
     const target = join(home, '.gemini/settings.json'); await mkdir(dirname(target), { recursive: true, mode: 0o700 })
     await writeFile(target, JSON.stringify({ security: { auth: { selectedType: 'oauth-personal' } }, tools: { approvalMode: 'default' } }), { mode: 0o600 })
@@ -110,5 +120,10 @@ export async function importCliAccount(driver, { userHome = homedir() } = {}) {
   let content
   try { const raw = await readFile(join(userHome, ...relative.split('/'))); if (raw.length > 128_000) fail('账号文件过大。'); content = JSON.parse(raw.toString('utf8')) }
   catch { fail('未找到可导入的账号文件，请先在官方 CLI 登录，或手动提供此连接的认证资料。') }
+  if(driver==='stepAgent') {
+    // Older Step builds stored the plan bearer token as apiKey. Preserve that
+    // vendor shape for Step's own migration; a platform profile cannot pass.
+    if(content.step) content={step:content.step}
+  }
   return normalizeCliCredential(driver, JSON.stringify({ schemaVersion: 1, billing: driver === 'customAcp' ? 'local' : 'subscription', files: { [paths[0]]: content }, env: {} }))
 }

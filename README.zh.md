@@ -14,7 +14,7 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.73.1 · Windows Remote Agent：0.1.3**
+**当前正式版：0.73.2 · Windows Remote Agent：0.1.3**
 
 以 Bot 联系人和聊天为主要入口，集中使用独立 AI 连接、多模型路线、团队委派、私有资料库、数据分析与自有 Windows 电脑。任务、通知和执行记录保存在工作空间中，Main Bot 可在已保存的多条模型路线之间调度。
 
@@ -58,7 +58,7 @@
 
 ## AI 连接与 Bot 设置
 
-**完整 Bot 版本在“设置 → AI”独立管理模型连接。** 可以为同一提供商保存多个连接，分别设置名称、账号、模型与容量，再在 Bot 的“模型与工具”中选择路线。通过“模型 API”“CLI 聊天”“官方工具”分类管理连接。在 Bot 设置中展开工具行，选择执行身份与方式后保存。聊天模型和官方执行工具分别授权。点击 Bot 联系人上方的“电脑”或“AI 连接”直接进入页面；页面顶部也可打开当前 Bot 的设置。
+**完整 Bot 版本在“设置 → AI”独立管理模型连接。** 可以为同一提供商保存多个连接，分别设置名称、账号、模型与容量，再在 Bot 的“模型与工具”中选择路线。通过“模型 API”“CLI 聊天”“官方工具”分类管理连接。在 Bot 设置中展开工具行，选择执行身份与方式后保存。聊天模型和官方执行工具分别授权。点击 Bot 联系人上方的“电脑”或“AI 连接”直接进入页面；页面顶部也可打开当前 Bot 的设置。对于仅终端交互的工具，展开后点“配置与修复”，可检测入口、修复安装并保存原生聊天连接。Step Code 使用 Step Plan 账号和 `step/模型名`；dsh-TUI 通过底层 DeepSeek ACP 连接，使用独立 API Key 和 API 资金配置。聊天连接不授予执行工具权限。
 
 | 连接类型 | 配置方式 | 用途 |
 | --- | --- | --- |
@@ -66,7 +66,7 @@
 | 原生 CLI 聊天 | 选择聊天驱动，核验可执行文件、版本和可选入口脚本，保存该连接自己的账号资料与模型 ID。 | 保留 CLI 原生会话，按 Bot 已保存路线与资金配置调用。 |
 | 官方执行工具 | 在 Bot 设置中选择“安装与登录”，完成厂商登录、重新检测并保存工具绑定。 | 为 Bot 授予受支持的文件、命令或其他执行能力，可搭配不同提供商的聊天模型。 |
 
-CLI 聊天驱动包括 Claude Code、Codex、Pi、Muse Code、Antigravity、Grok、Gemini、Kimi Code、Droid、Cursor、OpenCode、Qwen、Hermes、Cline、Copilot、Command Code、DeepSeek ACP 和自定义 ACP。实际可用性取决于本机安装、账号权限和模型访问；连接页面分别显示已配置、需要处理和已验证对话等状态。
+CLI 聊天驱动包括 Claude Code、Codex、Pi、Step Code、Muse Code、Antigravity、Grok、Gemini、Kimi Code、Droid、Cursor、OpenCode、Qwen、Hermes、Cline、Copilot、Command Code、DeepSeek ACP 和自定义 ACP。实际可用性取决于本机安装、账号权限和模型访问；连接页面分别显示已配置、需要处理和已验证对话等状态。
 
 Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资料。DeepSeek ACP 使用 dsh **0.2.2-rc.2** 的 Node 入口、独立 API Key 和 API 资金配置，每轮最多一次模型请求、最多4096输出 token。其他订阅 CLI 使用各自的套餐账号。安装与配置步骤见 [CLI 聊天连接指南](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/cli-chat-providers.md)。
 
@@ -77,8 +77,8 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.73.1`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.73.1`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.73.2`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.73.2`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 完整版本进入 Bot 工作区，在 **设置 → AI** 添加独立模型连接，再为 Bot 选择模型。纯路由版本从侧栏打开 **模型路由**，使用 Harness 已配置路线。
 
@@ -86,10 +86,10 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.73.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.73.2
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.73.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.73.2
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。

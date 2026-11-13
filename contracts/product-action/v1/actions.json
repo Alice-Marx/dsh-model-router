@@ -49,7 +49,13 @@
     "cliProviders.remove": {
       "caller": "owner"
     },
+    "cliProviders.repair": {
+      "caller": "owner"
+    },
     "cliProviders.save": {
+      "caller": "owner"
+    },
+    "cliProviders.setup": {
       "caller": "owner"
     },
     "data.cancel": {

@@ -1128,6 +1128,14 @@ export async function probeAllTools({ fresh = false, preferences: selectedPrefer
     { preferences: selectedPreferences, ...(fresh ? { cacheMs: 0 } : {}) })))
 }
 
+/** One owner-selected registry tool; does not inspect an account or run a task. */
+export async function probeOfficialTool(toolId, { fresh = false } = {}) {
+  const tool=getOfficialTool(toolId)
+  if(!tool)throw new Error('未知的官方工具。')
+  await ensureNpmPrefixOnPath()
+  return probeToolSafely(tool,defaultRunner,{preferences:installPreferences(),...(fresh?{cacheMs:0}:{})})
+}
+
 function probeBanner(attempt) {
   return `${attempt?.stdout ?? ''}\n${attempt?.stderr ?? ''}`.trim()
 }

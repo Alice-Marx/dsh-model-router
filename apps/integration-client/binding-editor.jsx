@@ -5,6 +5,7 @@ import bindingCss from './binding.css'
 import { BotModelPicker } from './model-picker.jsx'
 import { botModelStatus } from './bot-model-status.mjs'
 import { MainRouteEditor } from './main-route-editor.jsx'
+import { OfficialToolSetup, hasCliSetup } from './official-tool-setup.jsx'
 import { mainDefaultFields, mainRoutePayload, mainRouteProblems, startMainRoutes } from './main-route-model.mjs'
 import {
   accountFor, bindingProblems, buildBinding, defaultMode, EXECUTION_MODES, failureText, findModel, FUNDING_MODES,
@@ -36,6 +37,7 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostSc
   const [feedback, setFeedback] = useState(null)
   const [working, setWorking] = useState('')
   const [toolFeedback, setToolFeedback] = useState(null)
+  const [setupTool,setSetupTool]=useState(null)
   const seedKey = useRef('')
   const seedRevision = useRef(null)
   const saveToken = useRef(0)
@@ -306,6 +308,8 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostSc
               <span className="bb-pill" data-tone={tool.grant ? (tool.stale ? 'warn' : 'ok') : 'muted'}>{tool.stale ? '授权已失效' : tool.grant ? '已添加' : tool.available ? '添加' : '设置'}</span><UiIcon name="chevron" size={14}/></summary>
             <div className="bb-tool-body">
               <p className="bb-tool-readiness" data-state={tool.status}><strong>{TOOL_STATUS_LABEL[tool.status] ?? '暂不可用'}</strong>{tool.reason && <span>{tool.reason}</span>}</p>
+              {hostScope?.dispatch&&hasCliSetup(tool.toolId)&&<button type="button" className="bb-link" disabled={Boolean(busy||working)} onClick={()=>setSetupTool({connection,botId:bot?.id,toolId:tool.toolId})}>配置与修复</button>}
+              {setupTool?.connection===connection&&setupTool.botId===bot?.id&&setupTool.toolId===tool.toolId&&<OfficialToolSetup key={tool.toolId} productApi={hostScope} toolId={tool.toolId} onClose={()=>setSetupTool(null)} onConfigured={()=>void refreshTools()}/>}
               {tool.grantTools.length > 0 && <details className="bb-tool-permissions"><summary>工具权限明细</summary><p className="bb-note">{tool.grantTools.join('、')}</p></details>}
               {tool.identities.length > 0 && (
                 <div className="bb-list">{tool.identities.map(identity => {

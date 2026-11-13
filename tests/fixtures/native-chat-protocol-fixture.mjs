@@ -50,7 +50,7 @@ async function handle(frame) {
     const usage = text.includes('no-usage') ? undefined : { input: 10, output: 3, cacheRead: 2, cacheWrite: 0 }
     emit({ type: 'message_end', message: { role: 'assistant', provider: model.split('/')[0], model: model.split('/').slice(1).join('/'), stopReason: 'stop', usage } })
     emit({ type: 'turn_end', message: { stopReason: 'stop' } }); emit({ type: 'agent_end' })
-    if (!text.includes('unsettled')) emit({ type: 'agent_settled' })
+    if (!text.includes('unsettled')) emit({ type: 'agent_settled',...(text.includes('settled-failure')?{failure:{kind:'incomplete_turn'}}:{}) })
   }
   active = null
 }

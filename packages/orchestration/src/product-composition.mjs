@@ -17,6 +17,7 @@ import { CLI_CHAT_DRIVERS } from '../../bot-engines/src/cli-driver-specs.mjs'
 import { normalizeCliCredential, importCliAccount, cliCredentialTemplate } from '../../bot-engines/src/cli-credentials.mjs'
 import { inspectCliEntry } from '../../bot-engines/src/cli-entry.mjs'
 import { openCliProviders } from './cli-providers.mjs'
+import { createCliToolSetup } from './cli-tool-setup.mjs'
 import { projectHostLoopTextRequest, hostLoopRouteContext, hostSessionPersona } from '../../bot-engines/src/host-loop-request.mjs'
 import { independentSystemMessage } from './independent-message-wire.mjs'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -462,6 +463,7 @@ export function startBotProduct(ctx, options = {}) {
   let conversationEngines
   const engineCredentialStamps = new Map()
   const engineLeaseId = `native-${randomUUID()}`
+  const cliToolSetup=createCliToolSetup()
   let machines, nativeRemoteActions, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat, securePairing, desktopProxy, desktopHttp, aiProviders, cliProviders, embeddedComputer, embeddedComputerOpening
   const ensureEmbeddedComputer = () => {
     if (embeddedComputer) return Promise.resolve(embeddedComputer)
@@ -1412,6 +1414,8 @@ export function startBotProduct(ctx, options = {}) {
             'cliProviders.save': ownerOnly((payload, context) => cliProviders.save(payload, context)),
             'cliProviders.remove': ownerOnly((payload, context) => cliProviders.remove(payload, context)),
             'cliProviders.inspect': ownerOnly((payload, context) => cliProviders.inspect(payload, context)),
+            'cliProviders.setup': ownerOnly((payload, context) => cliToolSetup.inspect(payload, context)),
+            'cliProviders.repair': ownerOnly((payload, context) => cliToolSetup.repair(payload, context)),
             'aiProviders.suggestions': ownerOnly((payload, context) => aiProviders.suggestions(payload, context)),
             'aiProviders.save': ownerOnly((payload, context) => aiProviders.save(payload, context)),
             'aiProviders.remove': ownerOnly((payload, context) => aiProviders.remove(payload, context)),

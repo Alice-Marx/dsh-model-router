@@ -1,0 +1,11 @@
+html body[data-bot-product-ui] .bp-cli-setup { box-sizing:border-box; margin-top:12px; border:1px solid var(--bp-border,#dce3dc); border-radius:12px; padding:16px; background:var(--bp-bg,#f6f8f5); font-size:13px; }
+.bp-cli-setup > header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.bp-cli-setup h4 { margin:0; font-size:14px; }
+.bp-cli-setup-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.bp-cli-setup button { cursor:pointer; border:1px solid var(--bp-border,#dce3dc); padding:7px 10px; border-radius:8px; background:var(--bp-surface,#fff); color:inherit; }
+.bp-cli-setup button:disabled { cursor:default; opacity:.55; }
+.bp-cli-setup-error,.bp-cli-setup-warning { color:var(--bp-warning,#8a5510); }
+.bp-cli-setup .bp-cli-chat { margin-top:16px; }
+.bp-cli-setup .bp-ai-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.bp-cli-setup input,.bp-cli-setup select { max-width:100%; box-sizing:border-box; }
+@media(max-width:600px){ .bp-cli-setup { padding:12px; } .bp-cli-setup .bp-ai-fields { grid-template-columns:minmax(0,1fr); } }

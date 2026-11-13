@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { UiIcon } from './ui-icons.jsx'
 import { CliChatProviders } from './cli-chat-providers.jsx'
+import { OfficialToolSetup, hasCliSetup } from './official-tool-setup.jsx'
 import css from './ai-providers.css'
 
 const labels = { ready: '就绪 · 已验证调用', configured: '已配置', 'needs-key': '需要 API Key', 'needs-models': '需要添加模型', 'needs-attention': '需要处理', disabled: '已停用' }
@@ -18,6 +19,7 @@ export function AiProvidersPage(props) { const key = useMemo(() => ++nextScope, 
 
 function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
   const [section, setSection] = useState('api'), [visitedCli, setVisitedCli] = useState(false)
+  const [setupTool,setSetupTool]=useState(null)
   const [view, setView] = useState(null), [cli, setCli] = useState(null), [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [checkingCli, setCheckingCli] = useState(false), [cliNotice, setCliNotice] = useState(''), cliEpoch = useRef(0)
   const [draft, setDraft] = useState(null), [busy, setBusy] = useState(''), [suggestions, setSuggestions] = useState([]), [search, setSearch] = useState('')
@@ -136,7 +138,12 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
       <div className="bp-ai-section-head"><h3>官方 CLI 与应用</h3>{onOpenTools && <button type="button" onClick={onOpenTools}>安装与登录<UiIcon name="arrow" size={14}/></button>}</div>
       {checkingCli && <p className="bp-ai-hint" role="status">正在检查本机工具…</p>}
       {cliNotice && <p className="bp-ai-hint" role="status">{cliNotice}</p>}
-      <div className="bp-ai-provider-list">{(cli?.tools ?? []).map(tool => <article className="bp-ai-provider" key={tool.toolId ?? tool.id}><div className="bp-ai-mark" aria-hidden="true"><UiIcon name="bot" size={20}/></div><div className="bp-ai-copy"><h4>{tool.label ?? tool.toolId ?? tool.id}</h4><p className="bp-ai-state" data-state={tool.status === 'ready' ? 'ready' : 'configured'}><span/>{cliLabels[tool.status] ?? '尚未检测'}</p>{tool.reason && <small>{tool.reason}</small>}</div>{onOpenTools && <button type="button" onClick={onOpenTools}>管理</button>}</article>)}</div>
+      <div className="bp-ai-provider-list">{(cli?.tools ?? []).map(tool => <React.Fragment key={tool.toolId??tool.id}>
+        <article className="bp-ai-provider"><div className="bp-ai-mark" aria-hidden="true"><UiIcon name="bot" size={20}/></div><div className="bp-ai-copy"><h4>{tool.label ?? tool.toolId ?? tool.id}</h4><p className="bp-ai-state" data-state={tool.status === 'ready' ? 'ready' : 'configured'}><span/>{cliLabels[tool.status] ?? '尚未检测'}</p>{tool.reason && <small>{tool.reason}</small>}</div>
+          {hasCliSetup(tool.toolId??tool.id)?<button type="button" onClick={()=>setSetupTool(tool.toolId??tool.id)}>配置与修复</button>:onOpenTools&&<button type="button" onClick={onOpenTools}>管理</button>}
+        </article>
+        {setupTool===(tool.toolId??tool.id)&&<OfficialToolSetup productApi={productApi} toolId={setupTool} onClose={()=>setSetupTool(null)} onOpenTools={onOpenTools}/>}
+      </React.Fragment>)}</div>
       {!(cli?.tools?.length) && <p className="bp-ai-hint">点击“重新检查”读取本机 CLI 状态；安装与登录在官方工具面板完成。</p>}
       </div>
       {onOpenBindings && <button type="button" className="bp-ai-bot-link" onClick={onOpenBindings}>为 Bot 选择模型<UiIcon name="chevron" size={15}/></button>}

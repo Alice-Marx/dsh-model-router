@@ -10,6 +10,26 @@ import { normalizeCliCredential, provisionCliCredential, importCliAccount, cliCr
 const Database = createRequire(import.meta.url)('better-sqlite3'), owner = { kind: 'owner' }
 const secret = JSON.stringify({ schemaVersion: 1, billing: 'subscription', files: { 'auth.json': { tokens: { access_token: 'fixture-private-access', refresh_token: 'fixture-private-refresh' } } }, env: {} })
 const input = patch => ({ expectedRevision: 0, driver: 'codex', name: 'Native connection', model: 'gpt-fixture', enabled: true, entry: { executable: process.execPath, version: process.versions.node }, credentialJson: secret, ...patch })
+test('Step Plan credentials are isolated, reject platform billing and import only the selected Step account',async()=>{
+ const root=resolve('tmp/integration/cli-providers');await mkdir(root,{recursive:true});const home=await mkdtemp(join(root,'step-'))
+ const content={step:{type:'oauth',access:'fixture-step-plan',refresh:'fixture-refresh',expires:123,profile:'step_plan'}}
+ const raw=JSON.stringify({schemaVersion:1,billing:'subscription',files:{'.stepcode/auth.json':content},env:{}})
+ assert.equal(JSON.parse(normalizeCliCredential('stepAgent',raw)).files['.stepcode/auth.json'].step.access,'fixture-step-plan')
+ for(const profile of ['platform_cn','platform_oversea',undefined]){
+  const changed=JSON.parse(raw);changed.files['.stepcode/auth.json'].step.profile=profile
+  assert.throws(()=>normalizeCliCredential('stepAgent',JSON.stringify(changed)),{code:'CLI_CHAT_CREDENTIAL_INVALID'})
+ }
+ const provisioned=await provisionCliCredential(home,{driver:'stepAgent',credentialRef:'fixture'},async()=>raw)
+ assert.equal(provisioned.env.STEP_CODING_AGENT_DIR,join(home,'.stepcode/agent'));assert.equal(provisioned.env.STEPCODE_AUTH_PATH,join(home,'.stepcode/auth.json'))
+ assert.deepEqual(JSON.parse(await readFile(provisioned.env.STEPCODE_AUTH_PATH,'utf8')),content)
+ const importedHome=await mkdtemp(join(root,'step-import-'));await mkdir(join(importedHome,'.stepcode'))
+ await writeFile(join(importedHome,'.stepcode/auth.json'),JSON.stringify({...content,other:{type:'oauth',access:'must-not-copy'}}))
+ const imported=JSON.parse(await importCliAccount('stepAgent',{userHome:importedHome}));assert.deepEqual(imported.files['.stepcode/auth.json'],content)
+ await writeFile(join(importedHome,'.stepcode/auth.json'),JSON.stringify({apiKey:'legacy-plan-bearer',profile:'step_plan_oversea'}))
+ assert.match(await importCliAccount('stepAgent',{userHome:importedHome}),/legacy-plan-bearer/)
+ await writeFile(join(importedHome,'.stepcode/auth.json'),JSON.stringify({apiKey:'platform-key',profile:'platform_cn'}))
+ await assert.rejects(importCliAccount('stepAgent',{userHome:importedHome}),{code:'CLI_CHAT_CREDENTIAL_INVALID'})
+})
 async function setup(run, overrides = {}) {
   const base = resolve('tmp/integration/cli-providers'); await mkdir(base, { recursive: true }); const home = await mkdtemp(join(base, 'case-')), file = join(home, 'sqlite.db'), values = new Map()
   const credentials = { async set(key, value) { values.set(key, value) }, async resolve(key) { return values.has(key) ? { value: values.get(key) } : undefined }, async describe(key) { return { configured: values.has(key) } }, async unset(key) { values.delete(key) } }

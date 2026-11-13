@@ -479,16 +479,17 @@ export const OFFICIAL_TOOLS = Object.freeze([
     purpose: 'DeepSeek Harness 的终端 TUI：像素鲸鱼、实时状态、时间回退、会话管理，直接复用 DSH 的模型、工具与会话。',
     package: '@deepseek-harness-tui/dsh-tui',
     manager: 'npm',
-    installArgs: ['install', '-g', '@deepseek-harness-tui/dsh-tui@latest', '--registry=https://registry.npmjs.org/'],
+    installArgs: ['install', '-g', '@deepseek-harness-tui/dsh-tui@latest', '@deepseek-ai/dsh@0.2.2-rc.2', '--registry=https://registry.npmjs.org/'],
     uninstallArgs: ['uninstall', '-g', '@deepseek-harness-tui/dsh-tui'],
     probeExecutables: ['dsh-tui', 'dst'],
     probeNote: '包同时提供 dsh-tui 与 dst 两个命令，二者指向同一入口；需要 Node 22.19 或 24 以上。',
-    // No headless mode: the Host drives it through the managed terminal instead.
+    // TUI and its automation wrapper remain separate from the pinned DeepSeek
+    // ACP chat route. Install its official Node prerequisite in the same prefix.
     tuiPrompt: true,
     providerHints: ['deepseek'],
     installMethods: Object.freeze([
-      packageManagerMethod('npm', 'npm', 'npm', '@deepseek-harness-tui/dsh-tui@latest'),
-      packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@deepseek-harness-tui/dsh-tui@latest'),
+      packageManagerMethod('npm', 'npm', 'npm', '@deepseek-harness-tui/dsh-tui@latest', { extraArgs: ['@deepseek-ai/dsh@0.2.2-rc.2'] }),
+      packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@deepseek-harness-tui/dsh-tui@latest', { extraArgs: ['@deepseek-ai/dsh@0.2.2-rc.2'] }),
     ]),
   }),
 ])
