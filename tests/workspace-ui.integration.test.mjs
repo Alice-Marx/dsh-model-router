@@ -7,12 +7,32 @@ import { pathToFileURL } from 'node:url'
 import React, { act } from 'react'
 import { JSDOM } from 'jsdom'
 import { build } from 'esbuild'
+import { chatSettingsFixture } from './fixtures/chat-settings-data.mjs'
 
 const parent = resolve('tmp/integration/workspace-upgrade'); await mkdir(parent, { recursive: true })
 const directory = await mkdtemp(join(parent, 'components-')), output = join(directory, 'workspace.mjs')
 const bundle = await build({ stdin: { contents: "export * from './apps/integration-client/panels.jsx'; export * from './apps/integration-client/workspace-ui.jsx'; export * from './apps/integration-client/workspace-navigation.mjs'", resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, platform: 'node', format: 'esm', external: ['react', 'react-dom', 'react-dom/*'], write: false , loader: { '.css': 'text' } })
 await writeFile(output, bundle.outputFiles[0].contents)
 const { ProductPage, Tasks, workspaceNavigation, workspaceAppearance, installWorkspaceAppearance } = await import(pathToFileURL(output))
+
+test('the registered product page owns its compact toolbar and opens only the current Host committed Bot settings',async()=>{
+  await withDom(async({render,container,click})=>{
+    const snapshot=sample();snapshot.mainBotId='a';snapshot.availableActions=['binding.inspect']
+    const binding=chatSettingsFixture(snapshot.bots[0]),opened=[]
+    const api={snapshot:async()=>snapshot,dispatch:binding.dispatch}
+    await render(React.createElement(ProductPage,{section:'machines',productApi:api,openPanel:id=>opened.push(id)}))
+    assert.equal(container.querySelectorAll('h1').length,1)
+    assert.equal(container.querySelector('h1').textContent,'电脑')
+    assert.equal(container.querySelectorAll('.bp-page-header,.preview-shell').length,0)
+    assert.equal(binding.calls.length,0,'opening a product page cannot change a binding')
+    await click('Bot 设置')
+    assert.ok(document.querySelector('.bp-bot-settings-dialog'))
+    assert.ok(binding.calls.every(call=>call.action==='binding.inspect'&&call.payload.botId==='a'))
+    await render(React.createElement(ProductPage,{section:'machines',productApi:{snapshot:async()=>snapshot,dispatch:async()=>assert.fail('a stale dialog must not call a replacement Host')},openPanel:id=>opened.push(id)}))
+    assert.equal(document.querySelector('.bp-bot-settings-dialog'),null)
+    assert.ok(binding.calls.every(call=>call.action==='binding.inspect'))
+  })
+})
 
 const sample = () => ({ schemaVersion: 1, observedAt: '2026-11-07T12:00:00Z', readOnly: null,
   bots: [{ id: 'a', name: '研究伙伴', main: true, role: '查找证据', model: 'fixture/exact', sessionId: 'session-a' }, { id: 'b', name: '写作伙伴', role: '整理文字', model: 'fixture/exact', sessionId: 'session-b' }],

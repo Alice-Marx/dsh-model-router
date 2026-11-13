@@ -46,7 +46,7 @@ async function withDom(work) {
   const unmount = async () => { if (root) { const old = root; root = null; await act(async () => old.unmount()) } }
   const remount = async api => { root = createRoot(container); await mount(api) }
   const click = async text => {
-    const button = [...container.querySelectorAll('button')].find(item => item.textContent === text)
+    const button = [...container.querySelectorAll('button')].find(item => item.textContent === text || item.getAttribute('aria-label') === (text === '刷新' ? '刷新当前页面' : text))
     assert.ok(button, `button not found: ${text}`)
     await act(async () => button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })))
   }

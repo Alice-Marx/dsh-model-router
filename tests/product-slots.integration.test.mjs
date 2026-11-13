@@ -9,9 +9,9 @@ import { JSDOM } from 'jsdom'
 
 const parent=resolve('tmp/integration/product-slots');await mkdir(parent,{recursive:true})
 const directory=await mkdtemp(join(parent,'case-'))
-const bundle=await build({entryPoints:['apps/integration-client/product-slots.jsx'],bundle:true,platform:'node',format:'esm',external:['react','react-dom'],write:false,loader:{'.css':'text'}})
+const bundle=await build({stdin:{contents:"export {createProductSlots} from './apps/integration-client/product-slots.jsx';export {workspaceNavigation} from './apps/integration-client/workspace-navigation.mjs'",resolveDir:resolve('.')},bundle:true,platform:'node',format:'esm',external:['react','react-dom'],write:false,loader:{'.css':'text'}})
 const file=join(directory,'slots.mjs');await writeFile(file,bundle.outputFiles[0].contents)
-const {createProductSlots}=await import(pathToFileURL(file))
+const {createProductSlots,workspaceNavigation}=await import(pathToFileURL(file))
 
 test('header injection preserves the exact component, native navigation store and action identity while adding conversation context',()=>{
   const records=[],api={},opened=[],nativeActions={showDetails(){}},hooks={},store={value:'native-navigation'}
@@ -38,13 +38,23 @@ test('native contacts remain in place and only their supporting footer is replac
   const {createRoot}=await import('react-dom/client'),root=createRoot(document.getElementById('root')),records=[],opened=[],drawers=[]
   t.after(async()=>{await act(()=>root.unmount());dom.window.close();for(const [key,value]of Object.entries(previous)){if(value)Object.defineProperty(globalThis,key,value);else delete globalThis[key]}})
   const Team=({actions})=>React.createElement('aside',null,React.createElement('div',{className:'native-contacts'},'Native Bot list'),React.createElement(actions.sidebarAddon,{wide:true}))
-  const proxy=createProductSlots({register:(options,component)=>records.push({options,component})},id=>opened.push(id),{},Team)
+  const api={}
+  const proxy=createProductSlots({register:(options,component)=>records.push({options,component})},id=>opened.push(id),api,Team)
   proxy.register({name:'sidebar.workspaces'},Team)
   assert.equal(records[0].component.dsBotTeamSidebar,Team)
-  await act(()=>root.render(React.createElement(records[0].component,{actions:{setLeftDrawer:value=>drawers.push(value)}})))
+  const actions={setLeftDrawer:value=>drawers.push(value)}
+  const roster={byId:{'worker-session':{id:'worker-a'}},threadsById:{'worker-thread':{botId:'worker-b'}}}
+  const props=sessionId=>({actions,useSessions:selector=>selector({byId:{[sessionId]:{id:sessionId,retainedBy:{mainView:1}}}}),useRoster:selector=>selector(roster)})
+  await act(()=>root.render(React.createElement(records[0].component,props('worker-session'))))
   assert.ok(document.querySelector('.native-contacts'))
   assert.equal(document.querySelectorAll('.bp-contact-nav').length,1);assert.equal(document.querySelectorAll('.bp-nav').length,0)
   const button=label=>[...document.querySelectorAll('button')].find(value=>value.textContent===label)
+  await act(async()=>{button('电脑').click();await new Promise(setImmediate)});assert.equal(opened.at(-1),'bot-product-machines');assert.deepEqual(drawers,[false])
+  assert.equal(workspaceNavigation(api).getSnapshot().botId,'worker-a')
+  await act(()=>root.render(React.createElement(records[0].component,props('worker-thread'))))
+  await act(async()=>{button('AI 连接').click();await new Promise(setImmediate)});assert.equal(opened.at(-1),'bot-product-ai')
+  assert.equal(workspaceNavigation(api).getSnapshot().botId,'worker-b')
+  opened.length=0;drawers.length=0
   await act(async()=>{button('待办').click();await new Promise(setImmediate)});assert.deepEqual(opened,['bot-product-inbox']);assert.deepEqual(drawers,[false])
   await act(async()=>{button('高级工作台').click();await new Promise(setImmediate)});assert.equal(opened.at(-1),'model-router-galgame')
 })

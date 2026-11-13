@@ -66,10 +66,15 @@ export function AppearanceControls() {
   </details>
 }
 
-export function WorkspaceToolbar({ title, onHome, onSearch }) {
-  return <div className="bp-workspace-bar"><div className="bp-workspace-location"><button type="button" className="bp-workspace-brand" onClick={onHome} aria-label="返回工作空间总览"><UiIcon name="spark" size={18} /><span>DSH WORKSPACE</span></button><span className="bp-workspace-divider" aria-hidden="true">/</span><span className="bp-workspace-current">{title}</span></div>
-    <div className="bp-workspace-bar-actions"><button type="button" className="bp-workspace-search" onClick={onSearch} aria-label="搜索工作空间"><UiIcon name="search" size={16} /><span>查找任务、伙伴、电脑</span><kbd>Ctrl K</kbd></button><AppearanceControls /></div>
-  </div>
+export function WorkspaceToolbar({ title, section, onHome, onSearch, onNavigate, onOpenBotSettings, botName, onRefresh, refreshing, syncing, stale }) {
+  return <header className="bp-workspace-bar bp-workspace-toolbar"><div className="bp-workspace-location"><button type="button" className="bp-workspace-home" onClick={onHome} aria-label="返回工作空间总览" title="工作空间总览"><UiIcon name="home" size={17}/></button><h1 className="bp-workspace-current">{title}</h1></div>
+    <div className="bp-workspace-bar-actions">
+      {onNavigate && <nav className="bp-toolbar-destinations" aria-label="工作空间快捷入口"><button type="button" aria-current={section === 'machines' ? 'page' : undefined} onClick={() => onNavigate('machines')}><UiIcon name="computer" size={16}/><span>电脑</span></button><button type="button" aria-current={section === 'ai' ? 'page' : undefined} onClick={() => onNavigate('ai')}><UiIcon name="spark" size={16}/><span>AI 连接</span></button></nav>}
+      {onOpenBotSettings && <button type="button" className="bp-toolbar-bot-settings" onClick={onOpenBotSettings} title={`${botName ?? 'Bot'} 的模型与工具`}><UiIcon name="settings" size={16}/><span>Bot 设置</span></button>}
+      {onRefresh && <button type="button" className="bp-toolbar-refresh" disabled={refreshing} onClick={onRefresh} aria-label="刷新当前页面" title={stale ? '状态待更新，点击刷新' : syncing ? '正在同步' : '刷新当前页面'}><UiIcon name="refresh" size={16} className={refreshing ? 'bp-spinning' : ''}/><span className="bp-toolbar-sync" data-state={stale ? 'stale' : syncing ? 'loading' : 'ready'} aria-label={stale ? '状态待更新' : syncing ? '正在同步' : '已同步'}/></button>}
+      <button type="button" className="bp-workspace-search" onClick={onSearch} aria-label="搜索工作空间" title="搜索工作空间 · Ctrl K"><UiIcon name="search" size={16}/></button><AppearanceControls/>
+    </div>
+  </header>
 }
 
 export function WorkspaceCommandPalette({ open, onClose, snapshot, onNavigate, openSession }) {

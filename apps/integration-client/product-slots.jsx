@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useRef } from 'react'
 import { withComposerDraft } from './composer-draft-host.jsx'
 import { ConversationTools } from './chat-ui.jsx'
 import { ContactAttentionNavigation } from './contact-attention.jsx'
@@ -6,7 +6,9 @@ import { WebPanelPinsLive } from './web-panel-pins-live.jsx'
 import { workspaceNavigation, PRODUCT_PANELS } from './workspace-navigation.mjs'
 import { requestWorkbenchView } from '../../.dsh-plugin/client/workbench-state.mjs'
 import { openIndependentChat } from './independent-chat-navigation.mjs'
-import { UiIcon } from './ui-icons.jsx'
+import { WorkspaceShortcuts } from './workspace-shortcuts.jsx'
+
+const emptySource = () => null
 
 /** Native slot identities stay intact so their registration watchers cannot select their own replacement. */
 export function createProductSlots(slots,openPanel,productApi,TeamSidebar,client={}){
@@ -27,10 +29,16 @@ export function createProductSlots(slots,openPanel,productApi,TeamSidebar,client
       }
       if(component!==TeamSidebar)return target.register(options,component)
       const Sidebar=props=>{
+        // Read the native session/roster sources; this address only selects the
+        // settings destination. Host actions still enforce the saved grants.
+        const useSessions=props.useSessions??emptySource,useRoster=props.useRoster??emptySource
+        const sessionId=useSessions(list=>Object.values(list.byId??{}).find(row=>(row?.retainedBy?.mainView??0)>0)?.id??null)
+        const botId=useRoster(roster=>roster.threadsById?.[sessionId]?.botId??roster.byId?.[sessionId]?.id??null)
+        const focusedBot=useRef(null);focusedBot.current=botId
         const sidebarAddon=useMemo(()=>function Footer({wide}){
           const go=id=>{props.actions?.setLeftDrawer?.(false);return openPanel(id)}
           return <>
-            <button type="button" className="bp-ai-sidebar" onClick={() => go(PRODUCT_PANELS.ai)} title="AI 提供方" aria-label="AI 提供方"><UiIcon name="spark" size={16}/>{wide ? 'AI 提供方' : null}</button>
+            <WorkspaceShortcuts compact={!wide} onNavigate={section => {workspaceNavigation(productApi).navigate({section,botId:focusedBot.current});return go(PRODUCT_PANELS[section])}}/>
             <ContactAttentionNavigation productApi={productApi} compact={!wide}
               onNavigate={input=>{workspaceNavigation(productApi).navigate(input);return go(PRODUCT_PANELS[input.section])}}
               onOpenAdvanced={()=>go('model-router-galgame')}/>

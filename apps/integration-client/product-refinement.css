@@ -20,6 +20,31 @@ html body[data-bot-product-ui][data-ds-dark-theme]:not([data-bp-appearance=light
 }
 html body[data-bot-product-ui] [hidden] { display: none !important; }
 html body[data-bot-product-ui] .bp-page { line-height: 1.6; }
+.bp-workspace > .bp-page { padding: 28px; }
+.bp-workspace > .bp-page > .bp-page-inner { max-width: 1050px; }
+html body[data-bot-product-ui] .bp-workspace-toolbar { padding: 0 28px; height: 66px; background: var(--bp-bg); gap: 12px; }
+html body[data-bot-product-ui] .bp-workspace-toolbar .bp-workspace-location { gap: 10px; }
+html body[data-bot-product-ui] .bp-workspace-toolbar .bp-workspace-current { margin: 0; font-size: 16px; font-weight: 600; white-space: nowrap; }
+html body[data-bot-product-ui] .bp-workspace-toolbar .bp-workspace-bar-actions { gap: 5px; }
+html body[data-bot-product-ui] .bp-workspace-toolbar button { display: inline-flex; align-items: center; justify-content: center; min-width: 33px; min-height: 33px; gap: 7px; border: 0; border-radius: 22px; padding: 7px 11px; color: var(--bp-ink); background: var(--bp-subtle); cursor: pointer; font-size: 12px; }
+html body[data-bot-product-ui] .bp-workspace-toolbar button:hover { background: var(--bp-hover); }
+html body[data-bot-product-ui] .bp-workspace-toolbar .bp-workspace-home { padding: 7px; background: transparent; color: var(--bp-muted); }
+.bp-toolbar-destinations { display: flex; gap: 5px; }
+html body[data-bot-product-ui] .bp-toolbar-destinations button[aria-current=page] { background: var(--bp-accent-soft); color: var(--bp-focus); }
+.bp-toolbar-sync { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #25865e; }
+.bp-toolbar-sync[data-state=stale] { background: var(--bp-warning); }
+.bp-toolbar-sync[data-state=loading] { background: var(--bp-quiet); }
+html body[data-bot-product-ui] .bp-workspace-toolbar .bp-appearance > summary { background: var(--bp-subtle); border-radius: 22px; width: 33px; min-height: 33px; }
+.bp-workspace-shortcuts { display: flex; gap: 5px; padding: 6px 0 10px; }
+html body[data-bot-product-ui] .bp-workspace-shortcuts > button { display: inline-flex; align-items: center; justify-content: center; flex: 1; gap: 7px; min-height: 34px; padding: 7px; border: 0; border-radius: 10px; background: var(--bp-subtle); color: var(--bp-ink); font: inherit; font-size: 12px; cursor: pointer; }
+.bp-workspace-shortcuts-compact { flex-direction: column; }
+.bp-workspace-shortcuts > button:hover { background: var(--bp-hover); }
+/* Host user-message renderers and DS Bot's replacement use one pair of colors. */
+body[data-bot-product-ui] .bt-ubody,
+body[data-bot-product-ui] :is([class*="_userRow"], [data-chat-flow-kind=question-reply], [data-chat-flow-kind=command-input]) [class*="_bubble"] { background: var(--bp-chat-user) !important; color: var(--bp-chat-on-user) !important; }
+body[data-bot-product-ui] :is([class*="_userRow"], [data-chat-flow-kind=question-reply], [data-chat-flow-kind=command-input]) [class*="_bubble"] :is([class*="_markdown"], p, a) { color: inherit !important; }
+body[data-bot-product-ui][data-bp-user-bubbles=neutral] .bt-ubody,
+body[data-bot-product-ui][data-bp-user-bubbles=neutral] :is([class*="_userRow"], [data-chat-flow-kind=question-reply], [data-chat-flow-kind=command-input]) [class*="_bubble"] { background: var(--bp-chat-inset) !important; color: var(--bp-chat-ink) !important; }
 html body[data-bot-product-ui] .bp-card { border-radius: 15px; box-shadow: none; }
 html body[data-bot-product-ui] .bp-page button { border-radius: 9px; }
 .bp-computers-page { max-width: 1050px; margin: 0 auto; display: grid; gap: 18px; }
@@ -107,6 +132,12 @@ html body[data-bot-product-ui] .bb-tool-body { padding: 0 15px 15px; }
 html body[data-bot-product-ui] .bb-save { border: 1px solid var(--bp-border); border-radius: 12px; padding: 15px; background: var(--bp-surface); }
 html body[data-bot-product-ui] .bb-save .bb-overview { margin-top: 12px; }
 @media (max-width: 600px) {
+  html body[data-bot-product-ui] .bp-workspace-toolbar { padding: 0 12px; height: 58px; gap: 6px; }
+  html body[data-bot-product-ui] .bp-workspace-toolbar .bp-workspace-bar-actions { gap: 3px; }
+  html body[data-bot-product-ui] .bp-workspace-toolbar button { min-width: 30px; min-height: 32px; padding: 7px; }
+  .bp-toolbar-destinations { gap: 3px; }
+  .bp-toolbar-destinations span, .bp-toolbar-bot-settings > span { display: none; }
+  .bp-workspace > .bp-page { padding: 16px; }
   .bp-computer-connections { padding: 0 14px 16px; }
   .bp-computer-connection-panel > summary { padding: 16px; }
   .bp-pairing-welcome h3 { font-size: 19px; }

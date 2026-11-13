@@ -21,6 +21,7 @@ import { requestWorkbenchView } from '../../.dsh-plugin/client/workbench-state.m
 import { routingSubmissions, submissionCode } from './routing-submissions.mjs'
 import { WORKSPACE_SECTIONS, workspaceNavigation } from './workspace-navigation.mjs'
 import { AiProvidersPage } from './ai-providers.jsx'
+import { BotSettingsDialog } from './bot-settings-dialog.jsx'
 import { TeamDirectory, WorkspaceCommandPalette, WorkspaceHome, WorkspaceInbox, WorkspaceToolbar } from './workspace-ui.jsx'
 
 const NAV_EVENT = 'bot-product:navigation'
@@ -865,6 +866,7 @@ export function RoleCatalog({ dispatch, busy }) {
 
 export function ProductPage({ section, productApi, openSession, openPanel }) {
   const pageRef = useRef(null)
+  const [settingsBot, setSettingsBot] = useState(null)
   useLayoutEffect(() => { if (pageRef.current) { pageRef.current.scrollTop = 0; pageRef.current.scrollLeft = 0 } }, [section, productApi])
   const navigation = useMemo(() => workspaceNavigation(productApi), [productApi])
   const route = useSyncExternalStore(navigation.subscribe, navigation.getSnapshot, navigation.getSnapshot)
@@ -874,7 +876,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     navigation.navigate(destination)
     openPanel?.(PRODUCT_PANELS[destination.section])
   }, [navigation, openPanel])
-  useEffect(() => { setSearchOpen(false) }, [productApi])
+  useEffect(() => { setSearchOpen(false); setSettingsBot(null) }, [productApi])
   useEffect(() => { if (focus?.search) setSearchOpen(true) }, [focus?.version, focus?.search])
   useEffect(() => {
     const onKey = event => {
@@ -950,11 +952,11 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
   const disabled = busy || snapshotStale || snapshotApi.current !== productApi || Boolean(snapshot?.readOnly)
   const meta = WORKSPACE_SECTIONS.find(row => row.section === section) ?? { title: '工作空间', icon: 'home', description: '' }
   const title = meta.title
-  return <div className="bp-workspace"><WorkspaceToolbar title={title} onHome={() => onNavigate({ section: 'home' })} onSearch={() => setSearchOpen(true)} /><main ref={pageRef} className="bp-page" data-section={section}><div className="bp-page-inner"><header className={`bp-page-header${section === 'home' ? ' bp-home-header' : ''}`}>
-    <div className="bp-page-heading">{section === 'home' ? <p className="bp-eyebrow"><span className="bp-live-dot" />团队工作空间</p> : <><p className="bp-eyebrow"><UiIcon name={meta.icon} size={14} />工作空间<UiIcon name="chevron" size={12} /><span>{title}</span></p><h1>{title}</h1><p className="bp-page-description">{meta.description}</p></>}</div>
-    <div className="bp-page-tools"><span className="bp-sync" data-state={snapshotStale ? 'stale' : snapshot ? 'ready' : 'loading'}>{snapshotStale ? '等待同步' : snapshot ? '已同步' : '正在连接'}</span>
-      <button className="bp-refresh" disabled={busy} onClick={() => refresh()} title="刷新当前页面"><UiIcon name="refresh" size={16} className={busy ? 'bp-spinning' : ''} /><span>刷新</span></button></div>
-    </header><div className="bp-page-body">
+  const currentBot = snapshotApi.current === productApi ? snapshot?.bots?.find(bot => bot.id === (focus?.botId ?? snapshot.mainBotId)) : null
+  return <div className="bp-workspace"><WorkspaceToolbar title={title} section={section} onHome={() => onNavigate({ section: 'home' })} onSearch={() => setSearchOpen(true)}
+    onNavigate={target => onNavigate({ section: target, botId: currentBot?.id })} botName={currentBot?.name}
+    onOpenBotSettings={!disabled && currentBot && snapshot.availableActions?.includes('binding.inspect') ? () => setSettingsBot({ api: productApi, botId: currentBot.id }) : undefined}
+    onRefresh={() => refresh()} refreshing={busy} syncing={!snapshot} stale={snapshotStale}/><main ref={pageRef} className="bp-page" data-section={section}><div className="bp-page-inner"><div className="bp-page-body">
     {error && <div role="alert" className="bp-blocked"><strong>无法取得最新宿主状态</strong><p>{error}</p>{snapshot && <p>{snapshotStale ? '下面保留上次读取结果；状态未更新时，操作暂不可用。' : '下面保留上次读取结果，操作以宿主当前授权为准。'}</p>}</div>}
     {snapshot?.readOnly && <Blocked value={{ reason: snapshot.readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
     {!snapshot && !error && <div className="bp-loading" role="status"><span className="bp-loading-line" aria-hidden="true" /><span className="bp-loading-line" aria-hidden="true" /><p>正在读取宿主状态…</p></div>}
@@ -975,5 +977,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
       {section === 'ai' && !snapshotStale && snapshotApi.current === productApi && <AiProvidersPage productApi={productApi} onOpenTools={() => { requestWorkbenchView('tools'); openPanel('model-router-galgame') }} onOpenBindings={() => onNavigate({ section: 'bindings' })}/>}
       <footer className="bp-page-footer bp-muted">上次同步 {new Date(snapshot.observedAt).toLocaleString('zh-CN')}</footer></>}
     </div></div>
-  </main><WorkspaceCommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} snapshot={snapshotApi.current === productApi ? snapshot : null} onNavigate={onNavigate} openSession={snapshotApi.current === productApi ? openSession : undefined} /></div>
+  </main><WorkspaceCommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} snapshot={snapshotApi.current === productApi ? snapshot : null} onNavigate={onNavigate} openSession={snapshotApi.current === productApi ? openSession : undefined}/>
+  {settingsBot?.api === productApi && <BotSettingsDialog productApi={productApi} botId={settingsBot.botId} onClose={() => setSettingsBot(null)}
+    onOpenAi={() => { setSettingsBot(null); onNavigate({ section: 'ai' }) }} onOpenTools={typeof openPanel === 'function' ? () => { setSettingsBot(null); requestWorkbenchView('tools'); openPanel('model-router-galgame') } : undefined}/>}</div>
 }
