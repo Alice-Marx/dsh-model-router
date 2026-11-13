@@ -15,7 +15,7 @@ export function apply(ctx){
   const admission=ctx.connection.admit(request)
   if(!admission||'rejection'in admission||admission.peer?.principal?.kind!=='owner')return Response.json({error:'OWNER_REQUIRED'},{status:403})
   const input=await request.json()
-  if(!input||Object.keys(input).some(key=>!['toolId','operation'].includes(key))||!['gemini','stepcode','dsh-tui','mimo-code'].includes(input.toolId)||!['readiness','sandbox','diagnostics','prepare'].includes(input.operation))return Response.json({error:'INVALID_FIXED_CHECK'},{status:400})
+  if(!input||Object.keys(input).some(key=>!['toolId','operation'].includes(key))||!['gemini','stepcode','dsh-tui','mimo-code'].includes(input.toolId)||!['readiness','sandbox','diagnostics','prepare','prepare-read-only'].includes(input.operation))return Response.json({error:'INVALID_FIXED_CHECK'},{status:400})
   try{
    setInstallPreferences({installDir:'D:/AI/tools',registry:'https://registry.npmjs.org/',methods:{},scriptUrls:{},allowScriptInstall:true})
    if(input.operation==='diagnostics'){
@@ -26,10 +26,11 @@ export function apply(ctx){
    }
    if(input.operation==='readiness')return Response.json(await officialToolReadiness(input.toolId))
    const base=join(process.env.DSH_STATE_HOME,'execution-checks');await mkdir(base,{recursive:true});const workspace=await mkdtemp(join(base,'workspace-'))
-   if(input.operation==='prepare'){
-    const spec=await resolveOfficialToolLaunch(input.toolId,workspace,'workspace-write',null)
+   if(input.operation==='prepare'||input.operation==='prepare-read-only'){
+    const mode=input.operation==='prepare-read-only'?'read-only':'workspace-write'
+    const spec=await resolveOfficialToolLaunch(input.toolId,workspace,mode,null)
     if(spec.unsupported)return Response.json(spec)
-    const managed=await prepareOfficialRuntime(spec,input.toolId,workspace,'workspace-write')
+    const managed=await prepareOfficialRuntime(spec,input.toolId,workspace,mode)
     const confined=await ctx.sandbox.confine([managed.spec.file,...managed.spec.args],managed.policy)
     return Response.json({spec:{...managed.spec,file:confined.argv[0],args:confined.argv.slice(1)},workspace,enforcement:confined.enforcement,exactArgvConfined:true})
    }

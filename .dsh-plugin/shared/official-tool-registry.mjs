@@ -315,8 +315,8 @@ export const OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ['uninstall', '-g', '@google/gemini-cli'],
     probeExecutables: ['gemini'],
     providerHints: ['gemini', 'google'],
-    // Headless runs go through the task adapter. The signed sandbox runner does
-    // not launch this CLI; a missing or failed process falls back to the API.
+      // Host-owned headless execution uses the verified sandbox runner. The
+      // legacy standalone owner adapter remains a separate fallback policy.
     headlessAdapter: true,
     installMethods: Object.freeze([
       packageManagerMethod('npm', 'npm', 'npm', '@google/gemini-cli@latest'),

@@ -28024,8 +28024,8 @@ var OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ["uninstall", "-g", "@google/gemini-cli"],
     probeExecutables: ["gemini"],
     providerHints: ["gemini", "google"],
-    // Headless runs go through the task adapter. The signed sandbox runner does
-    // not launch this CLI; a missing or failed process falls back to the API.
+    // Host-owned headless execution uses the verified sandbox runner. The
+    // legacy standalone owner adapter remains a separate fallback policy.
     headlessAdapter: !0,
     installMethods: Object.freeze([
       packageManagerMethod("npm", "npm", "npm", "@google/gemini-cli@latest"),
@@ -40156,7 +40156,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.73.3", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.73.4", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);

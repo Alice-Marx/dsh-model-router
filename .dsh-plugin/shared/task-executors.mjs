@@ -118,7 +118,6 @@ export const TASK_ADAPTERS = Object.freeze([
     label: 'Gemini CLI',
     executable: 'gemini',
     portable: true,
-    portableOnly: true,
     apiKeyEnv: 'GEMINI_API_KEY',
     sessionEnv: Object.freeze(['GOOGLE_API_KEY', 'GEMINI_CONFIG_DIR']),
     format: 'gemini-json',

@@ -29,6 +29,15 @@ const ready = async id => ({ id, ready: true, readyModes: ['read-only'] })
 const sandbox = { confine() { throw new Error('The offline runtime must never start a sandbox process') } }
 const outcome = { status: 'succeeded', finalText: 'offline fixture answer', requestedModel: null, reportedModel: 'reported-vendor-model', usage: { inputTokens: 2, outputTokens: 3 }, exitCode: 0 }
 
+test('an authorized Gemini Bot route reaches the Host runner and cannot skip it for a portable-only adapter',async()=>{
+ let calls=0
+ const result=await executeAssignedTask({route:{provider:'google',model:'chat-model'},task:'read fixture',workspace,
+  authorizeOfficial:request=>({...admitted(request),botScoped:true}),
+  runVerified:async request=>{calls++;assert.equal(request.toolId,'gemini');assert.equal(request.mode,'read-only');return outcome},
+  resolvePortableLaunch:()=>{throw Error('unexpected portable launch')},apiFallback:()=>{throw Error('unexpected API fallback')}})
+ assert.equal(calls,1);assert.equal(result.ok,true);assert.equal(result.answer,outcome.finalText)
+})
+
 test('default identity is an authorization sentinel, never a CLI model argument', async () => {
   assert.equal(officialModelId('vendor-default'), null)
   assert.equal(officialModelId('provider/model'), 'provider/model')
