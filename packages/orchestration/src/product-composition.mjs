@@ -12,7 +12,11 @@ import { join, dirname, isAbsolute } from 'node:path'
 import { mkdir } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { randomUUID, createHash } from 'node:crypto'
-import { normalizeConversationEngines, mountConversationEngines, validateClaudeProfileCredential } from '../../bot-engines/src/host-registrations.mjs'
+import { normalizeConversationEngines, mountConversationEngines, validateConversationCredential } from '../../bot-engines/src/host-registrations.mjs'
+import { CLI_CHAT_DRIVERS } from '../../bot-engines/src/cli-driver-specs.mjs'
+import { normalizeCliCredential, importCliAccount, cliCredentialTemplate } from '../../bot-engines/src/cli-credentials.mjs'
+import { inspectCliEntry } from '../../bot-engines/src/cli-entry.mjs'
+import { openCliProviders } from './cli-providers.mjs'
 import { projectHostLoopTextRequest, hostLoopRouteContext, hostSessionPersona } from '../../bot-engines/src/host-loop-request.mjs'
 import { independentSystemMessage } from './independent-message-wire.mjs'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -324,7 +328,8 @@ export function startBotProduct(ctx, options = {}) {
   // A misconfigured official CLI entry must fail loudly at composition time
   // instead of silently degrading the managed Task surface.
   const cliConfig = normalizeTaskCli(taskCli)
-  const engineProfiles = normalizeConversationEngines(options.conversationEngines ?? [])
+  const configuredEngineProfiles = normalizeConversationEngines(options.conversationEngines ?? [])
+  let engineProfiles = configuredEngineProfiles
   // Grant compilation needs the raw configured-route catalog. The plugin's
   // discoverConfiguredRoutes applies the per-subject policy filter, which
   // refuses outside an execution context; a filtered catalog would leave every
@@ -456,7 +461,7 @@ export function startBotProduct(ctx, options = {}) {
   let conversationEngines
   const engineCredentialStamps = new Map()
   const engineLeaseId = `native-${randomUUID()}`
-  let machines, nativeRemoteActions, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat, securePairing, desktopProxy, desktopHttp, aiProviders
+  let machines, nativeRemoteActions, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat, securePairing, desktopProxy, desktopHttp, aiProviders, cliProviders
   let journal, taskService, taskBackends, releaseTaskTools, cliSessionFactory, remoteCliBackend, sharedAdmission, taskRunnerWatchdog, notifications, dataEngine, dataAccess, releaseDataTools, uiNamespace, nativeActivity, botThreads, webPanelStore, webPanelActions, independentChat, teamCoordination, releaseTeamTools, releaseTeamGuard, releaseTeamStop
   const grantRefresh = createGrantRefreshQueue({ lifecycle: () => product?.lifecycle,
     onError: () => ctx.logger?.warn?.('Bot grant refresh failed; grants remain suspended until a successful committed-state refresh.') })
@@ -545,19 +550,28 @@ export function startBotProduct(ctx, options = {}) {
   let ownerCatalogStamp=''
   let routes = new Set(), hydrated = false, refreshing = false, lastRefresh = 0, timer = null
   const publishRoutes = async discovered => {
-    routes = new Set([...discovered].filter(key => !aiProviders?.owns(key.slice(0, key.indexOf('/')))))
+    routes = new Set([...discovered].filter(key => { const provider = key.slice(0, key.indexOf('/')); return !aiProviders?.owns(provider) && !cliProviders?.owns(provider) }))
     for (const route of aiProviders?.routes() ?? []) routes.add(`${route.provider}/${route.model}`)
+    for (const route of cliProviders?.routes() ?? []) routes.add(`${route.provider}/${route.model}`)
     hydrated = true
     const ownerRoutes = [...routes].sort().map(key => { const slash = key.indexOf('/'); return { provider: key.slice(0, slash), model: key.slice(slash + 1) } }).filter(route => route.provider && route.model)
     const stamp = JSON.stringify(ownerRoutes)
     if (stamp !== ownerCatalogStamp) { policy.replaceOwnerGrant({ tools: ownerTools, modelRoutes: ownerRoutes }); ownerCatalogStamp = stamp }
     if (product) await product.lifecycle.refreshGrants()
   }
+  const syncConversationProfiles = async () => {
+    const next = normalizeConversationEngines([...configuredEngineProfiles, ...(cliProviders?.profiles() ?? [])])
+    if (JSON.stringify(next) !== JSON.stringify(engineProfiles)) {
+      await conversationEngines?.reconcile(next)
+      engineProfiles = next
+    }
+  }
   const refresh = async () => {
     if (refreshing) return
     refreshing = true
     try {
       aiProviders?.sync()
+      await syncConversationProfiles()
       await publishRoutes((await catalog()).map(route => `${route.provider}/${route.model}`))
     }
     catch { /* keep the last snapshot; the interval retries */ }
@@ -640,6 +654,8 @@ export function startBotProduct(ctx, options = {}) {
     for (const model of models) {
       const independent = aiProviders?.metadata(model.provider)
       if (independent) { model.label = `${independent.name} · ${model.model}`; model.providerName = independent.name; model.source = 'plugin'; model.fundingModes = ['api'] }
+      const native = cliProviders?.metadata(model.provider)
+      if (native) { model.label = `${native.name} · 原生聊天 · ${model.model}`; model.providerName = native.name; model.source = 'plugin'; model.fundingModes = ['subscription'] }
       const profile = engineProfiles.find(item => item.provider === model.provider && item.model === model.model)
       if (profile) { model.label = `${profile.name} · 仅文字 · ${model.model}`; model.fundingModes = ['subscription'] }
     }
@@ -731,6 +747,15 @@ export function startBotProduct(ctx, options = {}) {
   }
   const boot = (async () => {
     try{
+      cliProviders = openCliProviders({ Database, file: storageFile, credentials: () => ctx.get?.('credentials'), now,
+        drivers: () => CLI_CHAT_DRIVERS.map(driver => ({ ...driver, credentialTemplate: cliCredentialTemplate(driver.id) })),
+        normalizeCredential: normalizeCliCredential, importAccount: importCliAccount,
+        inspectEntry: (entry, driver, signal) => inspectCliEntry(entry, driver, signal, join(resolveStateHome(), 'model-router', 'cli-entry-checks')),
+        usedBy: route => (product?.lifecycle.committedBots() ?? []).filter(bot => bot.model?.startsWith(route + '/')
+          || botSettings?.get(bot.id, { publishChange: false }).settings?.mainRoutes?.routes?.some(item => item.provider === route)).map(bot => ({ id: bot.id, name: bot.name })),
+        onChanged: async () => { await syncConversationProfiles(); product?.rt.dropCatalog(); await publishRoutes(routes); botSettings?.refresh() } })
+      ctx.provide?.('botCliProviders', cliProviders)
+      await syncConversationProfiles()
       const nativeHostRequests = new WeakMap()
       const engineContext = (profile, route, expected = null) => {
         const refuse = code => { throw Object.assign(new Error(code), { code }) }
@@ -764,6 +789,7 @@ export function startBotProduct(ctx, options = {}) {
         return { request: projected, bootstrap }
       }
       const engineSecret = async secretRef => {
+        if (secretRef.startsWith('cli-secret/')) return (await ctx.get?.('credentials')?.resolve(secretRef.slice(11)))?.value
         if (!product) throw Object.assign(new Error('CONVERSATION_ENGINE_CREDENTIAL_UNAVAILABLE'), { code: 'CONVERSATION_ENGINE_CREDENTIAL_UNAVAILABLE' })
         await product.rt.loadSecrets()
         const name = secretRef.slice('ds-secret/'.length)
@@ -773,7 +799,7 @@ export function startBotProduct(ctx, options = {}) {
       }
       const checkEngineCredential = async (profile, botId) => {
         let value
-        try { value = validateClaudeProfileCredential(await engineSecret(profile.credentialRef)) }
+        try { value = validateConversationCredential(profile, await engineSecret(profile.credentialRef)) }
         catch (error) { await conversationEngines?.invalidateBot(profile.id, botId, 'credential-unavailable'); throw error }
         if (typeof value !== 'string' || !value) {
           await conversationEngines?.invalidateBot(profile.id, botId, 'credential-unavailable')
@@ -790,6 +816,7 @@ export function startBotProduct(ctx, options = {}) {
       }
       conversationEngines = await mountConversationEngines({ llm: ctx.llm, profiles: engineProfiles,
         runtimeRoot: join(resolveStateHome(), 'model-router', 'conversation-engines'),
+        onResult: (profile, health) => { if (profile.revision) cliProviders.markResult(profile.provider, health, profile.revision) },
         onActivity: (_profile, event) => nativeActivity?.observe(event),
         // Discovery/preparation may run before a Bot frame exists. The route
         // class is subscription-only; identityFor rechecks the Bot's actual
@@ -949,8 +976,8 @@ export function startBotProduct(ctx, options = {}) {
       if (deferredRouterState) {
         fundingAccounts = openFundingAccounts({ Database, file: storageFile,
           providers: () => [...new Set([...routes].map(key => key.slice(0, key.indexOf('/'))))],
-          labelFor: provider => aiProviders?.metadata(provider)?.name ?? provider,
-          sourceFor: provider => aiProviders?.metadata(provider) ? 'plugin-provider' : 'harness-provider',
+          labelFor: provider => cliProviders?.metadata(provider)?.name ?? aiProviders?.metadata(provider)?.name ?? provider,
+          sourceFor: provider => aiProviders?.metadata(provider) || cliProviders?.metadata(provider) ? 'plugin-provider' : 'harness-provider',
           onCommitted: () => { try { botSettings?.refresh() } catch { /* the interval retries */ } },
           onSuspended: () => { try { botSettings?.refresh() } catch { /* the interval retries */ } }, now })
         botSettings = openBotSettings({ Database, file: storageFile,
@@ -1365,6 +1392,10 @@ export function startBotProduct(ctx, options = {}) {
           ...(botSettings ? {
             'binding.inspect': ownerOnly((payload, context) => inspectProductBinding({ runtime: product.rt, lifecycle: product.lifecycle, botSettings, fundingAccounts, refreshOfficialTools: () => officialCatalog?.refresh({ fresh: true }), signal: context?.signal }, payload)),
             'aiProviders.list': ownerOnly((_payload, context) => aiProviders.list(context)),
+            'cliProviders.list': ownerOnly((_payload, context) => cliProviders.list(context)),
+            'cliProviders.save': ownerOnly((payload, context) => cliProviders.save(payload, context)),
+            'cliProviders.remove': ownerOnly((payload, context) => cliProviders.remove(payload, context)),
+            'cliProviders.inspect': ownerOnly((payload, context) => cliProviders.inspect(payload, context)),
             'aiProviders.suggestions': ownerOnly((payload, context) => aiProviders.suggestions(payload, context)),
             'aiProviders.save': ownerOnly((payload, context) => aiProviders.save(payload, context)),
             'aiProviders.remove': ownerOnly((payload, context) => aiProviders.remove(payload, context)),
@@ -1570,7 +1601,7 @@ export function startBotProduct(ctx, options = {}) {
       desktopHttp?.close()
       releaseDataTools?.()
       await dataEngine?.closeAll().catch(() => {})
-      for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close(),()=>aiProviders?.close()])try{cleanup()}catch{}
+      for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close(),()=>aiProviders?.close(),()=>cliProviders?.close()])try{cleanup()}catch{}
       if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
       if(taskService)await taskService.close().catch(()=>{})
       else journal?.close()
@@ -1616,7 +1647,7 @@ export function startBotProduct(ctx, options = {}) {
         desktopHttp?.close()
         releaseDataTools?.()
         await dataEngine?.closeAll().catch(() => {})
-        for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close(),()=>aiProviders?.close()])try{cleanup()}catch{}
+        for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close(),()=>aiProviders?.close(),()=>cliProviders?.close()])try{cleanup()}catch{}
         if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
         if(taskService)await taskService.close().catch(()=>{})
         else journal?.close()

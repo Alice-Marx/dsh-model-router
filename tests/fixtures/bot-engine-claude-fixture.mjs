@@ -79,7 +79,7 @@ evidence.argv = {
 }
 
 if (rawArgs[0] === '--version' && rawArgs.length === 1) {
-  process.stdout.write(`dsh-claude-fixture 1.0.0 (node ${process.versions.node}) fixture-only\n`)
+  await new Promise(resolve => process.stdout.write(`dsh-claude-fixture 1.0.0 (node ${process.versions.node}) fixture-only\n`, resolve))
   process.exit(0)
 }
 
@@ -288,6 +288,7 @@ async function runTurn(text) {
     resultFrame({ isError: true, subtype: 'error_during_execution', usage: false, cost: false, errors: ['No conversation found to resume.'], resultText: 'resume failed' })
     evidence.exited = 'resume-refused'
     writeEvidence()
+    await new Promise(resolve => process.stdout.write('', resolve))
     process.exit(1)
   }
   if (resumed && text.includes('resume-vanish')) {
@@ -358,6 +359,9 @@ async function runTurn(text) {
   if (text.includes('exit-after-result')) {
     evidence.exited = 'after-result'
     writeEvidence()
+    // Windows pipe writes are asynchronous: exit only after the terminal frame
+    // reached the OS pipe. The Host can still observe process death immediately.
+    await new Promise(resolve => process.stdout.write('', resolve))
     process.exit(0)
   }
 }

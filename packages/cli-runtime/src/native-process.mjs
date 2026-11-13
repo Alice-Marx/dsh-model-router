@@ -1,11 +1,11 @@
 import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { StringDecoder } from 'node:string_decoder'
-import { access, lstat, readFile, readdir, realpath, rmdir, unlink } from 'node:fs/promises'
+import { access, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rmdir, unlink } from 'node:fs/promises'
 import { lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
-import { basename, dirname, isAbsolute, join } from 'node:path'
+import { basename, dirname, isAbsolute, join, toNamespacedPath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { NativeCliOutput } from './native-cli-output.mjs'
 
@@ -22,6 +22,20 @@ let compilerRoot = null
 const compilerFailure = () => Object.assign(new Error('NATIVE_COMPILER_SCRATCH_UNAVAILABLE'), { code: 'NATIVE_COMPILER_SCRATCH_UNAVAILABLE' })
 const sameDirectory = (info, expected) => info.isDirectory() && !info.isSymbolicLink() && info.dev === expected.dev && info.ino === expected.ino
 const rootStamp = path => `dsh-native-compiler-v1:${basename(path)}\n`
+
+/** Session homes are transient. Keep Windows profiles short even when installed deeply.
+ * Callers must still protect the fresh home before writing account credentials.
+ */
+export async function createPrivateProfileHome(root, name, { recursive = false } = {}) {
+  const candidate = join(await realpath(root), name)
+  if (process.platform === 'win32' && candidate.length > 210) {
+    const parent = await realpath(hostTemp)
+    if (parent.length > 140) throw Object.assign(new Error('NATIVE_PROFILE_HOME_UNAVAILABLE'), { code: 'NATIVE_PROFILE_HOME_UNAVAILABLE' })
+    return mkdtemp(join(parent, 'dshp-'))
+  }
+  await mkdir(candidate, { recursive, mode: 0o700 })
+  return candidate
+}
 
 function compilerDirectory() {
   try {
@@ -91,12 +105,15 @@ export async function resolveNativeHelper({ python = '/usr/bin/python3' } = {}) 
 
 /** Spawn a packaged native helper. It accepts one bounded JSON configuration on stdin. */
 export function nativeProcess(helper, mode, spec, { home, env = privateEnvironment(home) } = {}) {
+  if (helper.platform === 'win32' && home.length > 240) throw Object.assign(new Error('NATIVE_PROFILE_HOME_TOO_LONG'), { code: 'NATIVE_PROFILE_HOME_TOO_LONG' })
   const events = new EventEmitter()
   const args = helper.platform === 'win32' ? [...helper.prefix, '-Mode', mode] : [...helper.prefix, mode]
   const compiler = helper.platform === 'win32' ? compilerDirectory() : null
   const helperEnv = compiler ? Object.fromEntries(Object.entries(env).filter(([key]) => ![COMPILER_ROOT, COMPILER_SCRATCH].includes(key.toUpperCase()))) : env
   if (compiler) { helperEnv[COMPILER_ROOT] = compiler.root; helperEnv[COMPILER_SCRATCH] = compiler.path }
-  const child = spawn(helper.executable, args, { cwd: home, env: helperEnv, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] })
+  // Windows PowerShell/CodeDom cannot compile from a deep current directory.
+  // Use its already allocated short scratch; HOME and the CLI workspace stay private.
+  const child = spawn(helper.executable, args, { cwd: compiler ? compiler.root : home, env: helperEnv, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] })
   let tail = '', buffer = '', bytes = 0, closed = false, treeStopped = false
   const decoder = new StringDecoder('utf8'), cliDecoder = new StringDecoder('utf8')
   const cliOutput = new NativeCliOutput()
@@ -114,6 +131,8 @@ export function nativeProcess(helper, mode, spec, { home, env = privateEnvironme
   }))
   child.on('error', error => events.emit('failure', error))
   child.stdin.on('error', () => {})
+  child.stdout.on('error', error => events.emit('failure', error))
+  child.stderr.on('error', error => events.emit('failure', error))
   child.stderr.on('data', data => { tail = (tail + data.toString('utf8')).slice(-4096) })
   child.stdout.on('data', chunk => {
     bytes += chunk.length
@@ -135,7 +154,10 @@ export function nativeProcess(helper, mode, spec, { home, env = privateEnvironme
     if (closed || Buffer.byteLength(wire) > MAX_FRAME) { reject(new Error(closed ? 'NATIVE_CLOSED' : 'INPUT_LIMIT')); return }
     child.stdin.write(wire, error => error ? reject(error) : resolve())
   })
-  if (spec) void send(spec).catch(error => events.emit('failure', error))
+  const nativeSpec = helper.platform === 'win32' && spec
+    ? { ...spec, ...(mode === 'protect' && typeof spec.path === 'string' && spec.path.length >= 260 ? { path: toNamespacedPath(spec.path) } : {}),
+      ...(mode === 'supervise' && typeof spec.cwd === 'string' && spec.cwd.length >= 260 ? { cwd: toNamespacedPath(spec.cwd) } : {}) } : spec
+  if (nativeSpec) void send(nativeSpec).catch(error => events.emit('failure', error))
   function waitControl(name, timeoutMs = 15_000) {
     return new Promise((resolve, reject) => {
       const clean = () => { clearTimeout(timer); events.off('control', control); events.off('closed', ended); events.off('failure', failed) }

@@ -58,9 +58,10 @@ describe('bot-engine driver catalog', () => {
     }
   })
 
-  test('only claude is implemented; everything else is honestly unavailable', () => {
+  test('sixteen concrete native drivers are implemented and special constraints stay explicit', () => {
     const implemented = BOT_ENGINE_DRIVERS.filter(driver => driver.availability === 'implemented')
-    assert.deepEqual(implemented.map(driver => driver.id), ['claude'])
+    assert.equal(implemented.length, 16)
+    for (const id of ['codex', 'pi', 'museCode', 'cursorAgent', 'kimiAgent', 'opencodeGo', 'hermesAgent']) assert.ok(implemented.some(driver => driver.id === id), id)
     assert.equal(implemented[0].implementation, 'src/claude-engine.mjs')
     assert.match(implemented[0].transport, /stream-json/)
     assert.equal(implemented[0].evidence.file, 'server/drivers/claude.ts')
@@ -79,31 +80,29 @@ describe('bot-engine driver catalog', () => {
     assert.equal(engines.length, 18)
   })
 
-  test('ACP engines wait for the ACP core port instead of being faked', () => {
-    for (const id of ['antigravityAgent', 'grokAgent', 'geminiAgent', 'kimiAgent', 'droidAgent', 'cursorAgent', 'opencodeGo', 'qwenAgent', 'hermesAgent', 'clineAgent', 'copilotAgent', 'commandCodeAgent', 'customAcp', 'deepseekAgent']) {
+  test('ACP engines resolve through the retained protocol adapter', () => {
+    for (const id of ['grokAgent', 'geminiAgent', 'kimiAgent', 'droidAgent', 'cursorAgent', 'opencodeGo', 'qwenAgent', 'hermesAgent', 'clineAgent', 'copilotAgent', 'commandCodeAgent', 'customAcp']) {
       const driver = getBotEngineDriver(id)
-      assert.equal(driver.availability, 'unavailable', id)
-      assert.equal(driver.targetCapability, 'pending-acp-core', id)
+      assert.equal(driver.availability, 'implemented', id)
+      assert.equal(driver.implementation, 'src/acp-chat-engine.mjs', id)
     }
   })
 
-  test('codex, museCode and pi are pending engine ports with concrete reasons', () => {
+  test('codex, museCode and pi each have a concrete native protocol implementation', () => {
     for (const id of ['codex', 'museCode', 'pi']) {
       const driver = getBotEngineDriver(id)
-      assert.equal(driver.availability, 'unavailable', id)
-      assert.equal(driver.targetCapability, 'pending-engine-port', id)
+      assert.equal(driver.availability, 'implemented', id)
+      assert.equal(driver.targetCapability, 'native-chat-engine', id)
     }
-    assert.match(getBotEngineDriver('codex').availabilityReason, /codex-session-core/)
-    assert.match(getBotEngineDriver('museCode').availabilityReason, /Muse Session Protocol/)
+    assert.match(getBotEngineDriver('codex').implementation, /codex-engine/)
+    assert.match(getBotEngineDriver('museCode').implementation, /muse-engine/)
   })
 
-  test('customAcp remains pending trusted owner registration and ACP core', () => {
+  test('customAcp is implemented but managed runtime and API-only funding constraints remain unavailable', () => {
     const driver = getBotEngineDriver('customAcp')
-    assert.equal(driver.availability, 'unavailable')
-    assert.equal(driver.targetCapability, 'pending-acp-core')
-    assert.match(driver.availabilityReason, /trusted owner registration/)
-    assert.match(driver.availabilityReason, /remain in migration scope/)
-    assert.match(driver.availabilityReason, /requests remain rejected/)
+    assert.equal(driver.availability, 'implemented')
+    assert.match(getBotEngineDriver('antigravityAgent').availabilityReason, /harness/)
+    assert.match(getBotEngineDriver('deepseekAgent').availabilityReason, /API/)
   })
 
   test('geminiAgent records the consumer-login retirement', () => {
@@ -152,7 +151,7 @@ describe('resolveBotEngine', () => {
   })
 
   test('unimplemented drivers return explicit unavailable verdicts', async () => {
-    for (const id of ['codex', 'museCode', 'pi', 'geminiAgent', 'customAcp', 'grok']) {
+    for (const id of ['antigravityAgent', 'deepseekAgent', 'grok']) {
       const resolved = await resolveBotEngine({ driver: id })
       assert.equal(resolved.status, 'unavailable', id)
       assert.equal(typeof resolved.reason, 'string', id)

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { UiIcon } from './ui-icons.jsx'
+import { CliChatProviders } from './cli-chat-providers.jsx'
 import css from './ai-providers.css'
 
 const labels = { ready: '就绪 · 已验证调用', configured: '已配置', 'needs-key': '需要 API Key', 'needs-models': '需要添加模型', 'needs-attention': '需要处理', disabled: '已停用' }
@@ -128,6 +129,7 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
         <div className="bp-ai-row-actions"><button type="button" disabled={Boolean(busy) || !provider.enabled || provider.auth === 'key' && !provider.keyConfigured} onClick={() => check(provider)}>{busy === `check-${provider.id}` ? '检查中…' : '检查'}</button><button type="button" disabled={editingBusy} onClick={() => edit(provider)}>管理</button></div>
       </article>)}{!view.providers.length && <div className="bp-ai-empty"><UiIcon name="spark" size={26}/><h4>连接你的第一个 AI</h4><p>选择下面的提供方，填写自己的账号密钥与模型。</p></div>}</div>
       <div className="bp-ai-presets">{view.presets.map(preset => <button type="button" key={preset.id} disabled={editingBusy} onClick={() => edit(preset)}><span className="bp-ai-small-mark" aria-hidden="true">{preset.mark}</span><span>{preset.name}</span><UiIcon name="plus" size={14}/></button>)}</div>
+      <CliChatProviders productApi={productApi} onOpenTools={onOpenTools} onOpenBindings={onOpenBindings}/>
       <div className="bp-ai-section-head"><h3>官方 CLI 与应用</h3>{onOpenTools && <button type="button" onClick={onOpenTools}>安装与登录<UiIcon name="arrow" size={14}/></button>}</div>
       <p className="bp-ai-hint">CLI 使用各自的账号和模型配置，独立于 API 连接。这里显示官方工具的执行状态。</p>
       {checkingCli && <p className="bp-ai-hint" role="status">正在后台检查官方 CLI，API 连接可以继续配置。</p>}

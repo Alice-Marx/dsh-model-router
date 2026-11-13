@@ -387,6 +387,9 @@ describe('claude engine native session', () => {
       assert.throws(() => engine.respondToRequest('unknown-id', { behavior: 'allow-everything' }), TypeError)
       assert.throws(() => engine.respondToRequest('unknown-id', { behavior: 'answer' }), TypeError, 'answer needs a message')
 
+      // The 20s bound measures a permission interaction on a live session.
+      // Native supervisor/bridge compilation is covered by the session deadline.
+      assert.equal((await engine.submitTurn({ text: 'warm up the retained permission session' })).ok, true)
       const turnPromise = engine.submitTurn({ text: 'ask-granted:read_notes' })
       await once(engine.events, 'permission-ask', { signal: AbortSignal.timeout(20_000) })
       const askId = seen.at(-1).id

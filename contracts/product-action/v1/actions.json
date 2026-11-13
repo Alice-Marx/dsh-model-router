@@ -40,6 +40,18 @@
     "botRouting.status": {
       "caller": "bot"
     },
+    "cliProviders.inspect": {
+      "caller": "owner"
+    },
+    "cliProviders.list": {
+      "caller": "owner"
+    },
+    "cliProviders.remove": {
+      "caller": "owner"
+    },
+    "cliProviders.save": {
+      "caller": "owner"
+    },
     "data.cancel": {
       "caller": "owner"
     },

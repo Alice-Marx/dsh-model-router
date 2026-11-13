@@ -29,7 +29,7 @@ const server = createServer(async (request, response) => {
       let text = ''; for await (const part of request) { text += part; if (text.length > 2_000_000) throw new Error('large fixture input') }
       const { action, payload } = JSON.parse(text)
       const service = services[index], owner = { kind: 'owner' }
-      const methods = { 'aiProviders.list': () => service.list(owner), 'aiProviders.save': () => service.save(payload, owner), 'aiProviders.remove': () => service.remove(payload, owner), 'aiProviders.check': () => service.probe(payload, owner), 'aiProviders.suggestions': () => service.suggestions(payload, owner),
+      const methods = { 'cliProviders.list': () => ({ schemaVersion: 1, drivers: [], profiles: [] }), 'aiProviders.list': () => service.list(owner), 'aiProviders.save': () => service.save(payload, owner), 'aiProviders.remove': () => service.remove(payload, owner), 'aiProviders.check': () => service.probe(payload, owner), 'aiProviders.suggestions': () => service.suggestions(payload, owner),
         'aiProviders.cliStatus': () => ({ tools: [{ toolId: 'codex', label: 'Codex CLI · 合成检测', status: 'ready' }, { toolId: 'claude-code', label: 'Claude Code · 合成检测', status: 'logged-out', reason: '请在官方 CLI 中登录。' }] }) }
       const value = await methods[action]?.()
       response.writeHead(200, { 'content-type': 'application/json' }); response.end(JSON.stringify({ ok: true, value })); return

@@ -1,6 +1,6 @@
-# DSH remote-computer-agent 0.1.2
+# DSH remote-computer-agent 0.1.3
 
-Version 0.1.2 ships the short-lived QR invitation and six-digit secure pairing flow with Model Router 0.67.0. Use this matching package for the updated Host pairing and desktop transport.
+Version 0.1.3 includes the shared Windows native-launcher path fix with Model Router 0.70.0. It uses the established secure pairing and desktop transport.
 
 Harness Desktop's native viewer uses `dsh-app://app`. Version 0.1.1 accepts this exact Origin only for a live desktop session minted by an authenticated Host; it does not enable it for HTTP API requests or other sessions. Model Router 0.63.3 carries the native viewer Origin through Desktop's HTTP bridge. Upgrade both sides when using the native application; ordinary HTTP/HTTPS viewers retain their existing exact-Origin checks.
 

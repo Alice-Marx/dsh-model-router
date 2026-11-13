@@ -44,6 +44,10 @@ const excluded = plan.excluded ?? {}
 test('test plan: every spec on disk is selected or explicitly excluded', () => {
   const unaccounted = onDisk.filter((file) => !selected.has(file) && !Object.hasOwn(excluded, file))
   assert.deepEqual(unaccounted, [], `these specs run nowhere and are not declared: ${unaccounted.join(', ')}`)
+  const serial = ['tests/bot-engine-claude-session.native.mjs', 'tests/bot-engine-llm-adapter.native.mjs', 'tests/product-native-host-tools.test.mjs']
+  const stage = plan.stages.find(args => serial.every(file => args.includes(file)))
+  assert.ok(stage?.includes('--test-concurrency=1'), 'native session/MCP specs need a dedicated serial phase to avoid startup timeouts under shared Windows load')
+  assert.ok(plan.stages.filter(args => serial.some(file => args.includes(file))).length === 1)
 })
 
 test('test plan: an exclusion carries a reason a reader can act on', () => {

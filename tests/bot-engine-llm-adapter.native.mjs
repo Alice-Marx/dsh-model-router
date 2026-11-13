@@ -140,7 +140,7 @@ describe('claude llm bridge native session', () => {
       // that resumed process then refuses (error result before init), as a real CLI does
       // when the conversation no longer exists upstream.
       const first = await turn(adapter, [systemMessage(PERSONA), userMessage('exit-after-result please', 'm1')])
-      assert.equal(finishOf(first).reason.kind, 'stop')
+      assert.equal(finishOf(first).reason.kind, 'stop', JSON.stringify(finishOf(first)))
       const nativeSession = first.at(-1).replayState.response.sessionId
       assert.match(nativeSession, /^fx-/)
       // The fixture exits right after its result. The Host sees the engine's own signal that
@@ -313,7 +313,7 @@ describe('claude llm bridge native money path', () => {
           messages: [systemMessage(PERSONA), userMessage('money turn', 'm1')],
         })
         assert.equal(chunks.at(-1).type, 'finish')
-        assert.equal(chunks.at(-1).reason.kind, 'stop')
+        assert.equal(chunks.at(-1).reason.kind, 'stop', JSON.stringify(chunks.at(-1)))
         assert.equal(textOf(chunks), 'echo: money turn')
         const receipts = await harness.receipts()
         assert.equal(receipts.length, 1, 'exactly one receipt: the bridge issues none of its own')

@@ -1,3 +1,5 @@
+import { cliDriver } from './cli-driver-specs.mjs'
+
 // Closed catalog of the 26 upstream OpenMausBot built-in Bot engine drivers.
 //
 // Upstream source: OpenMausBot at pin 1bc4749aa8307d7d6998bf86de4ef6478460dd93
@@ -288,7 +290,14 @@ export const BOT_ENGINE_DRIVERS = Object.freeze([
     permissions: 'ACP permission requests',
     usage: 'ACP session reports',
   }), { transport: 'acp-stdio (dsh --profile acp)' })),
-].map(Object.freeze))
+].map(driver => {
+  const spec = cliDriver(driver.id)
+  if (driver.kind !== 'conversation-engine' || !spec) return Object.freeze(driver)
+  if (!spec.implemented || !spec.available) return Object.freeze({ ...driver, availability: 'unavailable',
+    availabilityReason: spec.reason, targetCapability: spec.id === 'antigravityAgent' ? 'managed-runtime-with-pinned-harness' : 'bounded-api-funding-required' })
+  return Object.freeze({ ...driver, availability: 'implemented', availabilityReason: null, targetCapability: 'native-chat-engine',
+    implementation: spec.transport === 'acp' ? 'src/acp-chat-engine.mjs' : `src/${spec.id === 'museCode' ? 'muse' : spec.id}-engine.mjs` })
+}))
 
 const byId = new Map(BOT_ENGINE_DRIVERS.map(driver => [driver.id, driver]))
 if (byId.size !== BOT_ENGINE_DRIVERS.length) throw new Error('DUPLICATE_BOT_ENGINE_DRIVER_ID')
@@ -320,8 +329,13 @@ export async function resolveBotEngine(request) {
   if (entry.availability !== 'implemented') {
     return { status: 'unavailable', driver: entry.id, name: entry.name, reason: entry.availabilityReason, targetCapability: entry.targetCapability }
   }
-  const { createClaudeEngine } = await import('./claude-engine.mjs')
-  return { status: 'ready', driver: entry.id, name: entry.name, createEngine: createClaudeEngine, implementation: entry.implementation }
+  let createEngine
+  if (entry.id === 'claude') createEngine = (await import('./claude-engine.mjs')).createClaudeEngine
+  else if (entry.id === 'codex') createEngine = (await import('./codex-engine.mjs')).createCodexEngine
+  else if (entry.id === 'pi') createEngine = (await import('./pi-engine.mjs')).createPiEngine
+  else if (entry.id === 'museCode') createEngine = (await import('./muse-engine.mjs')).createMuseEngine
+  else { const { createAcpChatEngine } = await import('./acp-chat-engine.mjs'); createEngine = options => createAcpChatEngine({ driver: entry.id, model: options.model.catalogModel }, options) }
+  return { status: 'ready', driver: entry.id, name: entry.name, createEngine, implementation: entry.implementation }
 }
 
 /** Ad-hoc engine inputs are refused outright: authority comes from committed Host state only. */

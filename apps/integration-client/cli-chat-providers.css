@@ -1,0 +1,28 @@
+html body[data-bot-product-ui] .bp-cli-chat { min-width:0; margin-top:32px; }
+html body[data-bot-product-ui] .bp-cli-chat-title { align-items:flex-start; gap:12px; }
+html body[data-bot-product-ui] .bp-cli-chat-title h3 { margin:0; }
+html body[data-bot-product-ui] .bp-cli-chat-title p { margin:5px 0 0; max-width:540px; }
+html body[data-bot-product-ui] .bp-cli-chat-actions, html body[data-bot-product-ui] .bp-cli-chat-entry-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+html body[data-bot-product-ui] .bp-cli-chat-actions { flex:none; }
+html body[data-bot-product-ui] .bp-cli-chat-editor { min-width:0; padding:20px; background:var(--bp-surface); border:1px solid var(--bp-border); border-radius:18px; }
+html body[data-bot-product-ui] .bp-cli-chat-editor .bp-ai-editor-head h4 { margin:0; font-size:15px; }
+html body[data-bot-product-ui] .bp-cli-chat-kind { display:inline-flex; margin:16px 0 0; padding:4px 9px; border-radius:8px; background:var(--bp-subtle); color:var(--bp-ink); font-size:12px; }
+html body[data-bot-product-ui] .bp-cli-chat-entry-actions { margin:12px 0 0; }
+html body[data-bot-product-ui] .bp-cli-chat-auth-title { margin:24px 0 8px; font-size:14px; }
+html body[data-bot-product-ui] .bp-cli-chat-secret { display:grid; gap:6px; color:var(--bp-ink); font-size:13px; min-width:0; margin:12px 0; }
+html body[data-bot-product-ui] .bp-cli-chat-secret input { width:100%; min-width:0; padding:9px 11px; border:1px solid var(--bp-border); border-radius:9px; background:var(--bp-bg); color:var(--bp-ink); font:inherit; }
+html body[data-bot-product-ui] .bp-cli-chat-template { margin:14px 0; color:var(--bp-muted); font-size:12px; }
+html body[data-bot-product-ui] .bp-cli-chat-template summary { cursor:pointer; width:fit-content; }
+html body[data-bot-product-ui] .bp-cli-chat-template pre { padding:12px; background:var(--bp-subtle); border-radius:10px; overflow:auto; max-height:240px; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--bp-ink); }
+html body[data-bot-product-ui] .bp-cli-chat-empty { padding:24px 4px; color:var(--bp-ink); }
+html body[data-bot-product-ui] .bp-cli-chat-empty p { margin:0 0 4px; font-weight:550; }
+html body[data-bot-product-ui] .bp-cli-chat-empty small { color:var(--bp-muted); font-size:12px; }
+html body[data-bot-product-ui] .bp-cli-chat-availability { margin:10px 0; }
+@media (max-width:640px) {
+  html body[data-bot-product-ui] .bp-cli-chat-title { flex-direction:column; align-items:stretch; }
+  html body[data-bot-product-ui] .bp-cli-chat-actions { justify-content:flex-end; }
+  html body[data-bot-product-ui] .bp-cli-chat-editor { padding:14px; }
+  html body[data-bot-product-ui] .bp-cli-chat .bp-ai-provider { flex-wrap:wrap; gap:10px; }
+  html body[data-bot-product-ui] .bp-cli-chat .bp-ai-provider>.bp-ai-copy { min-width:calc(100% - 60px); }
+  html body[data-bot-product-ui] .bp-cli-chat .bp-ai-provider>button { margin-left:auto; }
+}

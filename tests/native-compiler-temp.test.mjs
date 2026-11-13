@@ -62,6 +62,7 @@ test('private environment carries no arbitrary compiler selection or inherited c
   assert.equal(env[SCRATCH_ENV], undefined)
   for (const key of ['AWS_SECRET_ACCESS_KEY', 'OPENAI_API_KEY', 'HTTP_PROXY']) assert.equal(env[key], undefined)
   assert.equal(env.TEMP, join(env.HOME, 'tmp'))
+  if (windows) assert.throws(() => nativeProcess({ platform: 'win32' }, 'probe', null, { home: 'C:\\' + 'x'.repeat(260) }), { code: 'NATIVE_PROFILE_HOME_TOO_LONG' })
 })
 
 test('Windows PowerShell compiles/probes at 216/240-character private homes and really protects current-SID ACLs', { skip: !windows, timeout: 90000 }, async () => {

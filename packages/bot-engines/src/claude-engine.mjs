@@ -45,9 +45,9 @@ import { createHash, randomBytes } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute, join, toNamespacedPath } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { capabilityProbe, nativeProcess, privateEnvironment, protectProfile } from '../../cli-runtime/src/native-process.mjs'
+import { capabilityProbe, createPrivateProfileHome, nativeProcess, privateEnvironment, protectProfile } from '../../cli-runtime/src/native-process.mjs'
 import { createCliBootstrap } from '../../capability-broker/src/cli-bootstrap.mjs'
 import {
   brokerAnswer, classifyClaudeFrame, claudeResultError, claudeUserMessage,
@@ -82,7 +82,7 @@ export async function pinClaudeEntry({ executable, sha256, version, script, scri
     if (!(await stat(scriptPath)).isFile() || digest(await readFile(scriptPath)) !== scriptSha256) throw new Error('ENGINE_ENTRY_SCRIPT_CHANGED')
   }
   const reported = await new Promise((resolve, reject) => {
-    const child = spawn(path, scriptPath ? [scriptPath, '--version'] : ['--version'], { cwd: home, env: privateEnvironment(home), windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(path, scriptPath ? [scriptPath, '--version'] : ['--version'], { cwd: process.platform === 'win32' && home.length >= 260 ? toNamespacedPath(home) : home, env: privateEnvironment(home), windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] })
     let output = '', error = ''
     const timer = setTimeout(() => { child.kill(); reject(new Error('ENGINE_VERSION_TIMEOUT')) }, 15_000)
     child.stdout.on('data', chunk => { output += chunk.toString('utf8'); if (output.length > 1024) child.kill() })
@@ -152,8 +152,7 @@ export async function createClaudeEngine(options) {
   if (!(await stat(cwd)).isDirectory()) throw new Error('INVALID_WORKSPACE')
   await mkdir(runtimeRoot, { recursive: true, mode: 0o700 })
   const root = await realpath(runtimeRoot)
-  const home = join(root, `e-${operationId}`)
-  await mkdir(home, { mode: 0o700 })
+  const home = await createPrivateProfileHome(root, `e-${operationId}`)
   for (const folder of ['tmp', 'cache', 'config', 'data', 'appdata', 'local', 'b']) await mkdir(join(home, folder), { recursive: true, mode: 0o700 })
   const probe = await launcher.probe({ home, python })
   if (!probe?.available) throw new Error(`NATIVE_PEER_UNAVAILABLE: ${probe?.reason ?? 'unknown'}`)

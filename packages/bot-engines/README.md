@@ -1,18 +1,18 @@
 # packages/bot-engines
 
 Native Bot conversation engines: a closed catalog of the 26 upstream OpenMausBot
-built-in drivers, plus the first ported engine — the **Claude** conversation-session
-adapter, its public LLM bridge and Host-owned registration. The product can explicitly
-configure a pinned Claude text/subscription route and select it through the existing Bot
-model binding. Serving, grants, request history and the one money authority remain in the Host.
+built-in drivers, with 16 retained native text conversation drivers behind a public
+LLM bridge and Host-owned registration. The product's AI page manages independent,
+pinned CLI connections and Bot model bindings. Serving, grants, request history and
+the one money authority remain in the Host.
 
-Status: `claude` is implemented and covered by real offline child-process tests. Every
-other catalog entry is explicitly **unavailable** with a concrete reason and target
-capability. Custom ACP engines remain in migration scope: the generic ACP core now exists
-in `packages/bot-acp` (session lifecycle, permissions, bounded stdio transport, native
-launch — offline-verified, **not** wired into product composition and no ACP CLI claimed
-usable), so `customAcp` is gated on trusted owner registration of pinned entries, grants
-and the permission broker rather than on the core itself.
+Status: Claude, Codex App Server, Pi RPC, Muse MSP and 12 ACP driver choices are
+wired into product composition and covered by real offline child-process tests.
+Vendor account login and paid inference are not certified by those fixtures.
+Antigravity requires a managed runtime and DeepSeek Harness ACP lacks a proven
+per-call metering cap; both remain unavailable with explicit reasons. Eight API
+catalog entries are served separately by the independent API provider module.
+New CLI routes provide text chat; Claude retains its existing granted Host tools.
 
 ## Modules
 
@@ -26,14 +26,17 @@ and the permission broker rather than on the core itself.
 | `src/claude-llm-turn.mjs` | Pure request projection for the LLM route (capability gate, retained-history continuity, usage/finish mapping) |
 | `src/claude-llm-adapter.mjs` | `ClaudeLlmAdapter` / `createClaudeLlmAdapter` — the public `LlmAdapter` bridge over the retained Claude session |
 | `src/host-registrations.mjs` | Closed Host profile validation, public model registration and private CLI credential provisioning |
+| `src/native-rpc-engine.mjs`, `src/codex-engine.mjs`, `src/pi-engine.mjs`, `src/muse-engine.mjs` | Retained native RPC engines, exact model proof and bounded settlement |
+| `src/acp-chat-engine.mjs`, `src/cli-driver-specs.mjs` | Product ACP bridge and fixed driver-specific launch arguments |
+| `src/cli-entry.mjs`, `src/cli-credentials.mjs` | Owner-only entry pinning and explicit scoped account provisioning |
 | `licenses/NOTICE.md`, `licenses/LICENSE-OpenMausBot` | Upstream attribution and full Apache-2.0 license (pin `1bc4749a…`) |
 
 ## Policy invariants
 
 - **Closed catalog.** Exactly the 26 upstream built-in driver ids exist. Unknown ids are
-  an error, not a fallback. `customAcp` awaits the generic ACP core in `packages/bot-acp`
-  (present, offline-verified, unwired) plus trusted owner registration of pinned entries,
-  grants and the permission broker. Turn/model request JSON cannot register a command.
+  an error, not a fallback. `customAcp` uses the generic core in `packages/bot-acp`
+  with an explicitly pinned owner wrapper for a local, unmetered model. Turn/model
+  request JSON cannot register a command.
 - **Authority is Host state.** Model routes, tools, executable paths, digests,
   environments and credentials never arrive through turn payloads. A driver request
   carrying any of `executable/path/command/endpoint/url/args/env/credentials/apiKey/

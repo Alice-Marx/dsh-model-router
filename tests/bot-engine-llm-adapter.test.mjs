@@ -237,6 +237,9 @@ describe('claude llm bridge: route declaration', () => {
     assert.equal(info.context, undefined, 'no context window is invented for a subscription CLI session')
     assert.equal(info.defaultMaxTokens, undefined, 'no output cap is invented')
     assert.equal(info.reasoning, undefined, 'no selectable reasoning efforts are claimed')
+    const native = (await makeAdapter(await makeHost(), { nativeSession: true })).adapter
+    assert.match((await native.listModels(PROVIDER))[0].description, /^原生订阅/)
+    assert.match((await native.resolveModel(PROVIDER, MODEL)).description, /^原生订阅/)
     await assert.rejects(() => adapter.resolveModel(PROVIDER, 'other-model'), { code: 'CLAUDE_MODEL_NOT_CONFIGURED' })
   })
 

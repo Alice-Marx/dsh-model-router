@@ -14,9 +14,9 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.69.0 · Windows Remote Agent：0.1.2**
+**当前正式版：0.70.0 · Windows Remote Agent：0.1.3**
 
-**0.69.0 正式版：独立 AI 提供方。** Bot 插件有自己的 AI 设置页，独立管理具名 API 连接、服务地址、密钥和模型容量。从侧栏“AI 提供方”或“设置 → AI”添加连接及模型，再在 Bot 设置中选择；同一厂商可保存多个账号，Main 可以使用多条路线。原有 Harness 路线继续可用。密钥保存在 Host 凭据存储中属于插件的命名空间，不回传给页面。目录检查仅代表已配置，实际调用成功后才显示已验证。官方 CLI 保持自己的账号与工具状态。支持 OpenAI Chat Completions/Responses、Anthropic Messages 与 Gemini 流式文本及结构化工具，本次不新增尚未适配的 CLI 聊天驱动。验收使用隔离数据和本机假提供方。
+**0.70.0 正式版：原生 CLI 聊天连接。** 在“设置 → AI”添加CLI连接，核验已安装的可执行文件和版本，保存独立账号资料，再为Bot或Main路线选择模型。在已有Claude基础上新增15类原生文本聊天驱动：Codex、Pi、Muse Code、Grok、Gemini、Kimi Code、Droid、Cursor、OpenCode、Qwen、Hermes、Cline、Copilot、Command Code和自定义ACP。多轮保留真实进程，明确确认模型，继续执行已提交资金与权限约束；未知结果退休且不自动重放。认证资料不回显，只有明确勾选导入时才读取白名单账号文件。新驱动提供文本聊天，官方执行工具单独配置。Antigravity仍需受管理harness摘要，按量DeepSeek ACP不冒充订阅路线。验收使用真实离线子进程、公开Host SDK/AgentLoop和真实SQLite，不声称实际厂商账号及付费推理已实测。 Windows深层安装目录会使用较短且经过ACL保护的私有会话目录，账号仍隔离保存，已提交工作空间保持原位置。
 
 Bot 设置先读取已保存模型并显示可编辑表单，再后台检测官方 CLI。CLI 卡住不再拖住设置窗口或 Host 启动。Host 单次检测总时限为12秒，客户端等待刷新最多15秒；超时工具在重新检测成功前保持不可用。检测期间仍可编辑、切换身份页与关闭窗口，未保存内容会保留，旧检测的迟到结果不能覆盖新选择。
 
@@ -24,7 +24,7 @@ Bot 官方工具现在独立于聊天模型配置。在 Bot 模型设置中点�
 
 **工作空间界面：**完整 Bot 版本新增重新设计的工作空间总览、任务待办、可搜索的团队目录、任务看板和工作空间搜索（产品页内 **Ctrl/Cmd K**）。目标会带入已有的预览与确认流程；外观支持跟随宿主、浅色、深色和紧凑布局。[实现与验证说明](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-workspace-upgrade.md)。
 
-正在进行的 [OpenMausBot 迁移](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-openmaus-full-migration.md)以 Bot 联系人和聊天为主界面，在会话中提供模型、电脑、记忆、语音、任务和资料入口。本版加入两分钟二维码设备邀请、六位确认码、公钥固定的 Noise 加密，以及经过 Host 的网页和原生客户端桌面通道。桌面支持审阅后发送文字、组合键、双指滚动、适应/原始比例与全屏；例行录制会保留已确认的输入释放步骤。请使用下方配套的 Agent 0.1.2。协议、安装目录运行及隔离桌面测试见[配对实现记录](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-secure-pairing.md)，真实远程桌面和上游完整功能集尚未完成验收。付费云桌面订阅不迁入。 导入邀请须手输目标电脑显示的确认码；凭据保存中断时先核对原记录，再继续登记。
+正在进行的 [OpenMausBot 迁移](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-openmaus-full-migration.md)以 Bot 联系人和聊天为主界面，在会话中提供模型、电脑、记忆、语音、任务和资料入口。本版加入两分钟二维码设备邀请、六位确认码、公钥固定的 Noise 加密，以及经过 Host 的网页和原生客户端桌面通道。桌面支持审阅后发送文字、组合键、双指滚动、适应/原始比例与全屏；例行录制会保留已确认的输入释放步骤。请使用下方配套的 Agent 0.1.3。协议、安装目录运行及隔离桌面测试见[配对实现记录](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-secure-pairing.md)，真实远程桌面和上游完整功能集尚未完成验收。付费云桌面订阅不迁入。 导入邀请须手输目标电脑显示的确认码；凭据保存中断时先核对原记录，再继续登记。
 
 本版还接通联系人底部的实时任务待办角标，新增按日期、Bot、来源和状态筛选收据、分组与 CSV 导出。未加载完整的任务和未知金额会明确标注，收据日期按 Host 时区计算。[收据分析与验证说明](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261108-receipt-explorer.md)。
 
@@ -95,8 +95,8 @@ API 资金调用需要 Host 提供模型容量信息。保存的输入额度需�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.69.0`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.69.0`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.70.0`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.70.0`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 在 Harness 官方 **模型** 设置中配置 Provider 凭据和模型。完整版本进入 Bot 工作区；纯路由版本从侧栏打开 **模型路由**。
 
@@ -104,10 +104,10 @@ API 资金调用需要 Host 提供模型容量信息。保存的输入额度需�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.69.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.70.0
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.69.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.70.0
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -191,7 +191,7 @@ Host 的 Claude 对话引擎配置可启用 `hostTools: true`，通过私有 MCP
 
 ## 多 Bot 任务进度与待处理
 
-**适用于完整 Bot 版本 0.69.0。** 在 **任务** 页面按 Bot 查看任务数量，通过 **全部 / 进行中 / 待处理 / 已结束** 筛选，或搜索任务名称及任务、计划、操作编号。计数和筛选针对已加载记录；资金准入检查属于进行中，等待预算属于待处理。
+**适用于完整 Bot 版本 0.70.0。** 在 **任务** 页面按 Bot 查看任务数量，通过 **全部 / 进行中 / 待处理 / 已结束** 筛选，或搜索任务名称及任务、计划、操作编号。计数和筛选针对已加载记录；资金准入检查属于进行中，等待预算属于待处理。
 
 **需要你处理** 显示完整数量，超过六项时可展开全部。每项都能打开原任务；等待审批时可进入对应 Bot 私聊查看原请求。打开任务后可查看 **任务时间线**，了解排队、资金准入、执行、停止请求及收据核对，并展开每次尝试的原编号。日志读取不会重新派发任务或调用模型；停止请求仍需等待确认。旧宿主未提供时间线时，页面保留现有收据详情。
 
@@ -242,7 +242,7 @@ Main Bot 也可调用 `bot_route_task` 或同义工具 `bot_dispatch`；两者�
 
 **在被控制的电脑上：**
 
-1. 下载 [Windows Agent 0.1.2 完整包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.69.0/dsh-remote-agent-0.1.2-windows-x64.zip)，解压到长期保留的目录，运行 `start.cmd`，并保持 Windows 交互用户已登录。
+1. 下载 [Windows Agent 0.1.3 完整包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.70.0/dsh-remote-agent-0.1.3-windows-x64.zip)，解压到长期保留的目录，运行 `start.cmd`，并保持 Windows 交互用户已登录。
 2. 在向导中设置可访问的地址、端口、允许工作目录及可选命令/浏览器能力。向导为当前用户注册 Agent 与桌面 helper，生成 `private/pairing.private.json`，不保存 Windows 密码；再次运行会保留已有配置。
 
 **在 Harness 中：**
@@ -298,7 +298,7 @@ Provider 凭据和认证会话由 Harness 管理。路由状态、收据、Bot �
 | --- | --- |
 | Harness 集成 | 声明的宿主版本见 [package.json](package.json)；集成验证使用实际 Harness SDK **0.2.1-rc.4**。 |
 | Bot 基础 | 固定 [DS Bot](https://github.com/Fei2411/DS-Bot) **0.2.7**，叠加本项目集成与产品扩展。 |
-| 远程桌面 | Windows x64 Agent **0.1.2**，需要可用且已登录的交互桌面。 |
+| 远程桌面 | Windows x64 Agent **0.1.3**，需要可用且已登录的交互桌面。 |
 | 工具执行 | 以工作台显示的本机平台、CLI 安装、账户、准确模型与执行适配器支持情况为准。 |
 
 <a id="troubleshooting"></a>

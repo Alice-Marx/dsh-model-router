@@ -6,9 +6,9 @@
 // same protocol core with every product decision pushed out to trusted Host
 // state: authority, binding, entry, argv, environment, model routes, hooks.
 //
-// What this adapter is NOT: it is not wired into product composition. Being
-// present in the tree does not make any ACP CLI a usable Bot engine, and no CLI
-// is claimed to be verified here.
+// Product composition wires this core through bot-engines/acp-chat-engine.mjs.
+// Driver-specific owner pinning and account provisioning live in that layer;
+// offline protocol fixtures do not certify real vendor account inference.
 //
 // Authority and money boundaries, matching packages/bot-engines:
 //   - a turn payload may carry `text` and nothing else;
@@ -33,6 +33,7 @@
 //     while that turn is pending: a new binding means a new adapter.
 
 import { EventEmitter } from 'node:events'
+import { createPrivateProfileHome } from '../../cli-runtime/src/native-process.mjs'
 import { randomBytes } from 'node:crypto'
 import { mkdir, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
@@ -92,8 +93,8 @@ export async function createAcpAdapter(options = {}) {
     model = {}, billing = 'subscription',
     deadlineMs = DEFAULT_ADAPTER_LIMITS.deadlineMs,
     signal, hooks = {}, onPermissionRequest, operationTool = null,
-    clientCapabilities = {}, auth = {}, resumeSessionId = null, expectedModelId = null,
-    launcher = DEFAULT_LAUNCHER, python,
+    clientCapabilities = {}, auth = {}, resumeSessionId = null, expectedModelId = null, requireModelSelection = false,
+    launcher = DEFAULT_LAUNCHER, python, provisionCredentials = null,
   } = options
   const limits = { ...DEFAULT_ADAPTER_LIMITS, ...(options.limits ?? {}) }
 
@@ -120,12 +121,14 @@ export async function createAcpAdapter(options = {}) {
   if (!(await stat(cwd)).isDirectory()) throw new Error('INVALID_ACP_WORKSPACE')
   await mkdir(runtimeRoot, { recursive: true, mode: 0o700 })
   const root = await realpath(runtimeRoot)
-  const home = join(root, `acp-${operationId}`)
-  await mkdir(home, { recursive: true, mode: 0o700 })
+  const home = await createPrivateProfileHome(root, `acp-${operationId}`, { recursive: true })
   for (const folder of ['tmp', 'cache', 'config', 'data', 'appdata', 'local']) await mkdir(join(home, folder), { recursive: true, mode: 0o700 })
   const probe = await launcher.probe({ home, python })
   if (!probe?.available) throw new Error(`NATIVE_PEER_UNAVAILABLE: ${probe?.reason ?? 'unknown'}`)
   await launcher.protect(probe.helper, home)
+  if (provisionCredentials !== null && typeof provisionCredentials !== 'function') throw new TypeError('ACP_CREDENTIAL_PROVIDER_INVALID')
+  const provisioned = await provisionCredentials?.(home)
+  const environment = provisioned?.env ?? {}
   const pinned = await pinAcpEntry(entry, home, { versionArgs })
   const deadlineEnd = Date.now() + deadlineMs
   const { botId, revision } = authority.describe(subject)
@@ -133,7 +136,7 @@ export async function createAcpAdapter(options = {}) {
   let rpc = null, host = null, session = null, pipe = null
   let currentProcess = null, stopPromise = null, stopped = false, fatalError = null
   let stopRequestedAt = null, launches = 0, turnsDispatched = 0, turnsAdmitted = 0, turnsSettled = 0, resumeRefused = false
-  let sessionId = null, reportedModel = null, modelMismatch = false
+  let sessionId = null, reportedModel = null, modelMismatch = false, modelSelectionConfirmed = false
   // One generation per launch: a retired process never answers for the turn
   // that replaced it, and a stop never leaves a late spawn behind.
   let generation = 0, launchPromise = null, retiredSpawn = null
@@ -279,10 +282,11 @@ export async function createAcpAdapter(options = {}) {
     const remaining = deadlineEnd - Date.now()
     if (remaining <= 1000) throw new Error('ACP_DEADLINE')
     const own = ++generation
+    modelSelectionConfirmed = false
     let started = null
     try {
       started = await launchAcpProcess({
-        entry: pinned, args: spawnArgs, cwd, home, ttlMs: Math.min(remaining, limits.ttlMs), launcher, python, probe,
+        entry: pinned, args: spawnArgs, cwd, home, ttlMs: Math.min(remaining, limits.ttlMs), launcher, python, probe, environment,
       })
     } catch (error) {
       if (stopped) throw new Error(`ACP_STOPPED: ${fatalError?.message ?? 'stopped during launch'}`)
@@ -395,17 +399,21 @@ export async function createAcpAdapter(options = {}) {
       let reported = null
       if (frame?.method === ACP_METHODS.sessionUpdate) {
         const update = frame.params?.update ?? {}
-        if (update.sessionUpdate === 'current_mode_update' && typeof update.currentModeId === 'string') reported = update.currentModeId
+        if (update.sessionUpdate === 'current_model_update' && typeof update.currentModelId === 'string') reported = update.currentModelId
       }
       if (frame?.id !== undefined && frame.method === undefined) {
-        const params = frame.params ?? {}
+        const params = frame.result ?? {}
         if (typeof params.modelId === 'string') reported = params.modelId
         if (typeof params.currentModelId === 'string') reported = params.currentModelId
+        if (typeof params.models?.currentModelId === 'string') reported = params.models.currentModelId
       }
       if (typeof reported === 'string' && reported) {
         reportedModel = reported
         // Only a Host-declared expectation can make a report a mismatch.
-        if (typeof expectedModelId === 'string' && expectedModelId && reported !== expectedModelId) modelMismatch = true
+        if (typeof expectedModelId === 'string' && expectedModelId && reported !== expectedModelId) {
+          modelMismatch = true
+          if (modelSelectionConfirmed) fatal(new Error('ACP_MODEL_IDENTITY_MISMATCH'), 'model-identity-mismatch')
+        }
       }
     }
     supervisor.events.on('control', onControl)
@@ -555,6 +563,14 @@ export async function createAcpAdapter(options = {}) {
     }
     resumeRefused = false
     sessionId = opened.sessionId
+    if (requireModelSelection) {
+      assertDispatchAuthorization()
+      await live.selectModel(catalogModel)
+      assertDispatchAuthorization()
+      reportedModel = catalogModel
+      modelMismatch = false
+      modelSelectionConfirmed = true
+    }
     events.emit('session', { sessionId: sessionId, resumed: opened.resumed === true, refused: false })
     // Diagnostic only: this reports that a session exists. It is never a
     // settlement and never carries money — settlement is `onSettle` alone.
@@ -763,8 +779,8 @@ export async function createAcpAdapter(options = {}) {
     fatalError: fatalError ? String(fatalError.message) : null,
     closed: stopped,
     limitations: [
-      'not wired into product composition: presence in the tree is not product availability',
-      'no ACP CLI is verified end-to-end here; entry pinning is proven against offline fixtures only',
+      'product availability requires an explicitly registered supported driver and owner-pinned entry',
+      'offline protocol coverage does not certify real vendor account login or paid inference',
       'session-scoped "allow always" approvals are deliberately not implemented: every ask is decided by the Host',
       'ACP reports token/context usage and no dollar amount, so cost stays null/unknown',
       'a live model switch away from the committed catalogModel is refused: a different binding needs a rebuilt, re-authorized adapter',

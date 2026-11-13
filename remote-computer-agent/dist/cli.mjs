@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { readFile as readFile10, writeFile as writeFile7, mkdir as mkdir8 } from "node:fs/promises";
+import { readFile as readFile10, writeFile as writeFile7, mkdir as mkdir9 } from "node:fs/promises";
 import { resolve as resolve5, dirname as dirname4, join as join9 } from "node:path";
 
 // src/agent.ts
-import { readFile as readFile9, writeFile as writeFile5, mkdir as mkdir6, rename, unlink as unlink5, stat as stat7, realpath as realpath7 } from "node:fs/promises";
+import { readFile as readFile9, writeFile as writeFile5, mkdir as mkdir7, rename, unlink as unlink5, stat as stat7, realpath as realpath7 } from "node:fs/promises";
 import { join as join8, dirname as dirname2, resolve as resolve3 } from "node:path";
 import { randomUUID as randomUUID7 } from "node:crypto";
 import { spawn as spawn4, execFile as execFile2 } from "node:child_process";
@@ -13,7 +13,7 @@ import { promisify as promisify2 } from "node:util";
 
 // src/protocol.ts
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-var AGENT_VERSION = "0.1.2";
+var AGENT_VERSION = "0.1.3";
 var AGENT_API_MAJOR = 1;
 var AgentError = class extends Error {
   constructor(code, status = 400) {
@@ -3591,7 +3591,7 @@ import { randomBytes as randomBytes6 } from "node:crypto";
 
 // ../packages/cli-runtime/src/codex-session-core.mjs
 import { createHash as createHash6 } from "node:crypto";
-import { readFile as readFile7, realpath as realpath6, stat as stat5, mkdir as mkdir5, writeFile as writeFile3 } from "node:fs/promises";
+import { readFile as readFile7, realpath as realpath6, stat as stat5, mkdir as mkdir6, writeFile as writeFile3 } from "node:fs/promises";
 import { spawn as spawn3 } from "node:child_process";
 import { isAbsolute as isAbsolute5, join as join6 } from "node:path";
 
@@ -3599,11 +3599,11 @@ import { isAbsolute as isAbsolute5, join as join6 } from "node:path";
 import { spawn as spawn2 } from "node:child_process";
 import { EventEmitter as EventEmitter2 } from "node:events";
 import { StringDecoder } from "node:string_decoder";
-import { access as access2, lstat as lstat5, readFile as readFile6, readdir as readdir2, realpath as realpath4, rmdir, unlink as unlink4 } from "node:fs/promises";
+import { access as access2, lstat as lstat5, mkdir as mkdir4, mkdtemp, readFile as readFile6, readdir as readdir2, realpath as realpath4, rmdir, unlink as unlink4 } from "node:fs/promises";
 import { lstatSync as lstatSync2, mkdirSync as mkdirSync2, mkdtempSync, readFileSync as readFileSync2, realpathSync, writeFileSync as writeFileSync2 } from "node:fs";
 import { randomBytes as randomBytes4 } from "node:crypto";
 import { tmpdir } from "node:os";
-import { basename, dirname, isAbsolute as isAbsolute3, join as join4 } from "node:path";
+import { basename, dirname, isAbsolute as isAbsolute3, join as join4, toNamespacedPath } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ../packages/cli-runtime/src/native-cli-output.mjs
@@ -3754,6 +3754,7 @@ async function resolveNativeHelper({ python = "/usr/bin/python3" } = {}) {
   return Object.freeze({ executable: await realpath4(python), prefix: ["-u", join4(HERE, "native-peer.py")], platform: "linux" });
 }
 function nativeProcess(helper, mode, spec, { home, env: env2 = privateEnvironment(home) } = {}) {
+  if (helper.platform === "win32" && home.length > 240) throw Object.assign(new Error("NATIVE_PROFILE_HOME_TOO_LONG"), { code: "NATIVE_PROFILE_HOME_TOO_LONG" });
   const events = new EventEmitter2();
   const args2 = helper.platform === "win32" ? [...helper.prefix, "-Mode", mode] : [...helper.prefix, mode];
   const compiler = helper.platform === "win32" ? compilerDirectory() : null;
@@ -3762,7 +3763,7 @@ function nativeProcess(helper, mode, spec, { home, env: env2 = privateEnvironmen
     helperEnv[COMPILER_ROOT] = compiler.root;
     helperEnv[COMPILER_SCRATCH] = compiler.path;
   }
-  const child = spawn2(helper.executable, args2, { cwd: home, env: helperEnv, windowsHide: true, shell: false, stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawn2(helper.executable, args2, { cwd: compiler ? compiler.root : home, env: helperEnv, windowsHide: true, shell: false, stdio: ["pipe", "pipe", "pipe"] });
   let tail = "", buffer = "", bytes = 0, closed2 = false, treeStopped = false;
   const decoder = new StringDecoder("utf8"), cliDecoder = new StringDecoder("utf8");
   const cliOutput = new NativeCliOutput();
@@ -3782,6 +3783,8 @@ function nativeProcess(helper, mode, spec, { home, env: env2 = privateEnvironmen
   child.on("error", (error2) => events.emit("failure", error2));
   child.stdin.on("error", () => {
   });
+  child.stdout.on("error", (error2) => events.emit("failure", error2));
+  child.stderr.on("error", (error2) => events.emit("failure", error2));
   child.stderr.on("data", (data) => {
     tail = (tail + data.toString("utf8")).slice(-4096);
   });
@@ -3815,7 +3818,12 @@ function nativeProcess(helper, mode, spec, { home, env: env2 = privateEnvironmen
     }
     child.stdin.write(wire, (error2) => error2 ? reject(error2) : resolve6());
   });
-  if (spec) void send(spec).catch((error2) => events.emit("failure", error2));
+  const nativeSpec = helper.platform === "win32" && spec ? {
+    ...spec,
+    ...mode === "protect" && typeof spec.path === "string" && spec.path.length >= 260 ? { path: toNamespacedPath(spec.path) } : {},
+    ...mode === "supervise" && typeof spec.cwd === "string" && spec.cwd.length >= 260 ? { cwd: toNamespacedPath(spec.cwd) } : {}
+  } : spec;
+  if (nativeSpec) void send(nativeSpec).catch((error2) => events.emit("failure", error2));
   function waitControl(name, timeoutMs = 15e3) {
     return new Promise((resolve6, reject) => {
       const clean = () => {
@@ -3887,7 +3895,7 @@ async function protectProfile(helper, home) {
 
 // ../packages/capability-broker/src/cli-bootstrap.mjs
 import { generateKeyPairSync, sign as sign2, randomBytes as randomBytes5 } from "node:crypto";
-import { mkdir as mkdir4, writeFile as writeFile2, mkdtemp, chmod, lstat as lstat6, realpath as realpath5, rmdir as rmdir2 } from "node:fs/promises";
+import { mkdir as mkdir5, writeFile as writeFile2, mkdtemp as mkdtemp2, chmod, lstat as lstat6, realpath as realpath5, rmdir as rmdir2 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
 import { isAbsolute as isAbsolute4, join as join5 } from "node:path";
 import { performance as performance2 } from "node:perf_hooks";
@@ -3977,15 +3985,15 @@ async function createCliBootstrap({ authority, subject, binding, tools, handlers
   const native = helper ?? await resolveNativeHelper();
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   const publicSpki = publicKey.export({ type: "spki", format: "der" }).toString("base64url");
-  await mkdir4(home, { recursive: true, mode: 448 });
-  await mkdir4(join5(home, "tmp"), { recursive: true, mode: 448 });
+  await mkdir5(home, { recursive: true, mode: 448 });
+  await mkdir5(join5(home, "tmp"), { recursive: true, mode: 448 });
   const descriptorPath2 = join5(home, `bridge-${randomBytes5(12).toString("hex")}.json`);
   let socketDirectory;
   let endpoint = process.platform === "win32" ? `dsh-cli-${randomBytes5(18).toString("hex")}` : join5(home, `p-${randomBytes5(6).toString("hex")}.sock`);
   if (process.platform === "linux" && Buffer.byteLength(endpoint) > 103) {
     let parent = await realpath5(tmpdir2());
     if (Buffer.byteLength(join5(parent, "dsh-cli-XXXXXX", "p.sock")) > 103) parent = await realpath5("/tmp");
-    socketDirectory = await mkdtemp(join5(parent, "dsh-cli-"));
+    socketDirectory = await mkdtemp2(join5(parent, "dsh-cli-"));
     await chmod(socketDirectory, 448);
     const stat8 = await lstat6(socketDirectory);
     if (!stat8.isDirectory() || stat8.isSymbolicLink() || stat8.uid !== process.getuid() || (stat8.mode & 63) !== 0) {
@@ -4366,11 +4374,11 @@ async function createCodexSessionCore({
   if (roleInstructions !== void 0 && !validText(roleInstructions)) throw new TypeError("INVALID_CLI_ROLE");
   const cwd = await realpath6(workspace);
   if (!(await stat5(cwd)).isDirectory()) throw new Error("INVALID_WORKSPACE");
-  await mkdir5(runtimeRoot, { recursive: true, mode: 448 });
+  await mkdir6(runtimeRoot, { recursive: true, mode: 448 });
   const root = await realpath6(runtimeRoot);
   const home = join6(root, `h-${operationId}`);
-  await mkdir5(home, { mode: 448 });
-  for (const folder of ["tmp", "cache", "config", "data", "appdata", "local", "b"]) await mkdir5(join6(home, folder), { mode: 448 });
+  await mkdir6(home, { mode: 448 });
+  for (const folder of ["tmp", "cache", "config", "data", "appdata", "local", "b"]) await mkdir6(join6(home, folder), { mode: 448 });
   const probe = await capabilityProbe({ home, python });
   if (!probe.available) throw new Error(`NATIVE_PEER_UNAVAILABLE: ${probe.reason}`);
   await protectProfile(probe.helper, home);
@@ -5132,7 +5140,7 @@ var Agent = class {
     const usage = await this.evictArtifacts(data.length);
     if (usage + data.length > ARTIFACT_QUOTA_BYTES) fail("ARTIFACT_QUOTA", 507);
     const id2 = `artifact-${randomUUID7()}`;
-    await mkdir6(join8(this.config.dataDir, "artifacts"), { recursive: true, mode: 448 });
+    await mkdir7(join8(this.config.dataDir, "artifacts"), { recursive: true, mode: 448 });
     await writeFile5(join8(this.config.dataDir, "artifacts", id2), data, { flag: "wx", mode: 384 });
     this.store.db.prepare("INSERT INTO artifacts VALUES (?,?,?,?,?)").run(id2, canonical(c), sha(data), data.length, media);
     return { artifactId: id2, sha256: sha(data), size: data.length, mediaType: media };
@@ -5885,7 +5893,7 @@ Content-Length: 0\r
 // src/pairing-page.ts
 import QRCode from "qrcode";
 import { randomBytes as randomBytes7 } from "node:crypto";
-import { mkdir as mkdir7, writeFile as writeFile6, lstat as lstat8, rename as rename2, rm } from "node:fs/promises";
+import { mkdir as mkdir8, writeFile as writeFile6, lstat as lstat8, rename as rename2, rm } from "node:fs/promises";
 import { dirname as dirname3, resolve as resolve4 } from "node:path";
 var escape = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 async function pairingPage(invite) {
@@ -5914,7 +5922,7 @@ async function writePairingPage(invite, destination) {
     });
     if (old && (!old.isFile() || old.isSymbolicLink() || old.nlink !== 1)) fail("PAIRING_OUTPUT_INVALID");
   }
-  await mkdir7(dirname3(page), { recursive: true, mode: 448 });
+  await mkdir8(dirname3(page), { recursive: true, mode: 448 });
   const result = await pairingPage(invite);
   for (const [path4, text] of [[json, JSON.stringify(JSON.parse(result.payload), null, 2) + "\n"], [page, result.html]]) {
     const temporary = `${path4}.${randomBytes7(8).toString("hex")}.tmp`;
@@ -5936,7 +5944,7 @@ try {
   if (command === "init") {
     const root = resolve5(args[0] ?? ".");
     const config = { dataDir: join9(dirname4(file), "data"), roots: { project: root }, isolation: "application", network: { mode: "loopback", host: "127.0.0.1", port: 9701 }, executables: { node: process.execPath }, browserOrigins: [] };
-    await mkdir8(dirname4(file), { recursive: true, mode: 448 });
+    await mkdir9(dirname4(file), { recursive: true, mode: 448 });
     await writeFile7(file, JSON.stringify(config, null, 2) + "\n", { flag: "wx", mode: 384 });
     console.log(JSON.stringify({ configured: file, next: "Run pair with an explicit Bot/tool/root ceiling, then serve." }));
   } else {

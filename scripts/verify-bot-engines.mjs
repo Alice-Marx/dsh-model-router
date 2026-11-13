@@ -59,9 +59,9 @@ try {
   check(catalog.BOT_ENGINE_DRIVER_IDS.length === 26, 'catalog holds exactly the 26 upstream driver ids')
   check(new Set(catalog.BOT_ENGINE_DRIVER_IDS).size === 26, 'driver ids are unique')
   const implemented = catalog.BOT_ENGINE_DRIVERS.filter(driver => driver.availability === 'implemented').map(driver => driver.id)
-  check(JSON.stringify(implemented) === JSON.stringify(['claude']), 'only claude is implemented')
+  check(implemented.length === 16 && ['claude', 'codex', 'pi', 'museCode', 'cursorAgent'].every(id => implemented.includes(id)), 'sixteen concrete native chat drivers are implemented')
   check(catalog.UPSTREAM_SOURCE.pin === '1bc4749aa8307d7d6998bf86de4ef6478460dd93', 'upstream pin recorded')
-  check(catalog.getBotEngineDriver('customAcp').targetCapability === 'pending-acp-core', 'customAcp awaits trusted registration and ACP core')
+  check(catalog.getBotEngineDriver('customAcp').targetCapability === 'native-chat-engine', 'customAcp uses trusted owner registration and retained ACP core')
   let refused = false
   try { catalog.assertNoAdHocDriverInput({ driver: 'claude', executable: 'x.exe' }) } catch { refused = true }
   check(refused, 'ad-hoc executable input is rejected')

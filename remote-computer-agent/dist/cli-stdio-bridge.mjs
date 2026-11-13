@@ -9,11 +9,11 @@ import { serveStdio, StdioServerTransport } from "@modelcontextprotocol/server/s
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { StringDecoder } from "node:string_decoder";
-import { access, lstat, readFile, readdir, realpath, rmdir, unlink } from "node:fs/promises";
+import { access, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rmdir, unlink } from "node:fs/promises";
 import { lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
-import { basename, dirname, isAbsolute, join } from "node:path";
+import { basename, dirname, isAbsolute, join, toNamespacedPath } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ../packages/cli-runtime/src/native-cli-output.mjs
@@ -154,6 +154,7 @@ function privateEnvironment(home, source = process.env) {
   return env;
 }
 function nativeProcess(helper, mode, spec, { home, env = privateEnvironment(home) } = {}) {
+  if (helper.platform === "win32" && home.length > 240) throw Object.assign(new Error("NATIVE_PROFILE_HOME_TOO_LONG"), { code: "NATIVE_PROFILE_HOME_TOO_LONG" });
   const events = new EventEmitter();
   const args = helper.platform === "win32" ? [...helper.prefix, "-Mode", mode] : [...helper.prefix, mode];
   const compiler = helper.platform === "win32" ? compilerDirectory() : null;
@@ -162,7 +163,7 @@ function nativeProcess(helper, mode, spec, { home, env = privateEnvironment(home
     helperEnv[COMPILER_ROOT] = compiler.root;
     helperEnv[COMPILER_SCRATCH] = compiler.path;
   }
-  const child = spawn(helper.executable, args, { cwd: home, env: helperEnv, windowsHide: true, shell: false, stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawn(helper.executable, args, { cwd: compiler ? compiler.root : home, env: helperEnv, windowsHide: true, shell: false, stdio: ["pipe", "pipe", "pipe"] });
   let tail = "", buffer = "", bytes = 0, closed = false, treeStopped = false;
   const decoder = new StringDecoder("utf8"), cliDecoder = new StringDecoder("utf8");
   const cliOutput = new NativeCliOutput();
@@ -182,6 +183,8 @@ function nativeProcess(helper, mode, spec, { home, env = privateEnvironment(home
   child.on("error", (error) => events.emit("failure", error));
   child.stdin.on("error", () => {
   });
+  child.stdout.on("error", (error) => events.emit("failure", error));
+  child.stderr.on("error", (error) => events.emit("failure", error));
   child.stderr.on("data", (data) => {
     tail = (tail + data.toString("utf8")).slice(-4096);
   });
@@ -215,7 +218,12 @@ function nativeProcess(helper, mode, spec, { home, env = privateEnvironment(home
     }
     child.stdin.write(wire, (error) => error ? reject(error) : resolve());
   });
-  if (spec) void send(spec).catch((error) => events.emit("failure", error));
+  const nativeSpec = helper.platform === "win32" && spec ? {
+    ...spec,
+    ...mode === "protect" && typeof spec.path === "string" && spec.path.length >= 260 ? { path: toNamespacedPath(spec.path) } : {},
+    ...mode === "supervise" && typeof spec.cwd === "string" && spec.cwd.length >= 260 ? { cwd: toNamespacedPath(spec.cwd) } : {}
+  } : spec;
+  if (nativeSpec) void send(nativeSpec).catch((error) => events.emit("failure", error));
   function waitControl(name, timeoutMs = 15e3) {
     return new Promise((resolve, reject) => {
       const clean = () => {

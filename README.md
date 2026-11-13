@@ -14,9 +14,9 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.69.0 · Windows Remote Agent: 0.1.2**
+**Current stable version: 0.70.0 · Windows Remote Agent: 0.1.3**
 
-**Release 0.69.0: independent AI providers.** The Bot plugin has its own AI settings page for named API connections, endpoints, keys and model capacities. Open **AI providers** in the sidebar or **Settings → AI**, add a connection and models, then select them in Bot settings. Multiple accounts from one provider have separate routes; Main can use multiple routes. Existing Harness routes remain available. Keys stay in the plugin namespace of the Host credential store and are never returned to the page. A catalog check means configured; a successful inference verifies readiness. Official CLIs keep their own accounts and separate tool status. Supports OpenAI Chat Completions/Responses, Anthropic Messages and Gemini streaming for text and structured tools. This release does not add unadapted CLI chat drivers. Verification uses isolated data and local fixture providers.
+**Release 0.70.0: native CLI chat connections.** Add a CLI connection under **Settings → AI**, verify its installed executable/version, save its own account credentials, then choose it for a Bot or Main route. Fifteen new native text-chat drivers join Claude: Codex, Pi, Muse Code, Grok, Gemini, Kimi Code, Droid, Cursor, OpenCode, Qwen, Hermes, Cline, Copilot, Command Code and custom ACP. Sessions retain a real process across turns, confirm the exact model, enforce committed funding/grants and retire uncertain outcomes without replay. Credentials are write-only and only explicitly imported from approved account files. New drivers provide text chat; official execution tools stay separately configured. Antigravity still needs a pinned managed harness, and API-metered DeepSeek ACP remains outside the subscription bridge. Verification uses real offline child processes, public Host SDK/AgentLoop and actual SQLite; vendor account/paid inference is not claimed. Deep Windows installations use a short, ACL-protected private session home; credentials remain isolated and the committed workspace stays unchanged.
 
 Bot settings now load the saved model and editable form before checking official CLIs in the background. A stalled CLI cannot keep the settings drawer or Host startup waiting. The Host ends a detection attempt after 12 seconds; the client stops waiting for a refresh after 15 seconds. Timed-out tools remain unavailable until a successful recheck. Switching tabs, editing and closing the drawer stay available, unsaved changes survive detection, and late results from an old check cannot replace a newer selection.
 
@@ -24,7 +24,7 @@ Bot official tools now use their own CLI configuration independently of the chat
 
 **Workspace interface:** the full Bot edition now includes a redesigned workspace overview, task inbox, searchable team directory, task boards, and workspace search (**Ctrl/Cmd K** on product pages). Goals move into the existing review-and-confirm flow; display preferences offer Host-following, light, dark, and compact layouts. [Implementation and verification](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-workspace-upgrade.md).
 
-The ongoing [OpenMausBot migration](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-openmaus-full-migration.md) makes Bot contacts and chat the main interface, with contextual model, computer, memory, voice, task and library controls. The plugin adds two-minute QR device invitations, six-digit confirmation, pinned Noise encryption and Host-mediated desktop streams for web and native clients. Desktop tools include reviewed text entry, keyboard shortcuts, two-finger scrolling, fit/original scaling and fullscreen; recorded routines retain acknowledged input releases. Use the matching Agent 0.1.2 package linked below. Protocol, installed-runtime and isolated desktop tests are recorded in the [pairing implementation notes](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-secure-pairing.md); a real remote desktop and the complete upstream feature set have not yet been accepted. Paid cloud-desktop subscriptions are excluded. Invitation imports require a code typed from the target device; interrupted credential saves are reconciled before completing registration.
+The ongoing [OpenMausBot migration](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-openmaus-full-migration.md) makes Bot contacts and chat the main interface, with contextual model, computer, memory, voice, task and library controls. The plugin adds two-minute QR device invitations, six-digit confirmation, pinned Noise encryption and Host-mediated desktop streams for web and native clients. Desktop tools include reviewed text entry, keyboard shortcuts, two-finger scrolling, fit/original scaling and fullscreen; recorded routines retain acknowledged input releases. Use the matching Agent 0.1.3 package linked below. Protocol, installed-runtime and isolated desktop tests are recorded in the [pairing implementation notes](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-secure-pairing.md); a real remote desktop and the complete upstream feature set have not yet been accepted. Paid cloud-desktop subscriptions are excluded. Invitation imports require a code typed from the target device; interrupted credential saves are reconciled before completing registration.
 
 The workspace also shows live task attention below contacts and adds receipt filters by date, Bot, source and status, grouping, and CSV export. Partial task lists and unknown amounts are labeled; receipt dates follow the Host timezone. [Receipt exploration and verification](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261108-receipt-explorer.md).
 
@@ -95,8 +95,8 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.69.0`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.69.0`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.70.0`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.70.0`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. Configure provider credentials and models in the official Harness **Models** settings. Open the Bot workspace for the full edition, or **Model Router** in the sidebar for the routing-only edition.
 
@@ -104,10 +104,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.69.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.70.0
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.69.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.70.0
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -191,7 +191,7 @@ Integration mode reuses Harness Sessions. An optional independent runtime has it
 
 ## Multi-Bot task progress and pending items
 
-**Available in the full Bot edition 0.69.0.** On **Tasks**, inspect task counts per Bot, filter by **All / In progress / Needs attention / Ended**, or search task names and task, plan, or operation IDs. Counts and filters cover loaded records; funding admission is in progress, while budget waiting needs attention.
+**Available in the full Bot edition 0.70.0.** On **Tasks**, inspect task counts per Bot, filter by **All / In progress / Needs attention / Ended**, or search task names and task, plan, or operation IDs. Counts and filters cover loaded records; funding admission is in progress, while budget waiting needs attention.
 
 **Needs your attention** reports the full count and expands beyond six items. Each reminder opens the original task; approval reminders can open the owning Bot's conversation to show its original request. Open a task's **timeline** for queue, admission, execution, stop-request, and reconciliation events, with the original identities for each attempt. Reading history does not dispatch tasks or invoke models; stop requests still require confirmation. Older Hosts without history support retain existing receipt details.
 
@@ -242,7 +242,7 @@ The Main Bot can also call `bot_route_task` or its alias `bot_dispatch`. Both di
 
 **On the computer to control:**
 
-1. Download the [complete Windows Agent 0.1.2 package](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.69.0/dsh-remote-agent-0.1.2-windows-x64.zip), extract it into a permanent directory, and run `start.cmd`. Keep the interactive Windows user signed in.
+1. Download the [complete Windows Agent 0.1.3 package](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.70.0/dsh-remote-agent-0.1.3-windows-x64.zip), extract it into a permanent directory, and run `start.cmd`. Keep the interactive Windows user signed in.
 2. In the setup wizard, configure the accessible address, port, approved work directories, and optional command/browser capabilities. It registers the Agent and desktop helper for the current user and generates `private/pairing.private.json` without storing a Windows password. Subsequent runs retain the existing configuration.
 
 **In Harness:**
@@ -298,7 +298,7 @@ Provider credentials and authenticated sessions are managed by Harness. Routing 
 | --- | --- |
 | Harness integration | Declared Host versions are listed in [package.json](package.json); integration verification uses the actual Harness SDK **0.2.1-rc.4**. |
 | Bot foundation | Pinned [DS Bot](https://github.com/Fei2411/DS-Bot) **0.2.7**, with project-specific integration and product overlays. |
-| Remote desktop | Windows x64 Agent **0.1.2**, with an available signed-in interactive desktop. |
+| Remote desktop | Windows x64 Agent **0.1.3**, with an available signed-in interactive desktop. |
 | Tool execution | Availability depends on the local platform, installed CLI, account, exact model, and supported execution adapter shown by the workbench. |
 
 <a id="troubleshooting"></a>

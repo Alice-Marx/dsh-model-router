@@ -74,6 +74,11 @@ for (const mode of ['integrated', 'independent', 'wire', 'cancel']) test(`native
               })
             } }
           } })
+          // Establish the actual CLI and MCP transport with the instrumented
+          // Host before timing in-flight cancellation. Startup has its own bound.
+          assert.equal(await send('native-cancel-warmup', []), 'completed', JSON.stringify(errors))
+          const receiptsBefore = readRows('router_model_calls').length
+          assert.equal(receiptsBefore, 1)
           const callsBefore = remote.audits('TOOL_RESULT').length
           const sending = send('native-cancel-tool', [{ name: 'bot_fs_read', arguments: { relativePath: 'notes.txt' } }])
           let timer
@@ -87,8 +92,8 @@ for (const mode of ['integrated', 'independent', 'wire', 'cancel']) test(`native
           assert.equal(toolSignal.aborted, true, 'Host cancellation reaches the actual MCP handler signal')
           assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' })
           assert.equal(remote.audits('TOOL_RESULT').length, callsBefore)
-          assert.equal(readRows('router_model_calls').length, 1)
-          assert.notEqual(readRows('router_model_calls')[0].outcome, 'succeeded')
+          assert.equal(readRows('router_model_calls').length, receiptsBefore + 1)
+          assert.notEqual(readRows('router_model_calls').at(-1).outcome, 'succeeded')
           return
         }
         if (mode === 'wire') {

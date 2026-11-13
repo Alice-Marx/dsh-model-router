@@ -64,8 +64,8 @@ export const configFields = {
   // Host-owned pinned conversation routes. Bot bindings select only the
   // advertised provider/model; messages cannot supply these launch details.
   conversationEngines: z.array(z.object({
-    id: z.string().max(100), driver: z.union(['claude']).default('claude'),
-    provider: z.string().max(100), model: z.string().max(100), name: z.string().max(128),
+    id: z.string().max(100), driver: z.union(['claude', 'codex', 'pi', 'museCode', 'grokAgent', 'geminiAgent', 'kimiAgent', 'droidAgent', 'cursorAgent', 'opencodeGo', 'qwenAgent', 'hermesAgent', 'clineAgent', 'copilotAgent', 'commandCodeAgent', 'customAcp']).default('claude'),
+    provider: z.string().max(100), model: z.string().max(240), name: z.string().max(128),
     entry: z.object({ executable: z.string().max(4096), sha256: z.string().pattern(/^[a-f0-9]{64}$/), version: z.string().max(32),
       script: z.string().max(4096), scriptSha256: z.string().pattern(/^[a-f0-9]{64}$/) }),
     credentialRef: z.string().max(80), deadlineMs: z.number().step(1).min(1000).max(7200000),

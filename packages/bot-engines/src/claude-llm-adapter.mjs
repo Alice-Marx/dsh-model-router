@@ -141,6 +141,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
   #launcher
   #python
   #engineFactory
+  #nativeSession
   #generation = 1
   #closed = false
   #sessions = new Map()
@@ -172,6 +173,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
    * @param {{probe?:Function, protect?:Function, supervise?:Function}} [options.launcher] process-launcher seam
    * @param {string} [options.python] native-peer interpreter selection
    * @param {Function} [options.engineFactory] `(config) => Promise<engine>` retained-session seam; the default is the real `createClaudeEngine`
+   * @param {boolean} [options.nativeSession=false] use generic native-session display text for another registered driver
    */
   constructor(options = {}) {
     super()
@@ -180,10 +182,11 @@ export class ClaudeLlmAdapter extends LlmAdapter {
       entry = null, entryFor = null, runtimeRoot, workspace = null, workspaceFor = null,
       identityFor, requestFor = null, persona = null, hooks = {}, onPermissionRequest = null, provisionCredentials = null,
       tools = [], handlers = [], toolsFor = null, onActivity = null, permissionMode = 'default', deadlineMs = 120_000,
-      launcher = null, python, engineFactory = null,
+      launcher = null, python, engineFactory = null, nativeSession = false,
     } = options ?? {}
     if (!identifier(provider)) throw badOptions('CLAUDE_ROUTE_PROVIDER_REQUIRED')
-    if (typeof model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/.test(model)) throw badOptions('CLAUDE_ROUTE_MODEL_REQUIRED')
+    if (typeof nativeSession !== 'boolean') throw badOptions('CLAUDE_ROUTE_METADATA_INVALID')
+    if (typeof model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,239}$/.test(model)) throw badOptions('CLAUDE_ROUTE_MODEL_REQUIRED')
     if (funding !== CLAUDE_LLM_FUNDING) {
       throw badOptions(`CLAUDE_ROUTE_FUNDING_REFUSED: this bridge only opens an explicitly configured Claude subscription chat route, not ${JSON.stringify(funding)}`)
     }
@@ -235,6 +238,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
     this.#launcher = launcher
     this.#python = python
     this.#engineFactory = engineFactory ?? (config => createClaudeEngine(config))
+    this.#nativeSession = nativeSession
   }
 
   /** Display metadata for the one route this registration holds. */
@@ -248,7 +252,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
     if (provider !== this.#provider) return []
     return [Object.freeze({
       provider: this.#provider, id: this.#model, name: this.#model,
-      description: 'Claude 订阅会话路由：一次一条新的用户文本，保留一个原生 CLI 会话。',
+      description: `${this.#nativeSession ? '原生' : 'Claude '}订阅会话路由：一次一条新的用户文本，保留一个原生 CLI 会话。`,
       inputModalities: Object.freeze(['text']),
     })]
   }
@@ -266,7 +270,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
     signal?.throwIfAborted()
     return Object.freeze({
       provider: this.#provider, id: this.#model, name: this.#model,
-      description: 'Claude 订阅会话路由：仅文本，上下文窗口与输出上界未知（不伪造）。',
+      description: `${this.#nativeSession ? '原生' : 'Claude '}订阅会话路由：仅文本，上下文窗口与输出上界未知（不伪造）。`,
       inputModalities: Object.freeze(['text']),
     })
   }
@@ -305,7 +309,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
     if (this.#closed) throw new LlmError('this registration has been released', 'REGISTRATION_DISPOSED')
     if (!next || typeof next !== 'object') throw badOptions('CLAUDE_ROUTE_REPLACEMENT_REQUIRED')
     const model = next.model ?? this.#model
-    if (typeof model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/.test(model)) throw badOptions('CLAUDE_ROUTE_MODEL_REQUIRED')
+    if (typeof model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,239}$/.test(model)) throw badOptions('CLAUDE_ROUTE_MODEL_REQUIRED')
     const funding = next.funding ?? this.#funding
     if (funding !== CLAUDE_LLM_FUNDING) throw badOptions(`CLAUDE_ROUTE_FUNDING_REFUSED: ${JSON.stringify(funding)}`)
     const entry = next.entry === undefined ? this.#entry : Object.freeze({ ...next.entry })

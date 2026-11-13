@@ -14,7 +14,7 @@ import { EventEmitter } from 'node:events'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFile, realpath, stat } from 'node:fs/promises'
-import { isAbsolute } from 'node:path'
+import { isAbsolute, toNamespacedPath } from 'node:path'
 
 import { classifyMessage, parseFrame, previewMessage } from './rpc-codec.mjs'
 import { capabilityProbe, nativeProcess, privateEnvironment, protectProfile } from '../../cli-runtime/src/native-process.mjs'
@@ -42,7 +42,7 @@ export async function pinAcpEntry({ executable, sha256, version, script, scriptS
     if (!(await stat(scriptPath)).isFile() || digest(await readFile(scriptPath)) !== scriptSha256) throw new Error('ACP_ENTRY_SCRIPT_CHANGED')
   }
   const reported = await new Promise((resolve, reject) => {
-    const child = spawn(path, scriptPath ? [scriptPath, ...versionArgs] : versionArgs, { cwd: home, env: privateEnvironment(home), windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(path, scriptPath ? [scriptPath, ...versionArgs] : versionArgs, { cwd: process.platform === 'win32' && home.length >= 260 ? toNamespacedPath(home) : home, env: privateEnvironment(home), windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] })
     let output = ''
     let error = ''
     const timer = setTimeout(() => { child.kill(); reject(new Error('ACP_VERSION_TIMEOUT')) }, 15_000)
@@ -98,7 +98,7 @@ export function createSupervisorPipe(supervisor, { maxFrameBytes = 262_144 } = {
  * to it. `probe` may be supplied when the caller already probed and protected
  * this home: the profile ACL is applied once per home, not once per launch.
  */
-export async function launchAcpProcess({ entry, args, cwd, home, ttlMs, launcher = DEFAULT_LAUNCHER, python, probe = null }) {
+export async function launchAcpProcess({ entry, args, cwd, home, ttlMs, launcher = DEFAULT_LAUNCHER, python, probe = null, environment = {} }) {
   if (!entry?.path || !Array.isArray(args) || args.some(arg => typeof arg !== 'string')) throw new TypeError('ACP_LAUNCH_SPEC_INVALID')
   if (typeof cwd !== 'string' || !cwd) throw new TypeError('ACP_LAUNCH_CWD_REQUIRED')
   if (!Number.isSafeInteger(ttlMs) || ttlMs < 1000) throw new TypeError('ACP_LAUNCH_TTL_INVALID')
@@ -107,12 +107,16 @@ export async function launchAcpProcess({ entry, args, cwd, home, ttlMs, launcher
   const capability = probe ?? await launcher.probe({ home, python })
   if (!capability?.available) throw new Error(`NATIVE_PEER_UNAVAILABLE: ${capability?.reason ?? 'unknown'}`)
   if (!probe) await launcher.protect(capability.helper, home)
-  const supervisor = launcher.supervise(probe.helper, 'supervise', {
+  if (!environment || typeof environment !== 'object' || Array.isArray(environment)
+    || Object.entries(environment).some(([key, value]) => !/^[A-Z_][A-Z0-9_]*$/.test(key)
+      || /^(?:PATH|HOME|USERPROFILE|TEMP|TMP|NODE_OPTIONS|NODE_PATH|PYTHONPATH|PYTHONHOME|LD_PRELOAD|DYLD_INSERT_LIBRARIES|COMSPEC|SYSTEMROOT)$/i.test(key)
+      || typeof value !== 'string' || value.includes('\0') || value.length > 128_000)) throw new TypeError('ACP_CREDENTIAL_ENVIRONMENT_INVALID')
+  const supervisor = launcher.supervise(capability.helper, 'supervise', {
     executable: entry.path,
     args: entry.script ? [entry.script, ...args] : args,
     cwd,
     ttlMs,
-  }, { home, env: privateEnvironment(home) })
+  }, { home, env: { ...privateEnvironment(home), ...environment } })
   const spawned = await supervisor.waitControl('spawned').catch(error => {
     supervisor.end()
     throw error

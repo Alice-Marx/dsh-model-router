@@ -2,16 +2,17 @@
 
 The generic ACP (Agent Client Protocol) session core for the Bot runtime: a strictly
 bounded JSON-RPC 2.0 stdio transport, multi-turn session management, fail-closed
-permissions, and a Host-bound adapter the product composition can wire.
+permissions, and a Host-bound adapter wired through the native CLI chat module.
 
 Ported and re-grounded from OpenMausBot `server/drivers/acp/*` at pin
 `1bc4749aa8307d7d6998bf86de4ef6478460dd93` (Apache-2.0); see `licenses/NOTICE.md`
 for the exact upstream paths and the preserved license text.
 
-> **Status.** This module is a core, not a product feature. It is **not wired into
-> product composition**, and no ACP CLI is claimed to be verified end-to-end here.
-> Presence in the tree is not availability: the parent composition still has to
-> register a pinned entry, a grant scope and the funding/ledger hooks.
+> **Status.** Product composition uses this core for 12 native text chat driver
+> choices through `packages/bot-engines/src/acp-chat-engine.mjs`. Each choice has
+> offline two-turn child-process coverage. Owner registration pins the entry,
+> model and private account; Host hooks remain the only ledger authority. These
+> fixtures do not certify vendor account login or paid inference.
 
 ## Modules
 
