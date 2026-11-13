@@ -86,33 +86,37 @@ function LocalComputerHostView({ snapshot, dispatch, transport = dispatch, busy 
   }
   if (!available) return null
   const locked = Boolean(pending || busy), connected = view?.listening === true
-  return <details className="bp-card bp-local-computer" open><summary><UiIcon name="computer"/>本机 · 允许其他电脑连接</summary>
-    <p className="bp-muted">两台电脑均安装 Bot 插件即可配对。本机开启远程访问后，把邀请交给另一台电脑；对方在下方“安全配对电脑”中导入，连接本机的共享文件和桌面。</p>
-    <p role="status"><strong>{labels[view?.state] ?? '正在读取本机状态…'}</strong>{view?.config?.endpoint && <> · <code>{view.config.endpoint}</code></>}</p>
+  return <section className="bp-card bp-local-computer" aria-label="本机远程访问">
+    <header className="bp-connection-heading"><span className="bp-connection-icon"><UiIcon name="computer" size={23}/></span><div><h3>{view?.config?.name ?? '这台电脑'}</h3><p className="bp-connection-state" data-online={connected} role="status"><i/>{labels[view?.state] ?? '正在读取…'}</p></div>
+      {connected && <button type="button" disabled={locked} onClick={() => void run('stop', 'machine.host.stop', { expectedRevision: view.revision })}>{pending === 'stop' ? '正在关闭…' : '关闭远程访问'}</button>}</header>
+    <p className="bp-muted">共享文件与桌面，邀请另一台电脑连接。</p>
     {failure && <p className="bp-error" role="alert">{failure}</p>}
     {view?.errorCode && <p className="bp-error">{messages[view.errorCode] || `本机服务未就绪：${view.errorCode}`}</p>}
-    {draft && <div className="bp-form">
+    {draft && <details className="bp-local-settings" open={!view.config || undefined}><summary><UiIcon name="settings" size={15}/>{view.config ? '共享设置' : '选择共享内容'}<UiIcon name="chevron" size={14}/></summary><div className="bp-form">
       <label>这台电脑名称<input aria-label="本机名称" value={draft.name} maxLength={60} disabled={locked} onChange={e => change('name', e.target.value)}/></label>
-      <label>连接网卡<select aria-label="本机连接网卡" value={draft.listenAddress} disabled={locked} onChange={e => change('listenAddress', e.target.value)}>{view.addresses.map(address => <option key={address}>{address}</option>)}</select></label>
-      <label>端口<input aria-label="本机接入端口" type="number" min={1} max={65535} value={draft.port} disabled={locked} onChange={e => change('port', Number(e.target.value))}/></label>
       <label>共享文件夹<input aria-label="本机共享文件夹" value={draft.sharedDirectory} disabled={locked} onChange={e => change('sharedDirectory', e.target.value)}/></label>
-      <label>其他电脑使用的地址（可选）<input aria-label="本机连接地址" value={draft.endpoint} disabled={locked} placeholder={`http://${draft.listenAddress}:${draft.port}`} onChange={e => change('endpoint', e.target.value)}/></label>
-      <p className="bp-muted">默认使用所选网卡地址。跨网络连接需已有 VPN 或可达地址；邀请码不提供公网穿透。必要时在 Windows 防火墙中放行所选 TCP 端口。</p>
-      <label><input type="checkbox" checked={draft.allowWrite} disabled={locked} onChange={e => change('allowWrite', e.target.checked)}/>允许修改共享文件夹</label>
-      <label><input type="checkbox" checked={draft.allowDesktop} disabled={locked || !view.desktopSupported} onChange={e => change('allowDesktop', e.target.checked)}/>允许查看与控制 Windows 桌面</label>
-      <p className="bp-muted">对方可在所选范围内授权其团队 Bot。更改并保存设置会撤销现有配对，需重新邀请。</p>
+      <div className="bp-sharing-options"><label><span><UiIcon name="folder" size={17}/>文件修改</span><input type="checkbox" role="switch" aria-label="允许修改共享文件夹" checked={draft.allowWrite} disabled={locked} onChange={e => change('allowWrite', e.target.checked)}/></label>
+      <label><span><UiIcon name="computer" size={17}/>桌面控制</span><input type="checkbox" role="switch" aria-label="允许查看与控制 Windows 桌面" checked={draft.allowDesktop} disabled={locked || !view.desktopSupported} onChange={e => change('allowDesktop', e.target.checked)}/></label></div>
+      <details className="bp-connection-advanced"><summary>网络与高级设置</summary>
+        <label>连接网卡<select aria-label="本机连接网卡" value={draft.listenAddress} disabled={locked} onChange={e => change('listenAddress', e.target.value)}>{view.addresses.map(address => <option key={address}>{address}</option>)}</select></label>
+        <label>端口<input aria-label="本机接入端口" type="number" min={1} max={65535} value={draft.port} disabled={locked} onChange={e => change('port', Number(e.target.value))}/></label>
+        <label>连接地址（可选）<input aria-label="本机连接地址" value={draft.endpoint} disabled={locked} placeholder={`http://${draft.listenAddress}:${draft.port}`} onChange={e => change('endpoint', e.target.value)}/></label>
+        <p className="bp-muted">跨网需已有 VPN 或可达地址；必要时放行所选 TCP 端口。配对不提供公网穿透。</p>
+        <p className="bp-muted">对方可在所选范围内管理其团队 Bot。</p>
+        <button type="button" disabled={locked} onClick={() => { setFailure(''); void load(true) }}>重新载入设置</button>
+      </details>
+      {view.revision > 0 && dirty.current && <p className="bp-sharing-warning" role="note">保存更改将撤销现有配对，需要重新邀请。</p>}
       <div className="bp-actions"><button type="button" className="bp-button-primary" disabled={locked} onClick={() => save(true)}>{pending === 'save' ? '正在开启…' : '保存并开启远程访问'}</button><button type="button" disabled={locked} onClick={() => save(false)}>仅保存，不开启</button>
-        {connected && <button type="button" disabled={locked} onClick={() => void run('stop', 'machine.host.stop', { expectedRevision: view.revision })}>{pending === 'stop' ? '正在关闭…' : '关闭远程访问'}</button>}
-        {view.config && !connected && !dirty.current && <button type="button" disabled={locked} onClick={() => void run('start', 'machine.host.start', { expectedRevision: view.revision })}>重新开启</button>}
-        <button type="button" disabled={locked} onClick={() => { setFailure(''); void load(true) }}>重新载入设置</button></div>
-    </div>}
-    {view?.state === 'running' && <div className="bp-actions"><button type="button" disabled={locked || dirty.current} onClick={() => void run('invite', 'machine.host.invite', { expectedRevision: view.revision })}>{pending === 'invite' ? '正在生成…' : '生成两分钟配对邀请'}</button></div>}
-    {invitation && <section aria-label="本机配对邀请"><img alt="本机配对二维码" src={invitation.qrDataUrl} width={260} height={260}/><p>六位确认码：<strong style={{ fontSize: '1.8em', letterSpacing: '.15em' }}>{invitation.code}</strong></p>
-      <p>设备指纹：<code>{invitation.invite.transport.fingerprint}</code></p><p role="timer">邀请剩余 {Math.max(0, Math.ceil((invitation.invite.expiresAt - time) / 1000))} 秒</p>
+      </div>
+    </div></details>}
+    {view?.config && !connected && !dirty.current && <button type="button" className="bp-button-primary" disabled={locked} onClick={() => void run('start', 'machine.host.start', { expectedRevision: view.revision })}>重新开启</button>}
+    {view?.state === 'running' && <div className="bp-actions"><button type="button" className="bp-button-primary" disabled={locked || dirty.current} onClick={() => void run('invite', 'machine.host.invite', { expectedRevision: view.revision })}><UiIcon name="plus" size={16}/>{pending === 'invite' ? '正在生成…' : '生成两分钟配对邀请'}</button></div>}
+    {invitation && <section className="bp-invitation-card" aria-label="本机配对邀请"><img alt="本机配对二维码" src={invitation.qrDataUrl} width={240} height={240}/><p className="bp-muted">在另一台电脑扫描，输入确认码</p><p className="bp-invitation-code" aria-label="六位确认码">{invitation.code}</p>
+      <details className="bp-connection-advanced"><summary>设备指纹</summary><code>{invitation.invite.transport.fingerprint}</code></details><p className="bp-muted" role="timer">{Math.max(0, Math.ceil((invitation.invite.expiresAt - time) / 1000))} 秒后失效</p>
       <div className="bp-actions"><button type="button" onClick={() => void copy()}>复制邀请</button><button type="button" onClick={download}>下载邀请文件</button><button type="button" onClick={() => setInvitation(null)}>收起邀请</button></div>
       <details><summary>手动复制邀请内容</summary><textarea aria-label="本机邀请内容" readOnly rows={4} value={JSON.stringify(invitation.invite)}/></details></section>}
     {devices.some(item => !item.revoked) && <section aria-label="已配对控制端"><h4>已配对控制端</h4>{devices.filter(item => !item.revoked).map(item => <div className="bp-actions" key={item.id}><code>{item.id}</code><span>{item.tools.length} 项能力</span><button type="button" disabled={locked} onClick={() => void run('revoke', 'machine.host.revoke', { id: item.id, revision: item.revision })}>撤销配对</button></div>)}</section>}
     {notice && <p role="status">{notice}</p>}
     {!view && <button type="button" onClick={() => void load()}>重新读取本机状态</button>}
-  </details>
+  </section>
 }

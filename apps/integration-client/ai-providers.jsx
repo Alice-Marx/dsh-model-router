@@ -17,6 +17,7 @@ let nextScope = 0
 export function AiProvidersPage(props) { const key = useMemo(() => ++nextScope, [props.productApi]); return <AiProviders key={key} {...props}/> }
 
 function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
+  const [section, setSection] = useState('api'), [visitedCli, setVisitedCli] = useState(false)
   const [view, setView] = useState(null), [cli, setCli] = useState(null), [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [checkingCli, setCheckingCli] = useState(false), [cliNotice, setCliNotice] = useState(''), cliEpoch = useRef(0)
   const [draft, setDraft] = useState(null), [busy, setBusy] = useState(''), [suggestions, setSuggestions] = useState([]), [search, setSearch] = useState('')
@@ -50,9 +51,9 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
     const current = scope.current; current.live = true
     const style = document.createElement('style'); style.dataset.aiProviders = '1'; style.textContent = css; document.head.append(style)
     void load()
-    void refreshCli()
     return () => { current.live = false; current.epoch++; draftVersion.current++; for (const request of current.requests) request.abort(); style.remove() }
   }, [productApi])
+  useEffect(() => { if (section === 'tools' && !cli && !checkingCli) void refreshCli() }, [section])
   const run = async (id, operation) => {
     if (scope.current.busy) return
     scope.current.busy = true
@@ -98,7 +99,7 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
   return <section className="bp-ai" aria-label="AI 提供方设置">
     <header className="bp-ai-heading"><div><h2>AI 提供方</h2><p><UiIcon name="computer" size={15}/>适用于这台电脑 · 插件独立配置</p></div>
       {!draft && <button type="button" disabled={Boolean(busy) || !view} onClick={allCheck}><UiIcon name="refresh" size={15}/>{busy === 'check-all' ? '正在检查…' : '重新检查'}</button>}</header>
-    <p className="bp-ai-intro">在这里连接 AI，再为每个 Bot 选择模型。同一提供方可以添加多个账号或服务地址。</p>
+    {!draft && <div className="bp-connection-tabs bp-ai-tabs" role="group" aria-label="AI 连接类型">{[['api','模型 API','spark'],['cli','CLI 聊天','bot'],['tools','官方工具','settings']].map(([id,label,icon]) => <button key={id} type="button" aria-pressed={section === id} onClick={() => { setSection(id); if (id === 'cli') setVisitedCli(true) }}><UiIcon name={icon} size={16}/>{label}</button>)}</div>}
     {error && <div className="bp-ai-alert" role="alert">{error}<button type="button" disabled={editingBusy} onClick={() => void load()}>刷新</button></div>}
     {notice && <p className="bp-ai-notice" role="status">{notice}</p>}
     {!view && !error && <p role="status">正在读取独立 AI 配置…</p>}
@@ -123,21 +124,22 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
       {draft.usedBy?.length > 0 && <p className="bp-ai-hint">正在使用：{draft.usedBy.map(bot => bot.name).join('、')}。删除前请先切换这些 Bot 的模型。</p>}
       <footer className="bp-ai-save">{draft.id && <button type="button" className="bp-ai-danger" disabled={Boolean(busy) || draft.usedBy?.length > 0} onClick={remove}>删除连接</button>}<button type="button" className="bp-ai-primary" disabled={Boolean(busy)} onClick={save}>{busy === 'save' ? '正在保存…' : '保存连接'}</button></footer>
     </div> : view && <>
-      <div className="bp-ai-section-head"><h3>API 连接</h3><span>每个连接独立保存模型与密钥</span></div>
+      <div hidden={section !== 'api'}>
+      <div className="bp-ai-section-head"><h3>我的模型连接</h3><span>独立账号与密钥</span></div>
       <div className="bp-ai-provider-list">{view.providers.map(provider => <article className="bp-ai-provider" key={provider.id} data-ai-provider={provider.id}>
         <div className="bp-ai-mark" aria-hidden="true">{view.presets.find(preset => preset.id === provider.preset)?.mark ?? 'AI'}</div><div className="bp-ai-copy"><h4>{provider.name}</h4><p className="bp-ai-state" data-state={provider.state}><span/>{labels[provider.state] ?? '状态未知'} · {provider.models.length} 个模型</p>{healthText(provider) && <small>{healthText(provider)}</small>}<small>{new URL(provider.baseUrl).host}</small></div>
         <div className="bp-ai-row-actions"><button type="button" disabled={Boolean(busy) || !provider.enabled || provider.auth === 'key' && !provider.keyConfigured} onClick={() => check(provider)}>{busy === `check-${provider.id}` ? '检查中…' : '检查'}</button><button type="button" disabled={editingBusy} onClick={() => edit(provider)}>管理</button></div>
       </article>)}{!view.providers.length && <div className="bp-ai-empty"><UiIcon name="spark" size={26}/><h4>连接你的第一个 AI</h4><p>选择下面的提供方，填写自己的账号密钥与模型。</p></div>}</div>
       <div className="bp-ai-presets">{view.presets.map(preset => <button type="button" key={preset.id} disabled={editingBusy} onClick={() => edit(preset)}><span className="bp-ai-small-mark" aria-hidden="true">{preset.mark}</span><span>{preset.name}</span><UiIcon name="plus" size={14}/></button>)}</div>
-      <CliChatProviders productApi={productApi} onOpenTools={onOpenTools} onOpenBindings={onOpenBindings}/>
+      </div><div hidden={section !== 'cli'}>{visitedCli && <CliChatProviders productApi={productApi} onOpenTools={onOpenTools} onOpenBindings={onOpenBindings}/>}</div>
+      <div hidden={section !== 'tools'}>
       <div className="bp-ai-section-head"><h3>官方 CLI 与应用</h3>{onOpenTools && <button type="button" onClick={onOpenTools}>安装与登录<UiIcon name="arrow" size={14}/></button>}</div>
-      <p className="bp-ai-hint">CLI 使用各自的账号和模型配置，独立于 API 连接。这里显示官方工具的执行状态。</p>
-      {checkingCli && <p className="bp-ai-hint" role="status">正在后台检查官方 CLI，API 连接可以继续配置。</p>}
+      {checkingCli && <p className="bp-ai-hint" role="status">正在检查本机工具…</p>}
       {cliNotice && <p className="bp-ai-hint" role="status">{cliNotice}</p>}
       <div className="bp-ai-provider-list">{(cli?.tools ?? []).map(tool => <article className="bp-ai-provider" key={tool.toolId ?? tool.id}><div className="bp-ai-mark" aria-hidden="true"><UiIcon name="bot" size={20}/></div><div className="bp-ai-copy"><h4>{tool.label ?? tool.toolId ?? tool.id}</h4><p className="bp-ai-state" data-state={tool.status === 'ready' ? 'ready' : 'configured'}><span/>{cliLabels[tool.status] ?? '尚未检测'}</p>{tool.reason && <small>{tool.reason}</small>}</div>{onOpenTools && <button type="button" onClick={onOpenTools}>管理</button>}</article>)}</div>
       {!(cli?.tools?.length) && <p className="bp-ai-hint">点击“重新检查”读取本机 CLI 状态；安装与登录在官方工具面板完成。</p>}
+      </div>
       {onOpenBindings && <button type="button" className="bp-ai-bot-link" onClick={onOpenBindings}>为 Bot 选择模型<UiIcon name="chevron" size={15}/></button>}
-      <p className="bp-ai-footnote">原有 Harness 模型仍可在 Bot 中选用。这里新增、修改和删除的连接只属于本插件。</p>
     </>}
   </section>
 }

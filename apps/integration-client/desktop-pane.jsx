@@ -264,7 +264,7 @@ export function DesktopPane({ bot }) {
   return <DesktopViewer key={bot.id} botId={bot.id} machines={machines} openSession={api.open} renewSession={api.renew} closeSession={api.close} saveRoutine={api.saveRoutine} transport={api.transport} />
 }
 
-export function DesktopWorkbench({ snapshot, dispatch, transport }) {
+export function DesktopWorkbench({ snapshot, dispatch, transport, onPair }) {
   const bots = snapshot.bots ?? [], [botId, setBotId] = useState(bots[0]?.id ?? '')
   const machines = (snapshot.machines?.items ?? []).filter(item => item.status !== 'revoked')
   const current = useRef({ dispatch, machines }); current.current = { dispatch, machines }
@@ -272,7 +272,7 @@ export function DesktopWorkbench({ snapshot, dispatch, transport }) {
   const renewSession = useCallback((id, sessionId) => current.current.dispatch('machine.desktop.renew', { botId: id, sessionId }), [])
   const closeSession = useCallback((id, sessionId) => current.current.dispatch('machine.desktop.close', { botId: id, sessionId }), [])
   const saveRoutine = useCallback((id, routine) => current.current.dispatch('routine.save', { botId: id, routine }), [])
-  if (!machines.length) return <section className="bp-card"><div className="bp-empty-state"><span className="bp-empty-icon"><UiIcon name="computer" size={29} /></span><strong>连接你的第一台电脑</strong><p>在另一台电脑的 Bot 插件中开启远程访问，再导入邀请，即可在这里连接共享文件和桌面。</p><div className="bp-actions"><button className="bp-button-primary" onClick={() => { const setup = document.querySelector('.bp-secure-pairing'); if (setup) { setup.open = true; setup.scrollIntoView({ block: 'start', behavior: 'smooth' }) } }}>配对另一台电脑</button></div></div></section>
+  if (!machines.length) return <section className="bp-card"><div className="bp-empty-state"><span className="bp-empty-icon"><UiIcon name="computer" size={29} /></span><strong>连接你的第一台电脑</strong><p>导入另一台电脑的邀请，连接文件和桌面。</p><div className="bp-actions"><button className="bp-button-primary" onClick={() => { if (onPair) return onPair(); const setup = document.querySelector('.bp-secure-pairing'); if (setup) { setup.open = true; setup.scrollIntoView({ block: 'start', behavior: 'smooth' }) } }}>配对另一台电脑</button></div></div></section>
   return <section className="bp-card"><div className="bp-actions" style={{ marginBottom: 20 }}><label>连接身份<select value={botId} onChange={event => setBotId(event.target.value)}>{bots.map(bot => <option key={bot.id} value={bot.id}>{bot.name ?? bot.id}</option>)}</select></label></div>
     <DesktopViewer key={botId} botId={botId} machines={machines} openSession={openSession} renewSession={renewSession} closeSession={closeSession} saveRoutine={saveRoutine} transport={transport} /></section>
 }

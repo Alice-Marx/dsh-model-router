@@ -24,6 +24,7 @@ import { INDEPENDENT_CHAT_PANEL } from './independent-chat-navigation.mjs'
 import independentChatCss from './independent-chat.css'
 import { AiProvidersPage } from './ai-providers.jsx'
 import aiProvidersCss from './ai-providers.css'
+import refinementCss from './product-refinement.css'
 import { requestWorkbenchView } from '../../.dsh-plugin/client/workbench-state.mjs'
 
 export const inject = [...new Set([...dsInject, 'remote'])]
@@ -53,7 +54,7 @@ export async function apply(ctx) {
   ctx.effect(() => {
     const previous = document.body.getAttribute('data-bot-product-ui')
     document.body.setAttribute('data-bot-product-ui', '1')
-    const style = document.createElement('style'); style.dataset.botProduct = '1'; style.textContent = `${css}\n${workspaceCss}\n${chatCss}\n${desktopCss}\n${usageCss}\n${notificationsCss}\n${dataCss}\n${botThreadsCss}\n${webPanelCss}\n${composerDraftCss}\n${botThreadHeaderCss}\n${independentChatCss}\n${aiProvidersCss}`; document.head.append(style)
+    const style = document.createElement('style'); style.dataset.botProduct = '1'; style.textContent = `${css}\n${workspaceCss}\n${chatCss}\n${desktopCss}\n${usageCss}\n${notificationsCss}\n${dataCss}\n${botThreadsCss}\n${webPanelCss}\n${composerDraftCss}\n${botThreadHeaderCss}\n${independentChatCss}\n${aiProvidersCss}\n${refinementCss}`; document.head.append(style)
     const disposeAppearance = installWorkspaceAppearance(window)
     return () => {
       disposeAppearance()

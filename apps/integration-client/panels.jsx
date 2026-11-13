@@ -547,7 +547,7 @@ function DesktopControl({ snapshot, dispatch, busy }) {
   </section>
 }
 
-function MachineSetup({ snapshot, dispatch, busy, transport }) {
+function MachineSetup({ snapshot, dispatch, busy, transport, mode = 'connect', onModeChange }) {
   const available = snapshot.availableActions ?? []
   const [paste, setPaste] = React.useState('')
   const [address, setAddress] = React.useState('')
@@ -611,7 +611,11 @@ function MachineSetup({ snapshot, dispatch, busy, transport }) {
       setWorking(false)
     }
   }
-  return <><LocalComputerHost snapshot={snapshot} dispatch={dispatch} transport={transport} busy={busy} /><SecurePairingSetup snapshot={snapshot} dispatch={dispatch} busy={busy} /><details className="bp-card bp-machine-setup"><summary>兼容已有电脑（导入长期配对文件）</summary>
+  return <section className="bp-computer-connections" aria-label="电脑连接"><div className="bp-connection-tabs" role="group" aria-label="电脑连接方式">
+    <button type="button" aria-pressed={mode === 'connect'} onClick={() => onModeChange?.('connect')}><UiIcon name="computer" size={17}/>连接电脑</button>
+    <button type="button" aria-pressed={mode === 'share'} onClick={() => onModeChange?.('share')}><UiIcon name="upload" size={17}/>共享本机</button></div>
+    <div hidden={mode !== 'share'}><LocalComputerHost snapshot={snapshot} dispatch={dispatch} transport={transport} busy={busy} /></div>
+    <div hidden={mode !== 'connect'}><SecurePairingSetup snapshot={snapshot} dispatch={dispatch} busy={busy} /><details className="bp-machine-setup bp-connection-advanced"><summary>导入旧版 Agent 配对</summary>
     <p className="bp-muted">在你自己的 Windows 电脑或云电脑上解压 Agent 包，双击 <code>start.cmd</code>，按向导选共享文件夹和连接地址。回到这里导入向导生成的 <code>pairing.private.json</code>，地址、目录和权限会自动填好。</p>
     {available.includes('machine.secret') && available.includes('machine.pair') ? <div className="bp-form">
       <label>配对文件<input type="file" accept=".json,application/json" onChange={event => { void importFile(event) }} /></label>
@@ -626,7 +630,7 @@ function MachineSetup({ snapshot, dispatch, busy, transport }) {
       {status !== '' && <p className="bp-muted" role="status">{status}</p>}
       {error !== '' && <p className="bp-error" role="alert">{error}</p>}
     </div> : <p className="bp-muted">宿主尚未提供配对操作。</p>}
-  </details></>
+  </details></div></section>
 }
 
 function MachineControls({ machine, snapshot, dispatch, busy }) {
@@ -692,6 +696,9 @@ function ArtifactDownload({ machine, snapshot, dispatch, busy }) {
 
 export function Machines({ snapshot, dispatch, busy, focus, transport }) {
   const machineCards = useRef(new Map())
+  const [connectionMode, setConnectionMode] = useState('connect'), [connectionsOpen, setConnectionsOpen] = useState(false)
+  const connections = useRef(null)
+  const openPairing = () => { setConnectionMode('connect'); setConnectionsOpen(true); requestAnimationFrame(() => connections.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })) }
   useEffect(() => {
     if (!focus?.machineId) return
     const card = machineCards.current.get(focus.machineId)
@@ -699,17 +706,20 @@ export function Machines({ snapshot, dispatch, busy, focus, transport }) {
   }, [focus?.version, focus?.machineId])
   const section = snapshot.machines
   if (section?.status !== 'available') return <Blocked value={section} />
-  return <>{dispatch&&<><DesktopWorkbench snapshot={snapshot} dispatch={dispatch} transport={transport} />
-    <details><summary>兼容截图操作</summary><DesktopControl snapshot={snapshot} dispatch={dispatch} busy={busy} /></details>
-    <MachineSetup snapshot={snapshot} dispatch={dispatch} busy={busy} transport={transport} /></>}{focus?.machineId && !section.items.some(machine => (machine.id ?? machine.machineId) === focus.machineId) && <p className="bp-blocked" role="status">所选电脑不在当前宿主记录中，请刷新后核对。</p>}{section.items.length ? <div className="bp-grid">{section.items.map(machine => <article className={`bp-card${focus?.machineId === (machine.id ?? machine.machineId) ? ' bp-selected-resource' : ''}`} key={machine.id ?? machine.machineId} tabIndex={-1} ref={node => { const id = machine.id ?? machine.machineId; if (node) machineCards.current.set(id, node); else machineCards.current.delete(id) }}>
+  return <div className="bp-computers-page">{dispatch&&<>
+    {section.items.length > 0 && <DesktopWorkbench snapshot={snapshot} dispatch={dispatch} transport={transport} onPair={openPairing} />}
+    <details className="bp-computer-connection-panel" ref={connections} open={!section.items.length || connectionsOpen} onToggle={event => setConnectionsOpen(event.currentTarget.open)}><summary onClick={event => { if (!section.items.length) event.preventDefault() }}><UiIcon name="computer" size={18}/>{section.items.length ? '电脑与连接' : '连接你的电脑'}{section.items.length > 0 && <UiIcon name="chevron" size={16}/>}</summary>
+    <MachineSetup snapshot={snapshot} dispatch={dispatch} busy={busy} transport={transport} mode={connectionMode} onModeChange={setConnectionMode}/></details>
+    </>}{focus?.machineId && !section.items.some(machine => (machine.id ?? machine.machineId) === focus.machineId) && <p className="bp-blocked" role="status">所选电脑不在当前宿主记录中，请刷新后核对。</p>}{section.items.length ? <div className="bp-machine-list">{section.items.map(machine => <article className={`bp-card bp-machine-card${focus?.machineId === (machine.id ?? machine.machineId) ? ' bp-selected-resource' : ''}`} key={machine.id ?? machine.machineId} tabIndex={-1} ref={node => { const id = machine.id ?? machine.machineId; if (node) machineCards.current.set(id, node); else machineCards.current.delete(id) }}>
     <div className="bp-card-title"><h2>{machine.name ?? machine.id ?? machine.machineId}</h2><Tag>{machine.status ?? '未知'}</Tag></div>
-    <dl className="bp-facts"><Value label="平台">{machine.platform}</Value><Value label="Agent 版本">{machine.version}</Value><Value label="最后在线">{machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString('zh-CN') : '从未取得心跳'}</Value>
-      <Value label="能力">{machine.capabilities?.join('、')}</Value><Value label="桌面会话">{machine.desktop?.status ?? '未报告'}</Value></dl>
+    <details className="bp-connection-advanced"><summary>连接详情</summary><dl className="bp-facts"><Value label="平台">{machine.platform}</Value><Value label="Agent 版本">{machine.version}</Value><Value label="最后在线">{machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString('zh-CN') : '从未取得心跳'}</Value>
+      <Value label="能力">{machine.capabilities?.join('、')}</Value><Value label="桌面会话">{machine.desktop?.status ?? '未报告'}</Value></dl></details>
     {(machine.blockedReason || machine.status !== 'online') && <Blocked value={{ reason: machine.blockedReason ?? '机器未在线，任务不会派到此机器。', nextAction: machine.nextAction ?? '启动 Agent 并检查配对、网络及登录桌面。' }} />}
     {machine.revocations?.some(item=>item.status!=='revoked')&&<aside className="bp-blocked" role="status"><strong>远程停止尚未确认</strong><p>本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。</p>
       {dispatch&&snapshot.availableActions?.includes('machine.reconcile')&&<button type="button" disabled={busy} onClick={()=>dispatch('machine.reconcile',{machineId:machine.id})}>重试确认远程撤销</button>}</aside>}
     {dispatch&&machine.status!=='revoked'&&<><MachineControls machine={machine} snapshot={snapshot} dispatch={dispatch} busy={busy} /><ArtifactDownload machine={machine} snapshot={snapshot} dispatch={dispatch} busy={busy} /></>}
-  </article>)}</div> : !dispatch && <p className="bp-empty">尚未配对远程电脑。安装 Agent，核验指纹并授予所需根目录后，机器会显示在这里。</p>}</>
+  </article>)}</div> : !dispatch && <p className="bp-empty">尚未连接电脑。</p>}
+  {dispatch && section.items.length > 0 && <details className="bp-connection-advanced"><summary>兼容截图操作</summary><DesktopControl snapshot={snapshot} dispatch={dispatch} busy={busy} /></details>}</div>
 }
 
 function UnknownReview({ item, dispatch, busy }) {

@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.72.0 · Windows Remote Agent: 0.1.3**
+**Current stable version: 0.73.0 · Windows Remote Agent: 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -58,7 +58,7 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 
 ## AI connections and Bot settings
 
-**The full Bot edition manages its own model connections under Settings → AI.** Save multiple connections for a provider with separate names, accounts, models and capacities, then select a route in the Bot's **Models & tools** settings. Chat models and official execution tools have separate grants.
+**The full Bot edition manages its own model connections under Settings → AI.** Save multiple connections for a provider with separate names, accounts, models and capacities, then select a route in the Bot's **Models & tools** settings. Use the **Model API**, **CLI chat** and **Official tools** sections to manage each connection type. In Bot settings, expand a tool row to choose its identity and execution mode, then save. Chat models and official execution tools have separate grants.
 
 | Connection | Configuration | Purpose |
 | --- | --- | --- |
@@ -77,8 +77,8 @@ Edit the Bot's name, role and standing instructions under **Identity & personali
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.72.0`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.72.0`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.73.0`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.73.0`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -86,10 +86,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.72.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.73.0
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.72.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.73.0
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -222,12 +222,12 @@ The Main Bot can also call `bot_route_task` or its alias `bot_dispatch`. Both di
 
 **On the computer to control:**
 
-1. Open **Remote computers → This computer · Allow other computers to connect**. Set a name, a network interface, a port and a dedicated shared folder. Enable file changes or Windows desktop control as needed, then choose **Save and enable remote access**. Allow the selected TCP port through Windows Firewall when needed.
+1. Open **Remote computers → Share this computer**. Set a name and a dedicated shared folder. Network interface, port and a custom address are available under **Network and advanced settings**. Enable file changes or Windows desktop control as needed, then choose **Save and enable remote access**. Allow the selected TCP port through Windows Firewall when needed.
 2. Choose **Generate two-minute pairing invitation**. Share the QR code or invitation file privately. The six-digit confirmation code is displayed separately; the exported invitation does not contain it.
 
 **On the controlling computer:**
 
-3. Open **Remote computers → Securely pair a computer**, scan/import the invitation, compare the device fingerprint and enter the confirmation code displayed on the target. Confirm pairing. The Main Bot can use the approved scope; workers require their saved computer and tool grants.
+3. Open **Remote computers → Connect a computer**, scan/import the invitation, compare the device fingerprint and enter the confirmation code displayed on the target. Confirm pairing. The Main Bot can use the approved scope; workers require their saved computer and tool grants.
 4. Open the computer page, choose a display and **Connect desktop** to watch first. Choose **Take control** and wait for acknowledgement before sending keyboard, mouse, wheel or text input. **Watch only** returns control and releases held input; disconnect when finished.
 5. On the target, **Revoke pairing** removes a controlling device immediately. **Disable remote access** closes the listener and desktop helper. Saved enabled access resumes with Harness; quitting Harness stops this embedded service. Saving changed settings revokes existing pairings so an old grant cannot silently target another folder.
 

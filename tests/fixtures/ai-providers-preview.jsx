@@ -6,9 +6,11 @@ import { SettingsDialog } from '../../modules/bot-runtime/vendor/ds-bot/src/clie
 import { SHELL_CSS } from '../../modules/bot-runtime/vendor/ds-bot/src/client/styles.js'
 import baseCss from '../../apps/integration-client/product.css'
 import workspaceCss from '../../apps/integration-client/workspace.css'
+import refinementCss from '../../apps/integration-client/product-refinement.css'
 
 const style = document.createElement('style'); style.textContent = SHELL_CSS + baseCss + workspaceCss + '\nbody{margin:0;background:var(--bp-bg);font-family:system-ui}#fixture-controls{display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px;background:var(--bp-subtle);font-size:12px;color:var(--bp-muted)}#fixture-main{padding:38px 24px;max-width:1050px;margin:auto}.bt-settings-shade{background:#0005}'; document.head.append(style)
 document.body.setAttribute('data-bot-product-ui', '1')
+const refinement = document.createElement('style'); refinement.textContent = refinementCss; document.head.append(refinement)
 const apis = [createProductApi(), createProductApi((url, options) => fetch('alternate/' + url, options))]
 function Fixture() {
   const [host, setHost] = useState(0), [settings, setSettings] = useState(false)

@@ -229,7 +229,7 @@ test('binding editor: a late Host or Bot switch cannot write its result onto the
     await act(async () => { byTextOf(container, '保存绑定').click(); await new Promise(setImmediate) })
     // The operator switches Bot (and Host) before the first save answers.
     await render({ bot: otherBot, record: record({ botId: 'developer', revision: 1, settings: settings({ model: { provider: 'anthropic', model: 'claude-sonnet-4' } }) }), accounts, dispatch: second.dispatch, busy: false })
-    assert.match(container.textContent, /开发 Bot/)
+    assert.match(container.querySelector('.bb-root').getAttribute('aria-label'), /开发 Bot/)
     assert.doesNotMatch(container.textContent, /正在提交到宿主校验/)
     await act(async () => { pending.resolve({ revision: 8, status: 'available' }); await new Promise(setImmediate) })
     assert.doesNotMatch(container.textContent, /设置已保存/)

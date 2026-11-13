@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { parseSecureInvite } from '../../packages/orchestration/src/pairing-invite.mjs'
 import { UiIcon } from './ui-icons.jsx'
 import { PairingQrReader } from './pairing-qr.jsx'
+import { ComputerArt } from './computer-art.jsx'
 
 const errors = {
   PAIRING_CODE_INVALID: '确认码不正确，请核对目标电脑上显示的六位数字。五次错误后邀请码失效。',
@@ -9,7 +10,7 @@ const errors = {
   PAIRING_PEER_UNVERIFIED: '未能验证目标电脑。请检查地址和网络，并核对设备指纹；不会切换到明文连接。',
   PAIRING_RESULT_UNKNOWN: '兑换结果尚未确认。保留这份邀请码，点击“继续核对原配对”；宿主会沿用原请求身份。',
   PAIRING_RESULT_UNRECOVERABLE: '原请求的恢复窗口已结束。请在目标电脑检查已配对设备；若宿主没有保存凭据，使用“撤销旧配对后重新邀请”，再导入新邀请。',
-  PAIRING_DEVICE_ALREADY_COMMITTED: '目标电脑已登记这次配对，宿主未能保存可用凭据。请在目标电脑核对设备，运行 pair-device.cmd -ResetPairing 撤销旧配对并重新邀请；此操作会断开旧配对。',
+  PAIRING_DEVICE_ALREADY_COMMITTED: '目标电脑已登记配对，但本机未保存凭据。请在目标电脑撤销此控制端，再生成新邀请。',
   PAIRING_CREDENTIAL_CHANGED: '宿主中已保存的凭据与原配对记录不一致。请核对目标电脑和宿主的设备登记后重新邀请。',
   PAIRING_ALREADY_REDEEMED: '这份邀请码已经被兑换。请在目标电脑核对已配对设备。',
   PAIRING_BINDING_REVIEW_REQUIRED: '设备已添加，请在电脑卡片中核对并完成 Bot 授权。',
@@ -59,24 +60,23 @@ export function SecurePairingSetup({ snapshot, dispatch, busy }) {
     catch{if(mounted.current&&epoch===importSequence.current)setFailure({message:'无法读取邀请码文件。'})}
   }
   return <details className="bp-card bp-secure-pairing" open><summary><UiIcon name="computer" />安全配对电脑</summary>
-    <p className="bp-muted">在目标电脑生成两分钟邀请码，扫描或粘贴到这里，再核对确认码与设备指纹。连接后可从 Bot 聊天中的电脑入口打开桌面。</p>
-    <p className="bp-muted">在目标电脑的 Bot 插件“本机 · 允许其他电脑连接”中开启远程访问并生成邀请，无需单独安装 Agent。已有独立 Agent 的配对文件也可继续使用。</p>
+    {!invite && <div className="bp-pairing-welcome"><ComputerArt/><h3>你的电脑，随时接手</h3><p className="bp-muted">在另一台电脑打开 Bot → 共享本机，生成邀请。</p></div>}
     {(snapshot.availableActions??[]).includes('machine.pair.invite') ? <div className="bp-form">
       <PairingQrReader onRead={change} disabled={working||recoverable||busy}/>
-      <label>设备邀请码<textarea rows={3} value={text} disabled={working||recoverable} onChange={event=>change(event.target.value)} autoComplete="off" spellCheck={false} placeholder="粘贴目标电脑生成的 dsh-pairing-invite JSON" /></label>
       <div className="bp-actions"><button type="button" disabled={working||recoverable||busy} onClick={()=>fileInput.current?.click()}>导入邀请码文件</button><input ref={fileInput} className="bp-pairing-file" aria-label="邀请码文件" type="file" accept=".json,application/json" disabled={working||recoverable} onChange={event=>{void importFile(event)}} /></div>
+      <details className="bp-pairing-paste" open={Boolean(text) || undefined}><summary>粘贴邀请码</summary><textarea aria-label="设备邀请码" rows={3} value={text} disabled={working||recoverable} onChange={event=>change(event.target.value)} autoComplete="off" spellCheck={false} placeholder="粘贴另一台电脑复制的邀请" /></details>
       {parsed.error&&<p className="bp-error" role="alert">无法识别这份邀请码。需要 Agent 生成的第 2 版安全配对文件。</p>}
       {invite&&<section className="bp-pairing-identity" aria-label="核对设备身份"><strong>{invite.name}</strong><code>{invite.endpoint}</code>
         <label>设备指纹<code>{invite.transport.fingerprint.match(/.{1,8}/g).join(' ')}</code></label>
         <p>共享目录：{invite.ceiling.roots.join('、')}；允许 {invite.ceiling.tools.length} 项能力。</p>
         <details><summary>查看允许的能力</summary><p className="bp-muted">{invite.ceiling.tools.join('、')}</p></details>
-        <p className="bp-muted">{invite.ceiling.hostManagedBots?'目标电脑允许本宿主管理团队 Bot，仍受共享目录和能力范围限制。':`仅允许 Bot：${invite.ceiling.botIds.join('、')}`}</p>
+        {!invite.ceiling.hostManagedBots && <p className="bp-muted">仅允许 Bot：{invite.ceiling.botIds.join('、')}</p>}
         {!allowed&&<p className="bp-error" role="alert">当前主 Bot 不在目标电脑允许的范围内。</p>}
         <span role="timer">{seconds>0?`邀请码剩余 ${seconds} 秒`:recoverable?'邀请码已过期；可继续核对已保存凭据的原请求。':'邀请码已过期，请在目标电脑重新生成。'}</span>
       </section>}
-      <label>目标电脑的六位确认码<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} disabled={working||recoverable} onChange={event=>{importSequence.current++;setCode(event.target.value.replace(/\D/g,''));request.current=null;setFailure(null)}} placeholder="000000" /></label>
-      <div className="bp-actions"><button type="button" className="bp-button-primary" disabled={!ready||busy||working} onClick={()=>{void submit()}}>{working?'正在验证设备…':recoverable?'继续核对原配对':'验证并配对'}</button>
-        {recoverable&&<button type="button" disabled={working} onClick={()=>change('')}>清除本地表单</button>}</div>
+      {invite && <label className="bp-confirm-code">目标电脑的六位确认码<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} disabled={working||recoverable} onChange={event=>{importSequence.current++;setCode(event.target.value.replace(/\D/g,''));request.current=null;setFailure(null)}} placeholder="000000" /></label>}
+      {invite && <div className="bp-actions"><button type="button" className="bp-button-primary" disabled={!ready||busy||working} onClick={()=>{void submit()}}>{working?'正在验证设备…':recoverable?'继续核对原配对':'验证并配对'}</button>
+        {recoverable&&<button type="button" disabled={working} onClick={()=>change('')}>清除本地表单</button>}</div>}
       {failure&&<p className="bp-error" role="alert">{failure.message}</p>}
       {status&&<p role="status">{status}</p>}
     </div>:<p className="bp-muted">宿主尚未提供安全配对操作，请更新 Host 与 Remote Agent。</p>}

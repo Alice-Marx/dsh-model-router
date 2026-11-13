@@ -24,6 +24,7 @@ import { installWorkspaceAppearance } from '../../apps/integration-client/worksp
 import productCss from '../../apps/integration-client/product.css'
 import workspaceCss from '../../apps/integration-client/workspace.css'
 import chatCss from '../../apps/integration-client/chat.css'
+import refinementCss from '../../apps/integration-client/product-refinement.css'
 import botThreadsCss from '../../apps/integration-client/bot-threads.css'
 import botThreadHeaderCss from '../../apps/integration-client/bot-thread-header-bridge.css'
 import { chatSettingsFixture } from './chat-settings-data.mjs'
@@ -71,7 +72,7 @@ window.__chatDesignFixture = { calls, bot, roster, sessionId, snapshot, attentio
 document.body.setAttribute('data-bot-product-ui', '1')
 installWorkspaceAppearance(window)
 const style = document.createElement('style')
-style.textContent = `${productCss}\n${workspaceCss}\n${chatCss}\n${botThreadsCss}\n${botThreadHeaderCss}\n${window.__fixtureVendorCss ?? ''}\n${window.__fixtureInheritedCss ?? ''}
+style.textContent = `${productCss}\n${workspaceCss}\n${chatCss}\n${botThreadsCss}\n${botThreadHeaderCss}\n${window.__fixtureVendorCss ?? ''}\n${window.__fixtureInheritedCss ?? ''}\n${refinementCss}
 /* Preview-only chrome: the window frame this fixture stands in for. The product
    and vendor styles above are the ones under test. */
 html,body,#root{height:100%;margin:0}

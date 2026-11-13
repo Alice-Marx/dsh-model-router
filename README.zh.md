@@ -14,7 +14,7 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.72.0 · Windows Remote Agent：0.1.3**
+**当前正式版：0.73.0 · Windows Remote Agent：0.1.3**
 
 以 Bot 联系人和聊天为主要入口，集中使用独立 AI 连接、多模型路线、团队委派、私有资料库、数据分析与自有 Windows 电脑。任务、通知和执行记录保存在工作空间中，Main Bot 可在已保存的多条模型路线之间调度。
 
@@ -58,7 +58,7 @@
 
 ## AI 连接与 Bot 设置
 
-**完整 Bot 版本在“设置 → AI”独立管理模型连接。** 可以为同一提供商保存多个连接，分别设置名称、账号、模型与容量，再在 Bot 的“模型与工具”中选择路线。聊天模型和官方执行工具分别授权。
+**完整 Bot 版本在“设置 → AI”独立管理模型连接。** 可以为同一提供商保存多个连接，分别设置名称、账号、模型与容量，再在 Bot 的“模型与工具”中选择路线。通过“模型 API”“CLI 聊天”“官方工具”分类管理连接。在 Bot 设置中展开工具行，选择执行身份与方式后保存。聊天模型和官方执行工具分别授权。
 
 | 连接类型 | 配置方式 | 用途 |
 | --- | --- | --- |
@@ -77,8 +77,8 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.72.0`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.72.0`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.73.0`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.73.0`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 完整版本进入 Bot 工作区，在 **设置 → AI** 添加独立模型连接，再为 Bot 选择模型。纯路由版本从侧栏打开 **模型路由**，使用 Harness 已配置路线。
 
@@ -86,10 +86,10 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.72.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.73.0
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.72.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.73.0
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -222,12 +222,12 @@ Main Bot 也可调用 `bot_route_task` 或同义工具 `bot_dispatch`；两者�
 
 **在被控制的电脑上：**
 
-1. 打开 **远程电脑 → 本机 · 允许其他电脑连接**，选择名称、网卡、端口和专门的共享文件夹，按需勾选文件修改或 Windows 桌面控制，点击 **保存并开启远程访问**。必要时在 Windows 防火墙中放行所选 TCP 端口。
+1. 打开 **远程电脑 → 共享本机**，选择名称和专门的共享文件夹；网卡、端口和自定义地址位于“网络与高级设置”，按需勾选文件修改或 Windows 桌面控制，点击 **保存并开启远程访问**。必要时在 Windows 防火墙中放行所选 TCP 端口。
 2. 点击 **生成两分钟配对邀请**，私下分享二维码或邀请文件。六位确认码单独显示，导出的邀请不包含确认码。
 
 **在控制端电脑上：**
 
-3. 打开 **远程电脑 → 安全配对电脑**，扫描或导入邀请，核对设备指纹，输入被控电脑上显示的确认码后配对。Main Bot 可使用对方允许的范围；普通 Bot 需保存相应电脑与工具授权。
+3. 打开 **远程电脑 → 连接电脑**，扫描或导入邀请，核对设备指纹，输入被控电脑上显示的确认码后配对。Main Bot 可使用对方允许的范围；普通 Bot 需保存相应电脑与工具授权。
 4. 打开电脑页面，选择显示器并点击 **连接桌面**，先观看画面。点击 **取得控制权**，等待确认后发送键盘、鼠标、滚轮或文字输入。**仅观看** 会归还控制并释放按住的输入，结束后断开连接。
 5. 在被控端点击 **撤销配对**，可立即撤销控制端。**关闭远程访问** 会关闭监听和桌面助手。已保存开启的接入会随 Harness 恢复，退出 Harness 则停止内置服务。更改并保存设置会撤销旧配对，避免原授权悄悄指向另一个文件夹。
 
