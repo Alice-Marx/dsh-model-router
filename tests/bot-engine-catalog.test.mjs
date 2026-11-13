@@ -58,9 +58,9 @@ describe('bot-engine driver catalog', () => {
     }
   })
 
-  test('sixteen concrete native drivers are implemented and special constraints stay explicit', () => {
+  test('eighteen concrete native drivers are implemented and special constraints stay explicit', () => {
     const implemented = BOT_ENGINE_DRIVERS.filter(driver => driver.availability === 'implemented')
-    assert.equal(implemented.length, 16)
+    assert.equal(implemented.length, 18)
     for (const id of ['codex', 'pi', 'museCode', 'cursorAgent', 'kimiAgent', 'opencodeGo', 'hermesAgent']) assert.ok(implemented.some(driver => driver.id === id), id)
     assert.equal(implemented[0].implementation, 'src/claude-engine.mjs')
     assert.match(implemented[0].transport, /stream-json/)
@@ -98,11 +98,11 @@ describe('bot-engine driver catalog', () => {
     assert.match(getBotEngineDriver('museCode').implementation, /muse-engine/)
   })
 
-  test('customAcp is implemented but managed runtime and API-only funding constraints remain unavailable', () => {
+  test('custom ACP, managed Antigravity and metered DeepSeek all resolve to implemented drivers', () => {
     const driver = getBotEngineDriver('customAcp')
     assert.equal(driver.availability, 'implemented')
-    assert.match(getBotEngineDriver('antigravityAgent').availabilityReason, /harness/)
-    assert.match(getBotEngineDriver('deepseekAgent').availabilityReason, /API/)
+    assert.equal(getBotEngineDriver('antigravityAgent').availability, 'implemented')
+    assert.equal(getBotEngineDriver('deepseekAgent').availability, 'implemented')
   })
 
   test('geminiAgent records the consumer-login retirement', () => {
@@ -151,7 +151,7 @@ describe('resolveBotEngine', () => {
   })
 
   test('unimplemented drivers return explicit unavailable verdicts', async () => {
-    for (const id of ['antigravityAgent', 'deepseekAgent', 'grok']) {
+    for (const id of ['grok']) {
       const resolved = await resolveBotEngine({ driver: id })
       assert.equal(resolved.status, 'unavailable', id)
       assert.equal(typeof resolved.reason, 'string', id)

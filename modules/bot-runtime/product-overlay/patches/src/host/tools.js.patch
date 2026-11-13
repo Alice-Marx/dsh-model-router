@@ -1,5 +1,14 @@
 --- a/src/host/tools.js
 +++ b/src/host/tools.js
+@@ -810,7 +810,7 @@
+     for (const def of rt.teamTools) {
+       if (relayOnly && def.name !== 'group_relay') continue
+       try {
+-        const dispose = agent.ctx.tools.register(def)
++        const dispose = agent.ctx.tools.register(def, { when: ({ modelSelection }) => !rt.isTextOnlyModel?.(modelSelection) })
+         if (typeof dispose === 'function') disposers.push(dispose)
+         registered.push(def.name)
+       } catch (error) {
 @@ -844,7 +844,7 @@
        const assembled = await next()
        return {

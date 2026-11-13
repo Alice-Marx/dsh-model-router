@@ -7,7 +7,7 @@ import { acpChatArgs, CLI_CHAT_DRIVERS } from '../packages/bot-engines/src/cli-d
 import { createFixtureNativeLauncher, nativeRpcFixtureEntry } from './helpers/native-rpc-fixture-launcher.mjs'
 
 const script = resolve('tests/fixtures/bot-acp-agent-fixture.mjs')
-for (const driver of CLI_CHAT_DRIVERS.filter(driver => driver.transport === 'acp' && driver.available && driver.implemented)) test(`${driver.name}: real ACP process retains two turns with fixed argv and exact model selection`, async () => {
+for (const driver of CLI_CHAT_DRIVERS.filter(driver => driver.transport === 'acp' && driver.available && driver.implemented && !['antigravityAgent', 'deepseekAgent'].includes(driver.id))) test(`${driver.name}: real ACP process retains two turns with fixed argv and exact model selection`, async () => {
   const root = resolve('tmp/integration/acp-chat-drivers'); await mkdir(root, { recursive: true }); const home = await mkdtemp(join(root, driver.id + '-')), workspace = join(home, 'work'); await mkdir(workspace)
   let launches = 0
   const authority = { describe: () => ({ botId: 'bot', revision: 1 }), assertModel(_subject, provider, model) { assert.equal(provider, 'fixture'); assert.equal(model, 'fixture-model-a') } }

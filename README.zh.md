@@ -14,9 +14,9 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.70.0 · Windows Remote Agent：0.1.3**
+**当前正式版：0.71.0 · Windows Remote Agent：0.1.3**
 
-**0.70.0 正式版：原生 CLI 聊天连接。** 在“设置 → AI”添加CLI连接，核验已安装的可执行文件和版本，保存独立账号资料，再为Bot或Main路线选择模型。在已有Claude基础上新增15类原生文本聊天驱动：Codex、Pi、Muse Code、Grok、Gemini、Kimi Code、Droid、Cursor、OpenCode、Qwen、Hermes、Cline、Copilot、Command Code和自定义ACP。多轮保留真实进程，明确确认模型，继续执行已提交资金与权限约束；未知结果退休且不自动重放。认证资料不回显，只有明确勾选导入时才读取白名单账号文件。新驱动提供文本聊天，官方执行工具单独配置。Antigravity仍需受管理harness摘要，按量DeepSeek ACP不冒充订阅路线。验收使用真实离线子进程、公开Host SDK/AgentLoop和真实SQLite，不声称实际厂商账号及付费推理已实测。 Windows深层安装目录会使用较短且经过ACL保护的私有会话目录，账号仍隔离保存，已提交工作空间保持原位置。
+**0.71.0 正式版：Antigravity 与按量 DeepSeek ACP，适配 dsh 0.2.2-rc.2。** 在“设置 → AI → CLI 聊天连接”分别管理模型与独立账号。Antigravity 同时核验官方 runtime/harness 及其摘要，使用专属 OAuth 资料。DeepSeek ACP 使用 dsh 0.2.2-rc.2 Node 入口、独立 API Key 与 API 资金配置；每轮最多一次模型请求、输出最多4096 token，关闭重试及额外工具调用，并读取真实用量。已真实短请求验证 Codex、Kimi 与 DeepSeek ACP；其他驱动的安装、账号及网络状态分别记录，不将协议握手等同于付费推理通过。Host SDK/Cordis 4.1/schemastery 3.19 实际冒烟通过，工具启用条件适配新版 SDK。Windows Agent 沿用0.1.3。
 
 Bot 设置先读取已保存模型并显示可编辑表单，再后台检测官方 CLI。CLI 卡住不再拖住设置窗口或 Host 启动。Host 单次检测总时限为12秒，客户端等待刷新最多15秒；超时工具在重新检测成功前保持不可用。检测期间仍可编辑、切换身份页与关闭窗口，未保存内容会保留，旧检测的迟到结果不能覆盖新选择。
 
@@ -95,8 +95,8 @@ API 资金调用需要 Host 提供模型容量信息。保存的输入额度需�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.70.0`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.70.0`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.71.0`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.71.0`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 在 Harness 官方 **模型** 设置中配置 Provider 凭据和模型。完整版本进入 Bot 工作区；纯路由版本从侧栏打开 **模型路由**。
 
@@ -104,10 +104,10 @@ API 资金调用需要 Host 提供模型容量信息。保存的输入额度需�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.70.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.71.0
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.70.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.71.0
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -191,7 +191,7 @@ Host 的 Claude 对话引擎配置可启用 `hostTools: true`，通过私有 MCP
 
 ## 多 Bot 任务进度与待处理
 
-**适用于完整 Bot 版本 0.70.0。** 在 **任务** 页面按 Bot 查看任务数量，通过 **全部 / 进行中 / 待处理 / 已结束** 筛选，或搜索任务名称及任务、计划、操作编号。计数和筛选针对已加载记录；资金准入检查属于进行中，等待预算属于待处理。
+**适用于完整 Bot 版本 0.71.0。** 在 **任务** 页面按 Bot 查看任务数量，通过 **全部 / 进行中 / 待处理 / 已结束** 筛选，或搜索任务名称及任务、计划、操作编号。计数和筛选针对已加载记录；资金准入检查属于进行中，等待预算属于待处理。
 
 **需要你处理** 显示完整数量，超过六项时可展开全部。每项都能打开原任务；等待审批时可进入对应 Bot 私聊查看原请求。打开任务后可查看 **任务时间线**，了解排队、资金准入、执行、停止请求及收据核对，并展开每次尝试的原编号。日志读取不会重新派发任务或调用模型；停止请求仍需等待确认。旧宿主未提供时间线时，页面保留现有收据详情。
 
@@ -242,7 +242,7 @@ Main Bot 也可调用 `bot_route_task` 或同义工具 `bot_dispatch`；两者�
 
 **在被控制的电脑上：**
 
-1. 下载 [Windows Agent 0.1.3 完整包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.70.0/dsh-remote-agent-0.1.3-windows-x64.zip)，解压到长期保留的目录，运行 `start.cmd`，并保持 Windows 交互用户已登录。
+1. 下载 [Windows Agent 0.1.3 完整包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.71.0/dsh-remote-agent-0.1.3-windows-x64.zip)，解压到长期保留的目录，运行 `start.cmd`，并保持 Windows 交互用户已登录。
 2. 在向导中设置可访问的地址、端口、允许工作目录及可选命令/浏览器能力。向导为当前用户注册 Agent 与桌面 helper，生成 `private/pairing.private.json`，不保存 Windows 密码；再次运行会保留已有配置。
 
 **在 Harness 中：**

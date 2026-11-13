@@ -205,6 +205,8 @@
       "tests/cli-providers.test.mjs",
       "tests/cli-chat-providers.integration.test.mjs",
       "tests/acp-chat-drivers.test.mjs",
+      "tests/antigravity-runtime.test.mjs",
+      "tests/deepseek-runtime.test.mjs",
       "tests/native-chat-protocols.test.mjs",
       "tests/native-chat-supervisor.native.mjs",
       "tests/muse-chat-protocol.test.mjs",

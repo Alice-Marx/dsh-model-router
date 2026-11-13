@@ -8,11 +8,11 @@ const HOST_FACT_SOURCES = new Set(['runtime-context', 'ds-bot-time-context'])
  * route. Nonempty tools and controls remain unsupported; no authority is
  * accepted from a caller and the original request stays untouched for accounting.
  */
-export function projectHostLoopTextRequest(request, { session, isLoopRequest, allowRouteContext = false } = {}) {
+export function projectHostLoopTextRequest(request, { session, isLoopRequest, allowRouteContext = false, metered = false } = {}) {
   if (!session || session.id !== request?.sessionId || typeof isLoopRequest !== 'function'
     || !isLoopRequest(request) || !Object.isFrozen(request) || !Object.isFrozen(request.messages)) fail('CLAUDE_HOST_LOOP_REQUEST_REQUIRED')
   if (Object.keys(request).some(key => !TEXT_FIELDS.has(key) && !CONTROL_FIELDS.has(key) && !META_FIELDS.has(key))) fail('CLAUDE_ROUTE_UNKNOWN_REQUEST_FIELD')
-  if ([...CONTROL_FIELDS].some(key => request[key] !== undefined)) fail('CLAUDE_ROUTE_CAPABILITY_REFUSED')
+  if ([...CONTROL_FIELDS].some(key => request[key] !== undefined && !(key === 'maxTokens' && metered))) fail('CLAUDE_ROUTE_CAPABILITY_REFUSED')
   if (request.tools !== undefined && (!Array.isArray(request.tools) || request.tools.length)) fail('CLAUDE_ROUTE_CAPABILITY_REFUSED')
   const canonical = session.deriveMessages()
   if (!Array.isArray(request.messages) || canonical.length !== request.messages.length
@@ -36,7 +36,8 @@ export function projectHostLoopTextRequest(request, { session, isLoopRequest, al
       messages[messages.length - 1] = { ...previous, content: [{ type: 'text', text: `${input}\n\n[Host runtime context]\n${text}` }] }
     } else messages.push(message)
   }
-  return { ...Object.fromEntries([...TEXT_FIELDS].filter(key => request[key] !== undefined).map(key => [key, request[key]])), messages }
+  return { ...Object.fromEntries([...TEXT_FIELDS].filter(key => request[key] !== undefined).map(key => [key, request[key]])), messages,
+    ...(metered && request.maxTokens !== undefined ? { maxTokens: request.maxTokens } : {}) }
 }
 
 function lastCompletedForeignReply(messages, session, route) {

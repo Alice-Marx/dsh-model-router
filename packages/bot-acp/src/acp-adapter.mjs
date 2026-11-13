@@ -88,12 +88,13 @@ const provablyUnsent = error => PROVABLY_UNSENT.some(marker => error?.[marker] =
 export async function createAcpAdapter(options = {}) {
   const {
     authority, subject, binding, operationId,
-    entry, spawnArgs = [], versionArgs = ['--version'],
+    entry, spawnArgs = [], versionArgs = ['--version'], versionProbe = null,
     runtimeRoot, workspace,
     model = {}, billing = 'subscription',
     deadlineMs = DEFAULT_ADAPTER_LIMITS.deadlineMs,
     signal, hooks = {}, onPermissionRequest, operationTool = null,
     clientCapabilities = {}, auth = {}, resumeSessionId = null, expectedModelId = null, requireModelSelection = false,
+    modelWireValue = value => value, modelFromWireValue = value => value,
     launcher = DEFAULT_LAUNCHER, python, provisionCredentials = null,
   } = options
   const limits = { ...DEFAULT_ADAPTER_LIMITS, ...(options.limits ?? {}) }
@@ -104,8 +105,9 @@ export async function createAcpAdapter(options = {}) {
   if (!isAbsolute(runtimeRoot ?? '') || !isAbsolute(workspace ?? '')) throw new TypeError('INVALID_ACP_PATHS')
   const catalogProvider = model.catalogProvider ?? 'unknown'
   const catalogModel = model.catalogModel
-  if (typeof catalogProvider !== 'string' || !catalogProvider || typeof catalogModel !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/.test(catalogModel)) throw new TypeError('INVALID_ACP_MODEL')
+  if (typeof catalogProvider !== 'string' || !catalogProvider || typeof catalogModel !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,239}$/.test(catalogModel)) throw new TypeError('INVALID_ACP_MODEL')
   if (!BILLING_KINDS.includes(billing)) throw new TypeError('INVALID_ACP_BILLING')
+  if (typeof modelWireValue !== 'function' || typeof modelFromWireValue !== 'function') throw new TypeError('INVALID_ACP_MODEL_CODEC')
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1000 || deadlineMs > 7_200_000) throw new TypeError('INVALID_ACP_DEADLINE')
   for (const key of ['onBeforeRequest', 'onObserve', 'onSettle', 'onClose']) {
     if (hooks[key] !== undefined && typeof hooks[key] !== 'function') throw new TypeError(`ACP_HOOK_${key.toUpperCase()}_REQUIRED_FUNCTION`)
@@ -129,7 +131,7 @@ export async function createAcpAdapter(options = {}) {
   if (provisionCredentials !== null && typeof provisionCredentials !== 'function') throw new TypeError('ACP_CREDENTIAL_PROVIDER_INVALID')
   const provisioned = await provisionCredentials?.(home)
   const environment = provisioned?.env ?? {}
-  const pinned = await pinAcpEntry(entry, home, { versionArgs })
+  const pinned = await pinAcpEntry(entry, home, { versionArgs, versionProbe })
   const deadlineEnd = Date.now() + deadlineMs
   const { botId, revision } = authority.describe(subject)
 
@@ -156,7 +158,9 @@ export async function createAcpAdapter(options = {}) {
   const assertModelAuthorized = modelId => {
     if (typeof modelId !== 'string' || !modelId) throw new TypeError('ACP_MODEL_REQUIRED')
     // A model switch is a Host decision on committed state, never a turn input.
-    authority.assertModel(subject, catalogProvider, modelId)
+    const canonical = modelFromWireValue(modelId)
+    if (canonical !== catalogModel) throw new Error('ACP_MODEL_BINDING_CHANGED')
+    authority.assertModel(subject, catalogProvider, canonical)
   }
 
   const fatal = (error, reason) => {
@@ -408,6 +412,7 @@ export async function createAcpAdapter(options = {}) {
         if (typeof params.models?.currentModelId === 'string') reported = params.models.currentModelId
       }
       if (typeof reported === 'string' && reported) {
+        reported = modelFromWireValue(reported)
         reportedModel = reported
         // Only a Host-declared expectation can make a report a mismatch.
         if (typeof expectedModelId === 'string' && expectedModelId && reported !== expectedModelId) {
@@ -565,7 +570,7 @@ export async function createAcpAdapter(options = {}) {
     sessionId = opened.sessionId
     if (requireModelSelection) {
       assertDispatchAuthorization()
-      await live.selectModel(catalogModel)
+      await live.selectModel(modelWireValue(catalogModel))
       assertDispatchAuthorization()
       reportedModel = catalogModel
       modelMismatch = false
@@ -738,8 +743,8 @@ export async function createAcpAdapter(options = {}) {
     const live = await ensureSession()
     // Re-judged across the launch boundary.
     assertNoPendingTurn('selectModel')
-    assertModelAuthorized(modelId)
-    const selected = await live.selectModel(modelId)
+    assertModelAuthorized(modelWireValue(modelId))
+    const selected = await live.selectModel(modelWireValue(modelId))
     reportedModel = modelId
     events.emit('model-selected', { modelId, sessionId: live.sessionId })
     return selected

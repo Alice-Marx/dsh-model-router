@@ -61,6 +61,7 @@ const entryEquals = (left, right) => Boolean(left) && Boolean(right)
   && left.executable === right.executable && left.sha256 === right.sha256
   && left.version === right.version && (left.script ?? null) === (right.script ?? null)
   && (left.scriptSha256 ?? null) === (right.scriptSha256 ?? null)
+  && (left.harness ?? null) === (right.harness ?? null) && (left.harnessSha256 ?? null) === (right.harnessSha256 ?? null)
 
 /** Turn refusal → one terminal SDK failure, so no consumer has to guess an outcome. */
 const failureOf = error => {
@@ -120,6 +121,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
   #name
   #funding
   #fundingFor
+  #metered
   #entry
   #entryFor
   #runtimeRoot
@@ -182,12 +184,15 @@ export class ClaudeLlmAdapter extends LlmAdapter {
       entry = null, entryFor = null, runtimeRoot, workspace = null, workspaceFor = null,
       identityFor, requestFor = null, persona = null, hooks = {}, onPermissionRequest = null, provisionCredentials = null,
       tools = [], handlers = [], toolsFor = null, onActivity = null, permissionMode = 'default', deadlineMs = 120_000,
-      launcher = null, python, engineFactory = null, nativeSession = false,
+      launcher = null, python, engineFactory = null, nativeSession = false, metered = null,
     } = options ?? {}
     if (!identifier(provider)) throw badOptions('CLAUDE_ROUTE_PROVIDER_REQUIRED')
     if (typeof nativeSession !== 'boolean') throw badOptions('CLAUDE_ROUTE_METADATA_INVALID')
     if (typeof model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,239}$/.test(model)) throw badOptions('CLAUDE_ROUTE_MODEL_REQUIRED')
-    if (funding !== CLAUDE_LLM_FUNDING) {
+    if (metered !== null && (!nativeSession || typeof engineFactory !== 'function' || funding !== 'api'
+      || !Number.isSafeInteger(metered.contextWindow) || metered.contextWindow < 1
+      || !Number.isSafeInteger(metered.maxOutputTokens) || metered.maxOutputTokens < 1)) throw badOptions('CLI_METERED_CONFIG_INVALID')
+    if (funding !== CLAUDE_LLM_FUNDING && !(funding === 'api' && metered)) {
       throw badOptions(`CLAUDE_ROUTE_FUNDING_REFUSED: this bridge only opens an explicitly configured Claude subscription chat route, not ${JSON.stringify(funding)}`)
     }
     if (fundingFor !== null && typeof fundingFor !== 'function') throw badOptions('CLAUDE_ROUTE_FUNDING_READER_REQUIRED_FUNCTION')
@@ -218,6 +223,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
     this.#name = typeof name === 'string' && name.trim() ? name.trim() : `${provider} (Claude session)`
     this.#funding = funding
     this.#fundingFor = fundingFor
+    this.#metered = metered ? Object.freeze({ contextWindow: metered.contextWindow, maxOutputTokens: metered.maxOutputTokens }) : null
     this.#entry = entry === null ? null : Object.freeze({ ...entry })
     this.#entryFor = entryFor
     this.#runtimeRoot = runtimeRoot
@@ -254,6 +260,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
       provider: this.#provider, id: this.#model, name: this.#model,
       description: `${this.#nativeSession ? '原生' : 'Claude '}订阅会话路由：一次一条新的用户文本，保留一个原生 CLI 会话。`,
       inputModalities: Object.freeze(['text']),
+      ...(this.#metered ? { context: { contextWindow: this.#metered.contextWindow }, defaultMaxTokens: this.#metered.maxOutputTokens } : {}),
     })]
   }
 
@@ -272,6 +279,8 @@ export class ClaudeLlmAdapter extends LlmAdapter {
       provider: this.#provider, id: this.#model, name: this.#model,
       description: `${this.#nativeSession ? '原生' : 'Claude '}订阅会话路由：仅文本，上下文窗口与输出上界未知（不伪造）。`,
       inputModalities: Object.freeze(['text']),
+      ...(this.#metered ? { context: { contextWindow: this.#metered.contextWindow }, defaultMaxTokens: this.#metered.maxOutputTokens,
+        description: '按量 ACP 文本会话：每轮一次模型请求，实际用量由私有运行时报告。' } : {}),
     })
   }
 
@@ -311,7 +320,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
     const model = next.model ?? this.#model
     if (typeof model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,239}$/.test(model)) throw badOptions('CLAUDE_ROUTE_MODEL_REQUIRED')
     const funding = next.funding ?? this.#funding
-    if (funding !== CLAUDE_LLM_FUNDING) throw badOptions(`CLAUDE_ROUTE_FUNDING_REFUSED: ${JSON.stringify(funding)}`)
+    if (funding !== this.#funding) throw badOptions(`CLAUDE_ROUTE_FUNDING_REFUSED: ${JSON.stringify(funding)}`)
     const entry = next.entry === undefined ? this.#entry : Object.freeze({ ...next.entry })
     if (entry !== null && (!entry.executable || !/^[a-f0-9]{64}$/.test(entry.sha256 ?? '') || typeof entry.version !== 'string')) throw badOptions('CLAUDE_ROUTE_ENTRY_INVALID')
     const persona = next.persona === undefined ? this.#persona : next.persona
@@ -384,7 +393,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
     }
     signal?.throwIfAborted()
     const funding = this.#fundingFor === null ? this.#funding : await this.#fundingFor({ provider, model })
-    if (funding !== CLAUDE_LLM_FUNDING) {
+    if (funding !== this.#funding) {
       throw new LlmError(
         `this bridge only opens an explicitly configured Claude subscription chat route; committed funding is ${JSON.stringify(funding)} and an API-funded CLI route cannot prove a strict per-call cost or output bound here`,
         'CLAUDE_ROUTE_FUNDING_REFUSED')
@@ -427,7 +436,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
     try {
       const projected = this.#requestFor ? await this.#requestFor(options, identity) : null
       if (projected?.request) bootstrap = projected.bootstrap ?? null
-      gate = assertRouteRequest(projected?.request ?? projected ?? options, { provider: generation.provider, model: generation.model, persona })
+      gate = assertRouteRequest(projected?.request ?? projected ?? options, { provider: generation.provider, model: generation.model, persona, metered: this.#metered })
     } catch (error) { yield finishChunk('error', failureOf(error)); return }
 
     const key = sessionKeyOf(identity.botId, identity.conversationId ?? options.sessionId ?? null)
@@ -688,7 +697,7 @@ export class ClaudeLlmAdapter extends LlmAdapter {
     await awaitRetiredProcessNotice(engine)
 
     let outcome = null
-    const submission = engine.submitTurn({ text: projection.text }).then(
+    const submission = engine.submitTurn({ text: projection.text }, ...(this.#metered ? [{ maxTokens: options.maxTokens ?? this.#metered.maxOutputTokens }] : [])).then(
       result => { outcome = { result }; wakeUp() },
       error => { outcome = { error }; wakeUp() },
     )

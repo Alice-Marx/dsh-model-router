@@ -8,6 +8,7 @@ import { createPiEngine } from './pi-engine.mjs'
 import { createMuseEngine } from './muse-engine.mjs'
 import { cliDriver } from './cli-driver-specs.mjs'
 import { normalizeCliCredential, provisionCliCredential } from './cli-credentials.mjs'
+import { deepseekWireModel } from './deepseek-runtime.mjs'
 
 const fail = code => { throw Object.assign(new Error(code), { code }) }
 const plain = value => value && typeof value === 'object' && !Array.isArray(value)
@@ -24,12 +25,15 @@ export function normalizeConversationEngines(value = []) {
     if (!id(item.id) || !driver?.implemented || driver.available === false || !id(item.provider)
       || typeof item.model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,239}$/.test(item.model)
       || item.revision !== undefined && (!Number.isSafeInteger(item.revision) || item.revision < 1)) fail('CONVERSATION_ENGINE_CONFIG_INVALID')
-    keys(item.entry, ['executable', 'sha256', 'version', 'script', 'scriptSha256'])
+    keys(item.entry, ['executable', 'sha256', 'version', 'script', 'scriptSha256', 'harness', 'harnessSha256'])
     const entry = item.entry
     if (!isAbsolute(entry.executable ?? '') || !hash(entry.sha256) || typeof entry.version !== 'string'
       || !/^[0-9][A-Za-z0-9.+_-]{0,31}$/.test(entry.version)) fail('CONVERSATION_ENGINE_ENTRY_INVALID')
     if (entry.script !== undefined && (!isAbsolute(entry.script) || !hash(entry.scriptSha256))
       || entry.script === undefined && entry.scriptSha256 !== undefined) fail('CONVERSATION_ENGINE_ENTRY_INVALID')
+    if (item.driver === 'antigravityAgent' ? (!isAbsolute(entry.harness ?? '') || !hash(entry.harnessSha256) || Boolean(entry.script))
+      : entry.harness !== undefined || entry.harnessSha256 !== undefined) fail('CONVERSATION_ENGINE_ENTRY_INVALID')
+    if (item.driver === 'deepseekAgent') { deepseekWireModel(item.model); if (!entry.script || entry.version !== '0.2.2-rc.2') fail('DEEPSEEK_NODE_ENTRY_REQUIRED') }
     if (typeof item.credentialRef !== 'string' || !/^(?:ds-secret|cli-secret)\/[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(item.credentialRef)) fail('CONVERSATION_ENGINE_CREDENTIAL_REF_INVALID')
     const deadlineMs = item.deadlineMs ?? 1_800_000
     if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1000 || deadlineMs > 7_200_000) fail('CONVERSATION_ENGINE_DEADLINE_INVALID')
@@ -98,7 +102,8 @@ export async function mountConversationEngines({ llm, profiles = [], runtimeRoot
       }
       const adapter = createClaudeLlmAdapter({ provider: profile.provider, model: profile.model, name: profile.name,
         nativeSession: profile.driver !== 'claude',
-        funding: 'subscription', fundingFor: route => fundingFor(profile, route),
+        funding: profile.driver === 'deepseekAgent' ? 'api' : 'subscription', fundingFor: route => fundingFor(profile, route),
+        ...(profile.driver === 'deepseekAgent' ? { metered: { contextWindow: 1_048_576, maxOutputTokens: 4096 } } : {}),
         entry: profile.entry, runtimeRoot: join(runtimeRoot, profile.id), deadlineMs: profile.deadlineMs,
         workspaceFor: async () => join(runtimeRoot, profile.id, 'workspace'),
         identityFor: route => identityFor(profile, route),
@@ -141,6 +146,6 @@ export async function mountConversationEngines({ llm, profiles = [], runtimeRoot
       return evidence.every(item => item.notStarted === true) ? { notStarted: true, possiblyApplied: false } : { treeStopped: true }
     },
     catalog: () => profiles.map(profile => ({ id: profile.id, driver: profile.driver, provider: profile.provider,
-      model: profile.model, name: profile.name, funding: 'subscription', input: 'text', hostTools: profile.hostTools, status: 'configured' })) })
+      model: profile.model, name: profile.name, funding: profile.driver === 'deepseekAgent' ? 'api' : 'subscription', input: 'text', hostTools: profile.hostTools, status: 'configured' })) })
 }
 

@@ -93,12 +93,13 @@ const assertAssistantHistory = (message, provider, model) => {
  */
 export function assertRouteRequest(options, route) {
   if (!options || typeof options !== 'object' || Array.isArray(options)) fail('CLAUDE_TURN_REQUEST_REQUIRED', '请求缺失。')
-  const refused = REFUSED_FIELDS.filter(field => options[field] !== undefined)
+  const refused = REFUSED_FIELDS.filter(field => options[field] !== undefined && !(field === 'maxTokens' && route.metered))
   if (refused.length) {
     fail('CLAUDE_ROUTE_CAPABILITY_REFUSED',
       `本路由无法兑现这些能力，已拒绝而不是忽略：${refused.join(', ')}。接受的能力：${CLAUDE_LLM_CAPABILITIES.input.join('; ')}。`)
   }
-  const unknown = Object.keys(options).filter(key => !ALLOWED_FIELDS.includes(key))
+  if (route.metered && options.maxTokens !== undefined && (!Number.isSafeInteger(options.maxTokens) || options.maxTokens < 1 || options.maxTokens > route.metered.maxOutputTokens)) fail('CLI_METERED_OUTPUT_LIMIT', '输出上限超出此 CLI 连接的固定容量。')
+  const unknown = Object.keys(options).filter(key => !ALLOWED_FIELDS.includes(key) && !(key === 'maxTokens' && route.metered))
   if (unknown.length) {
     fail('CLAUDE_ROUTE_UNKNOWN_REQUEST_FIELD',
       `请求带有本路由不接受的身份、路径、命令、凭据或引擎配置字段：${unknown.join(', ')}。`)

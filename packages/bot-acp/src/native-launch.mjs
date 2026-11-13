@@ -13,13 +13,18 @@
 import { EventEmitter } from 'node:events'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFile, realpath, stat } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, toNamespacedPath } from 'node:path'
 
 import { classifyMessage, parseFrame, previewMessage } from './rpc-codec.mjs'
 import { capabilityProbe, nativeProcess, privateEnvironment, protectProfile } from '../../cli-runtime/src/native-process.mjs'
 
-const digest = value => createHash('sha256').update(value).digest('hex')
+const digestFile = async path => {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(path)) hash.update(chunk)
+  return hash.digest('hex')
+}
 export const DEFAULT_LAUNCHER = Object.freeze({ probe: capabilityProbe, protect: protectProfile, supervise: nativeProcess })
 
 /**
@@ -27,21 +32,25 @@ export const DEFAULT_LAUNCHER = Object.freeze({ probe: capabilityProbe, protect:
  * answer. `versionArgs` is Host state (most CLIs take `--version`); nothing here
  * resolves a command from PATH, from a model payload or from a shell.
  */
-export async function pinAcpEntry({ executable, sha256, version, script, scriptSha256 } = {}, home, { versionArgs = ['--version'] } = {}) {
+export async function pinAcpEntry(entry = {}, home, { versionArgs = ['--version'], versionProbe = null } = {}) {
+  const { executable, sha256, version, script, scriptSha256 } = entry
   if (!isAbsolute(executable ?? '') || !/^[a-f0-9]{64}$/.test(sha256 ?? '') || typeof version !== 'string' || !/^[0-9][A-Za-z0-9.+_-]{0,31}$/.test(version)) {
     throw new TypeError('PINNED_ACP_ENTRY_REQUIRED')
   }
   if (script !== undefined && (!isAbsolute(script) || !/^[a-f0-9]{64}$/.test(scriptSha256 ?? ''))) throw new TypeError('PINNED_ACP_SCRIPT_REQUIRED')
   if (!Array.isArray(versionArgs) || versionArgs.some(arg => typeof arg !== 'string')) throw new TypeError('ACP_VERSION_ARGS_INVALID')
+  if (versionProbe !== null && typeof versionProbe !== 'function') throw new TypeError('ACP_VERSION_PROBE_INVALID')
   const path = await realpath(executable)
   if (!(await stat(path)).isFile() || (process.platform === 'win32' && !path.toLowerCase().endsWith('.exe'))) throw new Error('ACP_ENTRY_REQUIRED')
-  if (digest(await readFile(path)) !== sha256) throw new Error('ACP_ENTRY_CHANGED')
+  if (await digestFile(path) !== sha256) throw new Error('ACP_ENTRY_CHANGED')
   let scriptPath = null
   if (script !== undefined) {
     scriptPath = await realpath(script)
-    if (!(await stat(scriptPath)).isFile() || digest(await readFile(scriptPath)) !== scriptSha256) throw new Error('ACP_ENTRY_SCRIPT_CHANGED')
+    if (!(await stat(scriptPath)).isFile() || await digestFile(scriptPath) !== scriptSha256) throw new Error('ACP_ENTRY_SCRIPT_CHANGED')
   }
-  const reported = await new Promise((resolve, reject) => {
+  // Some vendor runtimes identify themselves only in ACP initialize. The
+  // callback is compiled Host code, never owner JSON or model-supplied argv.
+  const reported = versionProbe ? await versionProbe(entry, home) : await new Promise((resolve, reject) => {
     const child = spawn(path, scriptPath ? [scriptPath, ...versionArgs] : versionArgs, { cwd: process.platform === 'win32' && home.length >= 260 ? toNamespacedPath(home) : home, env: privateEnvironment(home), windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] })
     let output = ''
     let error = ''
@@ -51,7 +60,7 @@ export async function pinAcpEntry({ executable, sha256, version, script, scriptS
     child.once('error', failure => { clearTimeout(timer); reject(failure) })
     child.once('close', code => { clearTimeout(timer); if (code === 0) resolve(output.trim()); else reject(new Error(`ACP_VERSION_FAILED: ${error.slice(0, 128)}`)) })
   })
-  if (!reported.includes(version)) throw new Error(`ACP_VERSION_MISMATCH: expected ${version} in ${JSON.stringify(reported.slice(0, 80))}`)
+  if (typeof reported !== 'string' || !reported.includes(version)) throw new Error(`ACP_VERSION_MISMATCH: expected ${version} in ${JSON.stringify(typeof reported === 'string' ? reported.slice(0, 80) : null)}`)
   return Object.freeze({ path, sha256, version, versionOutput: reported, versionArgs: [...versionArgs], script: scriptPath, scriptSha256: script !== undefined ? scriptSha256 : null })
 }
 
@@ -102,8 +111,8 @@ export async function launchAcpProcess({ entry, args, cwd, home, ttlMs, launcher
   if (!entry?.path || !Array.isArray(args) || args.some(arg => typeof arg !== 'string')) throw new TypeError('ACP_LAUNCH_SPEC_INVALID')
   if (typeof cwd !== 'string' || !cwd) throw new TypeError('ACP_LAUNCH_CWD_REQUIRED')
   if (!Number.isSafeInteger(ttlMs) || ttlMs < 1000) throw new TypeError('ACP_LAUNCH_TTL_INVALID')
-  if (digest(await readFile(entry.path)) !== entry.sha256) throw new Error('ACP_ENTRY_CHANGED')
-  if (entry.script && digest(await readFile(entry.script)) !== entry.scriptSha256) throw new Error('ACP_ENTRY_SCRIPT_CHANGED')
+  if (await digestFile(entry.path) !== entry.sha256) throw new Error('ACP_ENTRY_CHANGED')
+  if (entry.script && await digestFile(entry.script) !== entry.scriptSha256) throw new Error('ACP_ENTRY_SCRIPT_CHANGED')
   const capability = probe ?? await launcher.probe({ home, python })
   if (!capability?.available) throw new Error(`NATIVE_PEER_UNAVAILABLE: ${capability?.reason ?? 'unknown'}`)
   if (!probe) await launcher.protect(capability.helper, home)

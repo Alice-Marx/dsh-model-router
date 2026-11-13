@@ -8,6 +8,7 @@ import { attachActualAgentLoop } from './helpers/actual-agent-loop.mjs'
 test('plugin CLI connection serves actual Main and independent Bot through the public SDK with durable SQLite receipts', async () => {
   const values = new Map(); let actual
   await withProductIndependent(async ({ ctx, product, bind, dispatch, runtime, readRows }) => {
+    const errors = []; ctx.on('agent/error', event => errors.push(event.error?.stack ?? event.error?.message))
     await assert.rejects(ctx.get('botProductReadModel').dispatch({ action: 'cliProviders.list', payload: {} }, { kind: 'bot' }), { code: 'REMOTE_OWNER_REQUIRED' })
     const saved = await dispatch('cliProviders.save', { expectedRevision: 0, driver: 'codex', name: 'Codex offline account', model: 'gpt-fixture', enabled: true,
       entry: { executable: process.execPath, version: '1.0.0', script: resolve('tests/fixtures/native-chat-protocol-fixture.mjs') },
@@ -20,7 +21,7 @@ test('plugin CLI connection serves actual Main and independent Bot through the p
     try {
       handle.agent.send(createUserMessage({ content: [{ type: 'text', text: 'main first' }], source: { kind: 'user' } }), 'next-turn', true)
       await handle.agent.whenIdle()
-      assert.ok(handle.agent.session.deriveMessages().some(message => message.role === 'assistant' && message.content.some(block => block.text?.includes('main first'))))
+      assert.ok(handle.agent.session.deriveMessages().some(message => message.role === 'assistant' && message.content.some(block => block.text?.includes('main first'))), JSON.stringify(errors))
     } finally { await handle.dispose() }
     await bind('b', saved.provider, 'gpt-fixture'); await runtime.move('b', 'independent')
     assert.match((await runtime.turn({ botId: 'b', input: 'worker first' })).answer, /worker first/)

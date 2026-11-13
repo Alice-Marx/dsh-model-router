@@ -1561,8 +1561,8 @@
     {
       "path": "vendor/ds-bot/src/host/tools.js",
       "sourcePath": "ds-bot/src/host/tools.js",
-      "sha256": "abb64c9a9e19efd009686f943908513565471dac88da3a27d9f3c5fc19868ad0",
-      "gitBlob": "0181eb5290c0e135a2c444e32e36a2b6cdb06903",
+      "sha256": "e363c521f7876102345b88d2809131a0f3ef4d11130130d0bcff925871dd5973",
+      "gitBlob": "54986811b1ea58105cc3a4d77b9684644eb71712",
       "origin": "overlay"
     },
     {

@@ -46,13 +46,14 @@ function fakeEngineFactory({ script = async (input, emit) => { emit.delta(`reply
       submitted: [],
       get closed() { return closed },
       get sessionId() { return 'fx-session-1' },
-      submitTurn(input) {
+      submitTurn(input, controls) {
         if (closed) return Promise.reject(coded('ENGINE_STOPPED'))
         if (current) return Promise.reject(coded('ENGINE_TURN_IN_PROGRESS'))
         count++
         const turn = { turnId: `t-${count}`, dispatched: true }
         current = turn
         engine.submitted.push(input.text)
+        engine.lastControls = controls
         const emit = {
           delta: text => events.emit('delta', { streamKind: 'assistant_text', delta: text }),
           reasoning: text => events.emit('delta', { streamKind: 'reasoning_text', delta: text }),
@@ -147,6 +148,20 @@ const preparedStream = async (adapter, options) => (await adapter.prepareCall(PR
 const finishOf = chunks => { const last = chunks.at(-1); assert.equal(last?.type, 'finish', 'a turn always ends with exactly one finish chunk'); return last }
 const failureOf = chunks => finishOf(chunks).reason.failure
 const textOf = chunks => chunks.filter(chunk => chunk.type === 'text-delta').map(chunk => chunk.text).join('')
+
+test('Host metered native route exposes its bound, forwards the exact cap and refuses funding changes', async () => {
+  const host = await makeHost(), { adapter, seam } = await makeAdapter(host, { funding: 'api', nativeSession: true, metered: { contextWindow: 1048576, maxOutputTokens: 4096 } })
+  try {
+    const model = await adapter.resolveModel(PROVIDER, MODEL)
+    assert.equal(model.context.contextWindow, 1048576); assert.equal(model.defaultMaxTokens, 4096)
+    const options = { provider: PROVIDER, model: MODEL, messages: [userMessage('paid fixture', 'metered-1')], maxTokens: 32 }
+    assert.equal(finishOf(await streamOf(adapter, options)).reason.kind, 'stop')
+    assert.deepEqual(seam.created[0].lastControls, { maxTokens: 32 })
+    const invalid = await streamOf(adapter, { ...options, maxTokens: 4097 })
+    assert.equal(failureOf(invalid).code, 'CLI_METERED_OUTPUT_LIMIT'); assert.equal(seam.created[0].submitted.length, 1)
+    assert.throws(() => adapter.replaceRoute({ funding: 'subscription' }), { code: 'CLAUDE_ROUTE_FUNDING_REFUSED' })
+  } finally { await adapter.close() }
+})
 
 describe('native activity is a Host display observation', () => {
   test('observations retain Host scope and never emit executable tool chunks or raw payloads', async () => {

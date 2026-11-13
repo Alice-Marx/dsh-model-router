@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join, dirname } from 'node:path'
 import { cliDriver } from './cli-driver-specs.mjs'
+import { provisionAntigravityRuntime } from './antigravity-runtime.mjs'
+import { provisionDeepSeekRuntime } from './deepseek-runtime.mjs'
 
 const fail = message => { throw Object.assign(new Error(message), { code: 'CLI_CHAT_CREDENTIAL_INVALID' }) }
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -10,8 +12,9 @@ const files = Object.freeze({
   grokAgent: ['.grok/auth.json'], geminiAgent: ['.gemini/oauth_creds.json'], kimiAgent: ['.kimi-code/credentials/kimi-code.json'],
   droidAgent: ['.factory/auth.v2.file'], cursorAgent: [], opencodeGo: ['data/opencode/auth.json'], qwenAgent: ['.qwen/oauth_creds.json'],
   hermesAgent: ['.hermes/auth.json'], clineAgent: ['.cline/data/settings/providers.json'], copilotAgent: [], commandCodeAgent: ['.commandcode/auth.json'], customAcp: [],
+  antigravityAgent: ['.gemini/antigravity-acp/acp_token.json'], deepseekAgent: [],
 })
-const envNames = Object.freeze({ cursorAgent: ['CURSOR_AUTH_TOKEN'], copilotAgent: ['COPILOT_GITHUB_TOKEN'] })
+const envNames = Object.freeze({ cursorAgent: ['CURSOR_AUTH_TOKEN'], copilotAgent: ['COPILOT_GITHUB_TOKEN'], deepseekAgent: ['DEEPSEEK_API_KEY'] })
 function inspect(value, driver, depth = 0) {
   if (depth > 12) fail('认证资料嵌套过深。')
   if (typeof value === 'string' && (value.length > 64_000 || value.includes('\0'))) fail('认证字段过长或含无效字符。')
@@ -28,7 +31,7 @@ export function normalizeCliCredential(driverId, raw) {
   let value
   try { value = JSON.parse(raw) } catch { fail('认证资料需要有效 JSON。') }
   if (!plain(value) || Object.keys(value).some(key => !['schemaVersion', 'billing', 'files', 'env'].includes(key))
-    || value.schemaVersion !== 1 || value.billing !== (driverId === 'customAcp' ? 'local' : 'subscription')
+    || value.schemaVersion !== 1 || value.billing !== (driverId === 'customAcp' ? 'local' : driverId === 'deepseekAgent' ? 'api' : 'subscription')
     || !plain(value.files) || !plain(value.env)) fail('认证资料须包含 schemaVersion、billing、files 和 env。')
   if (Object.keys(value.files).length + Object.keys(value.env).length > 8) fail('每个连接仅保存所需的账号资料。')
   for (const [path, content] of Object.entries(value.files)) {
@@ -62,7 +65,7 @@ export function cliCredentialTemplate(driver) {
   if (driver === 'codex') account = { tokens: { access_token: 'YOUR_ACCOUNT_ACCESS_TOKEN', refresh_token: 'YOUR_ACCOUNT_REFRESH_TOKEN', account_id: 'YOUR_ACCOUNT_ID' } }
   if (driver === 'opencodeGo' || driver === 'pi') account = { provider: { type: 'oauth', access: 'YOUR_ACCOUNT_ACCESS_TOKEN', refresh: 'YOUR_ACCOUNT_REFRESH_TOKEN', expires: 0 } }
   if (driver === 'clineAgent') account = { version: 1, lastUsedProvider: 'cline', providers: { cline: { settings: { provider: 'cline', model: 'YOUR_NATIVE_MODEL_ID', auth: { accessToken: 'YOUR_ACCOUNT_ACCESS_TOKEN' } } } } }
-  return { schemaVersion: 1, billing: driver === 'customAcp' ? 'local' : 'subscription', files: path ? { [path]: account } : {},
+  return { schemaVersion: 1, billing: driver === 'customAcp' ? 'local' : driver === 'deepseekAgent' ? 'api' : 'subscription', files: path ? { [path]: account } : {},
     env: Object.fromEntries((envNames[driver] ?? []).map(name => [name, 'YOUR_ACCOUNT_TOKEN'])) }
 }
 export async function provisionCliCredential(home, profile, resolveSecret) {
@@ -81,8 +84,17 @@ export async function provisionCliCredential(home, profile, resolveSecret) {
   if (profile.driver === 'geminiAgent') {
     const target = join(home, '.gemini/settings.json'); await mkdir(dirname(target), { recursive: true, mode: 0o700 })
     await writeFile(target, JSON.stringify({ security: { auth: { selectedType: 'oauth-personal' } }, tools: { approvalMode: 'default' } }), { mode: 0o600 })
+    env.GEMINI_CLI_NO_RELAUNCH = '1'
+  }
+  if (profile.driver === 'kimiAgent') {
+    const model = profile.model?.replace(/^kimi-code\//, '')
+    if (!['kimi-for-coding', 'kimi-for-coding-highspeed', 'k3', 'k3-256k', 'k3.1-pro', 'k3.1-pro-highspeed'].includes(model)) fail('请使用 Kimi Code 官方模型 ID（kimi-code/模型名）。')
+    const config = `default_model = ${JSON.stringify(profile.model)}\n[providers.\"managed:kimi-code\"]\ntype = \"kimi\"\nbase_url = \"https://api.kimi.com/coding/v1\"\napi_key = \"\"\n[providers.\"managed:kimi-code\".oauth]\nstorage = \"file\"\nkey = \"oauth/kimi-code\"\n[models.${JSON.stringify(profile.model)}]\nprovider = \"managed:kimi-code\"\nmodel = ${JSON.stringify(model)}\nmax_context_size = 262144\ncapabilities = [\"thinking\", \"tool_use\"]\n`
+    await writeFile(join(home, '.kimi-code/config.toml'), config, { mode: 0o600 })
   }
   if (profile.driver === 'museCode') env.MUSE_NO_AUTO_UPDATE = '1'
+  if (profile.driver === 'antigravityAgent') Object.assign(env, (await provisionAntigravityRuntime(home, profile)).env)
+  if (profile.driver === 'deepseekAgent') Object.assign(env, (await provisionDeepSeekRuntime(home, profile)).env)
   if (profile.driver === 'clineAgent') {
     const settings = value.files['.cline/data/settings/providers.json'], provider = settings.lastUsedProvider
     if (settings.providers[provider].settings.model !== profile.model) fail('Cline 认证资料中的模型必须与此连接的模型 ID 一致。')

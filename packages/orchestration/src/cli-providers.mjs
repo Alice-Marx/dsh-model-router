@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname, isAbsolute } from 'node:path'
+import { deepseekWireModel } from '../../bot-engines/src/deepseek-runtime.mjs'
 
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const fail = (code, message) => { throw Object.assign(new Error(message), { code }) }
@@ -9,12 +10,13 @@ const token = id => /^[a-f0-9]{32}$/.test(id ?? '')
 const route = id => 'bot-cli-' + id
 const refPrefix = id => 'DSH_BOT_CLI_' + id.toUpperCase() + '_'
 const entryInput = input => {
-  if (!plain(input) || Object.keys(input).some(key => !['executable', 'version', 'script'].includes(key))
+  if (!plain(input) || Object.keys(input).some(key => !['executable', 'version', 'script', 'harness'].includes(key))
     || typeof input.executable !== 'string' || !isAbsolute(input.executable) || input.executable.length > 4096 || typeof input.version !== 'string' || !/^[0-9][A-Za-z0-9.+_-]{0,63}$/.test(input.version)
-    || input.script !== undefined && (typeof input.script !== 'string' || !input.script || input.script.length > 4096)) fail('CLI_CHAT_ENTRY_INVALID', '请填写 CLI 的绝对路径和已安装版本。')
+    || input.script !== undefined && (typeof input.script !== 'string' || !input.script || input.script.length > 4096)
+    || input.harness !== undefined && (typeof input.harness !== 'string' || !isAbsolute(input.harness) || input.harness.length > 4096)) fail('CLI_CHAT_ENTRY_INVALID', '请填写 CLI 的绝对路径和已安装版本。')
   return { ...input }
 }
-const publicEntry = entry => ({ executable: entry.executable, version: entry.version, ...(entry.script ? { script: entry.script } : {}) })
+const publicEntry = entry => ({ executable: entry.executable, version: entry.version, ...(entry.script ? { script: entry.script } : {}), ...(entry.harness ? { harness: entry.harness } : {}) })
 
 export function openCliProviders({ Database, file, credentials, drivers, inspectEntry, normalizeCredential, importAccount, onChanged = async () => {}, usedBy = () => [], now = Date.now }) {
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true })
@@ -32,8 +34,9 @@ export function openCliProviders({ Database, file, credentials, drivers, inspect
         || !driverList().some(driver => driver.id === data.driver) || typeof data.enabled !== 'boolean'
         || typeof data.name !== 'string' || !data.name.trim() || data.name.length > 100 || /\p{Cc}/u.test(data.name)
         || typeof data.model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,239}$/.test(data.model)
-        || !plain(data.entry) || Object.keys(data.entry).some(key => !['executable', 'version', 'sha256', 'script', 'scriptSha256'].includes(key)) || !/^[a-f0-9]{64}$/.test(data.entry.sha256 ?? '')
+        || !plain(data.entry) || Object.keys(data.entry).some(key => !['executable', 'version', 'sha256', 'script', 'scriptSha256', 'harness', 'harnessSha256'].includes(key)) || !/^[a-f0-9]{64}$/.test(data.entry.sha256 ?? '')
         || data.entry.script && (!isAbsolute(data.entry.script) || !/^[a-f0-9]{64}$/.test(data.entry.scriptSha256 ?? ''))
+        || (data.driver === 'antigravityAgent' ? !isAbsolute(data.entry.harness ?? '') || !/^[a-f0-9]{64}$/.test(data.entry.harnessSha256 ?? '') || Boolean(data.entry.script) : data.entry.harness !== undefined || data.entry.harnessSha256 !== undefined)
         || data.credentialRef !== null && !new RegExp('^cli-secret/' + refPrefix(data.id) + '[A-F0-9]{12}$').test(data.credentialRef)) throw new Error()
       entryInput(publicEntry(data.entry)); owned.add(data.provider)
       return { ...data, revision: row.revision, health: row.health ? JSON.parse(row.health) : null }
@@ -51,8 +54,9 @@ export function openCliProviders({ Database, file, credentials, drivers, inspect
   }
   const inspect = async (payload, context) => {
     owner(context)
-    if (!plain(payload) || Object.keys(payload).some(key => key !== 'entry')) fail('CLI_CHAT_INVALID', '无效的版本核验请求。')
-    const result = await inspectEntry(entryInput(payload.entry), null, context.signal)
+    if (!plain(payload) || Object.keys(payload).some(key => !['entry', 'driver'].includes(key))
+      || payload.driver !== undefined && !driverList().some(driver => driver.id === payload.driver)) fail('CLI_CHAT_INVALID', '无效的版本核验请求。')
+    const result = await inspectEntry(entryInput(payload.entry), payload.driver ?? null, context.signal)
     return { versionVerified: true, entry: publicEntry(result) }
   }
   const save = (input, context) => serial(async () => {
@@ -60,6 +64,7 @@ export function openCliProviders({ Database, file, credentials, drivers, inspect
     if (!plain(input) || Object.keys(input).some(key => !['id', 'expectedRevision', 'driver', 'name', 'model', 'enabled', 'entry', 'credentialJson', 'clearCredential', 'importLocalAccount'].includes(key))) fail('CLI_CHAT_INVALID', '配置包含不支持的字段。')
     const driver = driverList().find(driver => driver.id === input.driver)
     if (!driver?.implemented || driver.available === false) fail('CLI_CHAT_DRIVER_UNAVAILABLE', driver?.reason ?? '此驱动尚不可用。')
+    if (input.driver === 'deepseekAgent') deepseekWireModel(input.model)
     if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0 || typeof input.name !== 'string' || !input.name.trim() || input.name.length > 100 || /\p{Cc}/u.test(input.name)
       || typeof input.model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,239}$/.test(input.model) || typeof input.enabled !== 'boolean'
       || input.id !== undefined && !token(input.id) || input.clearCredential !== undefined && typeof input.clearCredential !== 'boolean'

@@ -655,9 +655,9 @@ export function startBotProduct(ctx, options = {}) {
       const independent = aiProviders?.metadata(model.provider)
       if (independent) { model.label = `${independent.name} · ${model.model}`; model.providerName = independent.name; model.source = 'plugin'; model.fundingModes = ['api'] }
       const native = cliProviders?.metadata(model.provider)
-      if (native) { model.label = `${native.name} · 原生聊天 · ${model.model}`; model.providerName = native.name; model.source = 'plugin'; model.fundingModes = ['subscription'] }
+      if (native) { model.label = `${native.name} · 原生聊天 · ${model.model}`; model.providerName = native.name; model.source = 'plugin'; model.fundingModes = [native.driver === 'deepseekAgent' ? 'api' : 'subscription'] }
       const profile = engineProfiles.find(item => item.provider === model.provider && item.model === model.model)
-      if (profile) { model.label = `${profile.name} · 仅文字 · ${model.model}`; model.fundingModes = ['subscription'] }
+      if (profile) { model.label = `${profile.name} · 仅文字 · ${model.model}`; model.fundingModes = [profile.driver === 'deepseekAgent' ? 'api' : 'subscription'] }
     }
     const localMachineId = machineId.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 100) || 'local-host'
     // A CLI identity is only offered once the host verified it against the
@@ -770,7 +770,7 @@ export function startBotProduct(ctx, options = {}) {
         if (!bot || profile.provider !== route.provider || profile.model !== route.model) refuse('CONVERSATION_ENGINE_BINDING_CHANGED')
         const binding = bindingRoute({ botId: bot.id, provider: route.provider, model: route.model })
         if (!binding || ((!binding.multi || independent) && bot.model !== `${route.provider}/${route.model}`)) refuse('CONVERSATION_ENGINE_BINDING_CHANGED')
-        if (binding.funding.mode !== 'subscription') refuse('CONVERSATION_ENGINE_SUBSCRIPTION_REQUIRED')
+        if (binding.funding.mode !== (profile.driver === 'deepseekAgent' ? 'api' : 'subscription')) refuse('CONVERSATION_ENGINE_FUNDING_MISMATCH')
         const subject = directory.forBot(bot.id)
         if (subject !== frame.subject) refuse('SUBJECT_MISMATCH')
         product.serving.assertMode(bot.id, independent ? 'independent' : 'integration')
@@ -782,6 +782,7 @@ export function startBotProduct(ctx, options = {}) {
         if (current.independent) return request
         const projected = projectHostLoopTextRequest(request, {
           session: current.session, isLoopRequest: isAgentLoopRequest, allowRouteContext: current.multi,
+          metered: engineProfiles.some(profile => profile.provider === request.provider && profile.model === request.model && profile.driver === 'deepseekAgent'),
         })
         const bootstrap = current.multi ? hostLoopRouteContext(projected, {
           session: current.session, redact: product.rt.redactSecrets,
@@ -823,7 +824,7 @@ export function startBotProduct(ctx, options = {}) {
         // committed funding at dispatch, and the one accounting admits it.
         fundingFor: async (profile, route) => {
           if (policy.activeIdentity()?.independent) { const { bot } = engineContext(profile, route); await checkEngineCredential(profile, bot.id) }
-          return 'subscription'
+          return profile.driver === 'deepseekAgent' ? 'api' : 'subscription'
         },
         identityFor: async (profile, route) => {
           const { bot, subject, independent, session, fundingRevision } = engineContext(profile, route)

@@ -346,7 +346,9 @@ export function createAcpSession({
     if (typeof assertModelAuthorized === 'function') assertModelAuthorized(modelId)
     const option = advertisedConfigOption('model')
     if (option) {
-      const offered = (Array.isArray(option.options) ? option.options : []).map(entry => entry?.value).filter(value => typeof value === 'string')
+      const offered = []
+      const collect = entries => { for (const entry of Array.isArray(entries) ? entries : []) { if (typeof entry?.value === 'string') offered.push(entry.value); if (Array.isArray(entry?.options)) collect(entry.options) } }
+      collect(option.options)
       if (!offered.includes(modelId)) throw new Error(`ACP_MODEL_NOT_ADVERTISED: ${modelId}`)
       const result = await link.request(
         ACP_METHODS.sessionSetConfigOption,
