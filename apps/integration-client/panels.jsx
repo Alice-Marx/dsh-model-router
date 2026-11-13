@@ -6,6 +6,7 @@ import { framePoint } from '../../packages/orchestration/src/desktop-contract.mj
 import { BotBindingEditor } from './binding-editor.jsx'
 import { LibraryPanel } from './library-panel.jsx'
 import { SecurePairingSetup } from './secure-pairing.jsx'
+import { LocalComputerHost } from './local-computer-host.jsx'
 import { UsageExplorer } from './usage-explorer.jsx'
 import { DesktopWorkbench } from './desktop-pane.jsx'
 import { RoutinesPanel } from './routines-panel.jsx'
@@ -546,7 +547,7 @@ function DesktopControl({ snapshot, dispatch, busy }) {
   </section>
 }
 
-function MachineSetup({ snapshot, dispatch, busy }) {
+function MachineSetup({ snapshot, dispatch, busy, transport }) {
   const available = snapshot.availableActions ?? []
   const [paste, setPaste] = React.useState('')
   const [address, setAddress] = React.useState('')
@@ -610,7 +611,7 @@ function MachineSetup({ snapshot, dispatch, busy }) {
       setWorking(false)
     }
   }
-  return <><SecurePairingSetup snapshot={snapshot} dispatch={dispatch} busy={busy} /><details className="bp-card bp-machine-setup"><summary>兼容已有电脑（导入长期配对文件）</summary>
+  return <><LocalComputerHost snapshot={snapshot} dispatch={dispatch} transport={transport} busy={busy} /><SecurePairingSetup snapshot={snapshot} dispatch={dispatch} busy={busy} /><details className="bp-card bp-machine-setup"><summary>兼容已有电脑（导入长期配对文件）</summary>
     <p className="bp-muted">在你自己的 Windows 电脑或云电脑上解压 Agent 包，双击 <code>start.cmd</code>，按向导选共享文件夹和连接地址。回到这里导入向导生成的 <code>pairing.private.json</code>，地址、目录和权限会自动填好。</p>
     {available.includes('machine.secret') && available.includes('machine.pair') ? <div className="bp-form">
       <label>配对文件<input type="file" accept=".json,application/json" onChange={event => { void importFile(event) }} /></label>
@@ -700,7 +701,7 @@ export function Machines({ snapshot, dispatch, busy, focus, transport }) {
   if (section?.status !== 'available') return <Blocked value={section} />
   return <>{dispatch&&<><DesktopWorkbench snapshot={snapshot} dispatch={dispatch} transport={transport} />
     <details><summary>兼容截图操作</summary><DesktopControl snapshot={snapshot} dispatch={dispatch} busy={busy} /></details>
-    <MachineSetup snapshot={snapshot} dispatch={dispatch} busy={busy} /></>}{focus?.machineId && !section.items.some(machine => (machine.id ?? machine.machineId) === focus.machineId) && <p className="bp-blocked" role="status">所选电脑不在当前宿主记录中，请刷新后核对。</p>}{section.items.length ? <div className="bp-grid">{section.items.map(machine => <article className={`bp-card${focus?.machineId === (machine.id ?? machine.machineId) ? ' bp-selected-resource' : ''}`} key={machine.id ?? machine.machineId} tabIndex={-1} ref={node => { const id = machine.id ?? machine.machineId; if (node) machineCards.current.set(id, node); else machineCards.current.delete(id) }}>
+    <MachineSetup snapshot={snapshot} dispatch={dispatch} busy={busy} transport={transport} /></>}{focus?.machineId && !section.items.some(machine => (machine.id ?? machine.machineId) === focus.machineId) && <p className="bp-blocked" role="status">所选电脑不在当前宿主记录中，请刷新后核对。</p>}{section.items.length ? <div className="bp-grid">{section.items.map(machine => <article className={`bp-card${focus?.machineId === (machine.id ?? machine.machineId) ? ' bp-selected-resource' : ''}`} key={machine.id ?? machine.machineId} tabIndex={-1} ref={node => { const id = machine.id ?? machine.machineId; if (node) machineCards.current.set(id, node); else machineCards.current.delete(id) }}>
     <div className="bp-card-title"><h2>{machine.name ?? machine.id ?? machine.machineId}</h2><Tag>{machine.status ?? '未知'}</Tag></div>
     <dl className="bp-facts"><Value label="平台">{machine.platform}</Value><Value label="Agent 版本">{machine.version}</Value><Value label="最后在线">{machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString('zh-CN') : '从未取得心跳'}</Value>
       <Value label="能力">{machine.capabilities?.join('、')}</Value><Value label="桌面会话">{machine.desktop?.status ?? '未报告'}</Value></dl>

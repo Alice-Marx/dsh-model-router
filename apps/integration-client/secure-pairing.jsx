@@ -60,7 +60,7 @@ export function SecurePairingSetup({ snapshot, dispatch, busy }) {
   }
   return <details className="bp-card bp-secure-pairing" open><summary><UiIcon name="computer" />安全配对电脑</summary>
     <p className="bp-muted">在目标电脑生成两分钟邀请码，扫描或粘贴到这里，再核对确认码与设备指纹。连接后可从 Bot 聊天中的电脑入口打开桌面。</p>
-    <p className="bp-muted">安全配对需要同一预览版 Agent；已有长期配对文件可使用下方兼容入口。</p>
+    <p className="bp-muted">在目标电脑的 Bot 插件“本机 · 允许其他电脑连接”中开启远程访问并生成邀请，无需单独安装 Agent。已有独立 Agent 的配对文件也可继续使用。</p>
     {(snapshot.availableActions??[]).includes('machine.pair.invite') ? <div className="bp-form">
       <PairingQrReader onRead={change} disabled={working||recoverable||busy}/>
       <label>设备邀请码<textarea rows={3} value={text} disabled={working||recoverable} onChange={event=>change(event.target.value)} autoComplete="off" spellCheck={false} placeholder="粘贴目标电脑生成的 dsh-pairing-invite JSON" /></label>

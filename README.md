@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.71.0 · Windows Remote Agent: 0.1.3**
+**Current stable version: 0.72.0 · Windows Remote Agent: 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -77,8 +77,8 @@ Edit the Bot's name, role and standing instructions under **Identity & personali
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.71.0`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.71.0`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.72.0`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.72.0`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -86,10 +86,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.71.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.72.0
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.71.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.72.0
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -218,20 +218,22 @@ The Main Bot can also call `bot_route_task` or its alias `bot_dispatch`. Both di
 
 ## Connect your Windows or cloud computer
 
-**Full Bot edition.** Bring your own **Windows x64 computer or cloud desktop**. The setup wizard creates the local Agent configuration and pairing file; the Host must be able to reach the Agent over your configured network, VPN, or tunnel.
+**Full Bot edition.** Install `@ljwei-stak/dsh-model-route-bot` in DeepSeek Harness on both computers. The plugin includes the Agent service and Windows desktop helper; a separate Agent installation is optional. The computers need a reachable LAN/VPN address. Keep Harness running and the target Windows user signed in.
 
 **On the computer to control:**
 
-1. Download the [complete Windows Agent 0.1.3 package](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.71.0/dsh-remote-agent-0.1.3-windows-x64.zip), extract it into a permanent directory, and run `start.cmd`. Keep the interactive Windows user signed in.
-2. In the setup wizard, configure the accessible address, port, approved work directories, and optional command/browser capabilities. It registers the Agent and desktop helper for the current user and generates `private/pairing.private.json` without storing a Windows password. Subsequent runs retain the existing configuration.
+1. Open **Remote computers → This computer · Allow other computers to connect**. Set a name, a network interface, a port and a dedicated shared folder. Enable file changes or Windows desktop control as needed, then choose **Save and enable remote access**. Allow the selected TCP port through Windows Firewall when needed.
+2. Choose **Generate two-minute pairing invitation**. Share the QR code or invitation file privately. The six-digit confirmation code is displayed separately; the exported invitation does not contain it.
 
-**In Harness:**
+**On the controlling computer:**
 
-3. Open **Remote computers → Add computer** and import `private/pairing.private.json`. Check the populated endpoint and grants, select the allowed Bots, then pair/probe the computer. Keep this pairing file private.
-4. In **Bot bindings**, save the Bot's computer and tool grants. Open **Computer operations** or the computer page, select a display, and choose **Connect desktop** to watch first.
-5. Choose **Take control** and wait for confirmation before sending keyboard, mouse, wheel, or text input. **Watch only** returns control and releases held input. Use **Expand** or double-click while watching for a larger view; disconnect when finished.
+3. Open **Remote computers → Securely pair a computer**, scan/import the invitation, compare the device fingerprint and enter the confirmation code displayed on the target. Confirm pairing. The Main Bot can use the approved scope; workers require their saved computer and tool grants.
+4. Open the computer page, choose a display and **Connect desktop** to watch first. Choose **Take control** and wait for acknowledgement before sending keyboard, mouse, wheel or text input. **Watch only** returns control and releases held input; disconnect when finished.
+5. On the target, **Revoke pairing** removes a controlling device immediately. **Disable remote access** closes the listener and desktop helper. Saved enabled access resumes with Harness; quitting Harness stops this embedded service. Saving changed settings revokes existing pairings so an old grant cannot silently target another folder.
 
-Desktop viewing uses adaptive JPEG streaming with native input acknowledgements and a visible measured frame rate. Human control prevents conflicting Bot desktop automation. The current desktop implementation targets an available, signed-in Windows interactive session; performance depends on resolution and network conditions. Secure/UAC desktops are outside this capture scope. Computer pairing configures access; it does not provision a cloud machine or establish network connectivity.
+Pairing pins the device public key and uses Noise encryption. Invitations expire after two minutes and allow five incorrect confirmation attempts. Pairing does not provide public NAT traversal. Embedded access shares one selected folder and optional Windows desktop; approved shell/browser configurations remain available through the [standalone Windows Agent 0.1.3](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.71.0/dsh-remote-agent-0.1.3-windows-x64.zip). Existing standalone Agent pairings remain supported.
+
+Desktop viewing uses adaptive JPEG streaming with native input acknowledgements and a measured frame rate. Human control prevents conflicting Bot desktop automation. It requires an available, signed-in Windows interactive session; secure/UAC desktops are outside this capture scope. Performance depends on resolution and network conditions.
 
 <a id="routines"></a>
 
@@ -278,7 +280,7 @@ Credentials for independent plugin AI connections are saved through the Host cre
 | --- | --- |
 | Harness integration | Declared Host versions are listed in [package.json](package.json); the current compatibility baseline is Harness SDK **0.2.2-rc.2**, Cordis **4.1** and schemastery **3.19**. |
 | Bot foundation | Pinned [DS Bot](https://github.com/Fei2411/DS-Bot) **0.2.7**, with project-specific integration and product overlays. |
-| Remote desktop | Windows x64 Agent **0.1.3**, with an available signed-in interactive desktop. |
+| Remote desktop | Embedded plugin access or Windows x64 Agent **0.1.3**, with an available signed-in interactive desktop. |
 | Tool execution | Availability depends on the local platform, installed CLI, account, exact model, and supported execution adapter shown by the workbench. |
 
 <a id="troubleshooting"></a>

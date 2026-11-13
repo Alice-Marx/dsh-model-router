@@ -14,7 +14,7 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.71.0 · Windows Remote Agent：0.1.3**
+**当前正式版：0.72.0 · Windows Remote Agent：0.1.3**
 
 以 Bot 联系人和聊天为主要入口，集中使用独立 AI 连接、多模型路线、团队委派、私有资料库、数据分析与自有 Windows 电脑。任务、通知和执行记录保存在工作空间中，Main Bot 可在已保存的多条模型路线之间调度。
 
@@ -77,8 +77,8 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.71.0`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.71.0`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.72.0`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.72.0`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 完整版本进入 Bot 工作区，在 **设置 → AI** 添加独立模型连接，再为 Bot 选择模型。纯路由版本从侧栏打开 **模型路由**，使用 Harness 已配置路线。
 
@@ -86,10 +86,10 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.71.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.72.0
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.71.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.72.0
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -218,20 +218,22 @@ Main Bot 也可调用 `bot_route_task` 或同义工具 `bot_dispatch`；两者�
 
 ## 连接自己的 Windows 或云电脑
 
-**适用于完整 Bot 版本。** 使用用户自备的 **Windows x64 电脑或云桌面**；向导生成本地 Agent 配置与配对文件。Host 需能通过已配置的网络、VPN 或隧道访问 Agent。
+**适用于完整 Bot 版本。** 两台电脑都在 DeepSeek Harness 中安装 `@ljwei-stak/dsh-model-route-bot`。插件包含 Agent 服务和 Windows 桌面助手，可直接配对；独立 Agent 为可选安装。两台电脑需有可达的局域网或 VPN 地址，并保持 Harness 运行、被控 Windows 用户已登录。
 
 **在被控制的电脑上：**
 
-1. 下载 [Windows Agent 0.1.3 完整包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.71.0/dsh-remote-agent-0.1.3-windows-x64.zip)，解压到长期保留的目录，运行 `start.cmd`，并保持 Windows 交互用户已登录。
-2. 在向导中设置可访问的地址、端口、允许工作目录及可选命令/浏览器能力。向导为当前用户注册 Agent 与桌面 helper，生成 `private/pairing.private.json`，不保存 Windows 密码；再次运行会保留已有配置。
+1. 打开 **远程电脑 → 本机 · 允许其他电脑连接**，选择名称、网卡、端口和专门的共享文件夹，按需勾选文件修改或 Windows 桌面控制，点击 **保存并开启远程访问**。必要时在 Windows 防火墙中放行所选 TCP 端口。
+2. 点击 **生成两分钟配对邀请**，私下分享二维码或邀请文件。六位确认码单独显示，导出的邀请不包含确认码。
 
-**在 Harness 中：**
+**在控制端电脑上：**
 
-3. 打开 **远程电脑 → 添加电脑**，导入 `private/pairing.private.json`，核对自动填写的地址与授权，选择允许的 Bot 后配对/探测。该配对文件需私下保管。
-4. 在 **Bot 绑定** 保存该 Bot 的电脑与工具权限，打开 **电脑操作** 或电脑页面，选择显示器并点击 **连接桌面**，先观看画面。
-5. 点击 **取得控制权**，等待确认后发送键盘、鼠标、滚轮或文字输入。**仅观看** 会归还控制并释放按住的输入；通过 **放大** 或观看时双击查看大画面，结束后断开连接。
+3. 打开 **远程电脑 → 安全配对电脑**，扫描或导入邀请，核对设备指纹，输入被控电脑上显示的确认码后配对。Main Bot 可使用对方允许的范围；普通 Bot 需保存相应电脑与工具授权。
+4. 打开电脑页面，选择显示器并点击 **连接桌面**，先观看画面。点击 **取得控制权**，等待确认后发送键盘、鼠标、滚轮或文字输入。**仅观看** 会归还控制并释放按住的输入，结束后断开连接。
+5. 在被控端点击 **撤销配对**，可立即撤销控制端。**关闭远程访问** 会关闭监听和桌面助手。已保存开启的接入会随 Harness 恢复，退出 Harness 则停止内置服务。更改并保存设置会撤销旧配对，避免原授权悄悄指向另一个文件夹。
 
-桌面采用自适应 JPEG 传输和原生输入确认，界面显示实测帧率；真人接管会阻止冲突的 Bot 桌面自动化。当前支持已登录且可用的 Windows 交互桌面，性能取决于分辨率和网络；安全/UAC 桌面不在采集范围内。电脑配对用于配置访问权限，云主机开通和网络连通由用户自行准备。
+配对固定设备公钥，连接采用 Noise 加密。邀请两分钟失效，确认码最多可输错五次。配对不提供公网 NAT 穿透。内置接入支持一个选定共享文件夹和可选 Windows 桌面；经批准的命令/浏览器配置可使用 [独立 Windows Agent 0.1.3](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.71.0/dsh-remote-agent-0.1.3-windows-x64.zip)。已有独立 Agent 配对仍可使用。
+
+桌面采用自适应 JPEG 传输和原生输入确认，界面显示实测帧率；真人接管会阻止冲突的 Bot 桌面自动化。需要已登录且可用的 Windows 交互桌面，安全/UAC 桌面不在采集范围内；性能取决于分辨率和网络。
 
 <a id="routines"></a>
 

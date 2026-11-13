@@ -27,6 +27,7 @@ const ACTIONS = new Set([
   'aiProviders.list', 'aiProviders.suggestions', 'aiProviders.save', 'aiProviders.remove', 'aiProviders.check', 'aiProviders.cliStatus',
   'cliProviders.list', 'cliProviders.save', 'cliProviders.remove', 'cliProviders.inspect',
   'machine.revoke', 'machine.reconcile', 'machine.artifact', 'machine.desktop.view', 'machine.desktop.act',
+  'machine.host.status', 'machine.host.configure', 'machine.host.start', 'machine.host.stop', 'machine.host.invite', 'machine.host.devices', 'machine.host.revoke',
   'machine.desktop.open', 'machine.desktop.renew', 'machine.desktop.close',
   'machine.desktop.poll', 'machine.desktop.send',
   'library.list', 'library.read', 'library.write', 'library.upload', 'library.download', 'library.remove', 'library.mkdir', 'library.search',

@@ -130,6 +130,27 @@
     "machine.desktop.send": {
       "caller": "owner"
     },
+    "machine.host.configure": {
+      "caller": "owner"
+    },
+    "machine.host.devices": {
+      "caller": "owner"
+    },
+    "machine.host.invite": {
+      "caller": "owner"
+    },
+    "machine.host.revoke": {
+      "caller": "owner"
+    },
+    "machine.host.start": {
+      "caller": "owner"
+    },
+    "machine.host.status": {
+      "caller": "owner"
+    },
+    "machine.host.stop": {
+      "caller": "owner"
+    },
     "machine.pair.invite": {
       "caller": "owner"
     },

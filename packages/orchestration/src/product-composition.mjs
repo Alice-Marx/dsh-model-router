@@ -32,6 +32,7 @@ import { createSessionLoopFrameResolver } from './model-loop-frame.mjs'
 import { createAuxiliaryModelStream } from './model-auxiliary-dispatch.mjs'
 import { compileMainBotGrant } from './main-bot-grant.mjs'
 import { openRemoteMachines } from './remote-machines.mjs'
+import { openEmbeddedComputerHost } from './embedded-computer-host.mjs'
 import { openSecurePairingHost } from './secure-pairing-host.mjs'
 import { createDesktopProxy } from './desktop-proxy.mjs'
 import { createDesktopHttpCarrier } from './desktop-http-carrier.mjs'
@@ -461,7 +462,13 @@ export function startBotProduct(ctx, options = {}) {
   let conversationEngines
   const engineCredentialStamps = new Map()
   const engineLeaseId = `native-${randomUUID()}`
-  let machines, nativeRemoteActions, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat, securePairing, desktopProxy, desktopHttp, aiProviders, cliProviders
+  let machines, nativeRemoteActions, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat, securePairing, desktopProxy, desktopHttp, aiProviders, cliProviders, embeddedComputer, embeddedComputerOpening
+  const ensureEmbeddedComputer = () => {
+    if (embeddedComputer) return Promise.resolve(embeddedComputer)
+    if (!isAbsolute(storageFile)) return Promise.reject(Object.assign(new Error('LOCAL_COMPUTER_STORAGE_REQUIRED'), { code: 'LOCAL_COMPUTER_STORAGE_REQUIRED' }))
+    return embeddedComputerOpening ??= openEmbeddedComputerHost({ Database, dataRoot: join(dirname(storageFile), 'computer-host'), protectedRoot: resolveStateHome() })
+      .then(value => { embeddedComputer = value; embeddedComputerOpening = null; return value }, error => { embeddedComputerOpening = null; throw error })
+  }
   let journal, taskService, taskBackends, releaseTaskTools, cliSessionFactory, remoteCliBackend, sharedAdmission, taskRunnerWatchdog, notifications, dataEngine, dataAccess, releaseDataTools, uiNamespace, nativeActivity, botThreads, webPanelStore, webPanelActions, independentChat, teamCoordination, releaseTeamTools, releaseTeamGuard, releaseTeamStop
   const grantRefresh = createGrantRefreshQueue({ lifecycle: () => product?.lifecycle,
     onError: () => ctx.logger?.warn?.('Bot grant refresh failed; grants remain suspended until a successful committed-state refresh.') })
@@ -1111,6 +1118,7 @@ export function startBotProduct(ctx, options = {}) {
         releaseTaskTools = registerTaskTools(ctx, defineTool, { service: taskService, directory })
       }
       const machineActions=Object.fromEntries(['pair','bind','probe','revoke','reconcile'].map(name=>[`machine.${name}`,(payload,context)=>machines[name](payload,context)]))
+      await ensureEmbeddedComputer().catch(error => ctx.logger?.('embedded-computer-unavailable', { code: error?.code ?? 'LOCAL_COMPUTER_UNAVAILABLE' }))
       machineActions['machine.pair'] = (payload, context) => pairMainMachine({ machines,
         mainBotId: () => product?.lifecycle.committedMainBotIds()[0] }, payload, context)
       // Pinned web panels: the owner's own short list of pages, in its own component tables
@@ -1319,6 +1327,13 @@ export function startBotProduct(ctx, options = {}) {
                 subscriptionSummary: { callsToday: subscription.today.calls, callsMonth: subscription.month.calls, usdToday: totals.subscriptionToday, usdMonth: totals.subscriptionMonth } } }
           } } : {}) },
         actions: { ...actions, ...machineActions,
+          'machine.host.status': ownerOnly(async (payload, context) => (await ensureEmbeddedComputer()).status(payload, context)),
+          'machine.host.configure': ownerOnly(async (payload, context) => (await ensureEmbeddedComputer()).configure(payload, context)),
+          'machine.host.start': ownerOnly(async (payload, context) => (await ensureEmbeddedComputer()).start(payload, context)),
+          'machine.host.stop': ownerOnly(async (payload, context) => (await ensureEmbeddedComputer()).stop(payload, context)),
+          'machine.host.invite': ownerOnly(async (payload, context) => (await ensureEmbeddedComputer()).invite(payload, context)),
+          'machine.host.devices': ownerOnly(async (payload, context) => (await ensureEmbeddedComputer()).devices(payload, context)),
+          'machine.host.revoke': ownerOnly(async (payload, context) => (await ensureEmbeddedComputer()).revoke(payload, context)),
           'ui.namespace': ownerOnly(payload => uiNamespace.read(payload)),
           'nativeActivity.list': ownerOnly((payload, context) => {
             const value = nativeActivity.list(payload, context)
@@ -1602,6 +1617,7 @@ export function startBotProduct(ctx, options = {}) {
       desktopHttp?.close()
       releaseDataTools?.()
       await dataEngine?.closeAll().catch(() => {})
+      await embeddedComputerOpening?.catch(() => {}); await embeddedComputer?.close().catch(() => {})
       for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close(),()=>aiProviders?.close(),()=>cliProviders?.close()])try{cleanup()}catch{}
       if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
       if(taskService)await taskService.close().catch(()=>{})
@@ -1648,6 +1664,7 @@ export function startBotProduct(ctx, options = {}) {
         desktopHttp?.close()
         releaseDataTools?.()
         await dataEngine?.closeAll().catch(() => {})
+        await embeddedComputerOpening?.catch(() => {}); await embeddedComputer?.close().catch(() => {})
         for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close(),()=>aiProviders?.close(),()=>cliProviders?.close()])try{cleanup()}catch{}
         if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
         if(taskService)await taskService.close().catch(()=>{})

@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-route-bot",
-  "version": "0.71.0",
+  "version": "0.72.0",
   "type": "module",
   "description": "DSH Bot workspace with integrated model routing, official tools and remote computers",
   "repository": {
@@ -248,6 +248,8 @@
     "modules/bot-runtime/vendor/ds-bot/src/host/usage.js",
     "modules/bot-runtime/vendor/ds-bot/src/shared/mentions.js",
     "packages/orchestration/src/remote-machines.mjs",
+    "packages/orchestration/src/embedded-computer-host.mjs",
+    "packages/orchestration/src/embedded-computer-native.mjs",
     "packages/orchestration/src/machine-secrets.mjs",
     "packages/orchestration/src/deferred-router-state.mjs",
     "packages/orchestration/src/funded-router-state.mjs",
