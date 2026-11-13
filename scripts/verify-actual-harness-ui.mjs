@@ -65,6 +65,7 @@ try{
    if(!await row.evaluate(node=>node.open))await row.locator('summary').first().click()
    await row.getByRole('button',{name:'配置与修复',exact:true}).click()
    const setup=row.locator('.bp-cli-setup')
+   await setup.getByText('另作聊天模型（可选）',{exact:true}).click()
    await setup.getByLabel('CLI 聊天驱动',{exact:true}).waitFor({timeout:35000})
    assert.equal(await setup.getByLabel('CLI 聊天驱动',{exact:true}).inputValue(),driver)
    assert.equal(await setup.getByLabel('CLI 模型 ID',{exact:true}).inputValue(),'')

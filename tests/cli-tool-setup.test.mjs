@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {resolve,join} from 'node:path'
-import {createCliToolSetup} from '../packages/orchestration/src/cli-tool-setup.mjs'
+import {createCliToolSetup as createActualSetup} from '../packages/orchestration/src/cli-tool-setup.mjs'
+const createCliToolSetup=options=>createActualSetup({readiness:async()=>({ready:false,reason:'offline entry fixture'}),...options})
 import {getOfficialTool,installCommandLine} from '../.dsh-plugin/shared/official-tool-registry.mjs'
 const owner={kind:'owner'},node=process.execPath,script=resolve('tmp/integration/synthetic-cli/gemini.js')
 test('CLI setup is owner-only, accepts fixed registry ids and never starts repair or imports an account on read',async()=>{

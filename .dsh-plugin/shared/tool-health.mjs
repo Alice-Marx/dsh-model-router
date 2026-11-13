@@ -47,6 +47,7 @@ const KEY_ENV = Object.freeze({
   'grok-build': ['XAI_API_KEY'],
   opencode: ['OPENCODE_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY'],
   stepcode: ['STEP_API_KEY', 'STEPCODE_API_KEY'],
+  'dsh-tui':['DEEPSEEK_API_KEY'],
 })
 
 /**
@@ -103,6 +104,8 @@ const API_KEY_ENV = Object.freeze({
   'minimax-code': ['MINIMAX_API_KEY'],
   'mimo-code': ['MIMO_API_KEY'],
   'grok-build': ['XAI_API_KEY'],
+  'dsh-tui':['DEEPSEEK_API_KEY'],
+  stepcode:['STEP_API_KEY','STEPCODE_API_KEY'],
 })
 
 /** Copy of `env` without this CLI's API-key variables, so a status probe reports the account login itself. */

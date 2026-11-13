@@ -40156,7 +40156,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.73.2", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.73.3", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -43904,7 +43904,7 @@ html body[data-bot-product-ui] .bp-ai-sidebar:hover { background:var(--bp-hover)
 `;
 
 // apps/integration-client/official-tool-setup.jsx
-var hasCliSetup = (toolId) => ["gemini", "stepcode", "dsh-tui", "opencode", "pi", "hermes", "codex", "claude-code", "kimi-code"].includes(toolId), nextScope2 = 0;
+var hasCliSetup = (toolId) => ["gemini", "stepcode", "dsh-tui", "mimo-code", "opencode", "pi", "hermes", "codex", "claude-code", "kimi-code"].includes(toolId), nextScope2 = 0;
 function OfficialToolSetup(props) {
   let key = (0, import_react67.useMemo)(() => ++nextScope2, [props.productApi, props.toolId]);
   return /* @__PURE__ */ import_react67.default.createElement(ToolSetup, { key, ...props });
@@ -43994,7 +43994,7 @@ function ToolSetup({ productApi, toolId, onClose, onConfigured, onOpenTools }) {
     repair("cancel");
   } }, job.cancelRequested ? "正在取消…" : "取消安装"), /* @__PURE__ */ import_react67.default.createElement("button", { type: "button", disabled: !!busy, onClick: () => {
     readJob();
-  } }, "读取安装状态"), onOpenTools && /* @__PURE__ */ import_react67.default.createElement("button", { type: "button", onClick: onOpenTools }, "安装目录与来源", /* @__PURE__ */ import_react67.default.createElement(UiIcon, { name: "arrow", size: 13 }))), job && /* @__PURE__ */ import_react67.default.createElement("p", { role: "status" }, { running: "安装正在进行", succeeded: "安装完成，请核对入口和账号", failed: "安装失败", cancelled: "安装已取消" }[job.status] ?? "安装结果待核对", job.error && `：${job.error}`), !setup && !error && /* @__PURE__ */ import_react67.default.createElement("p", { role: "status" }, "正在检测此工具的安装入口…"), setup && /* @__PURE__ */ import_react67.default.createElement(import_react67.default.Fragment, null, /* @__PURE__ */ import_react67.default.createElement("p", null, setup.reason), setup.entryNotice && /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-cli-setup-warning" }, setup.entryNotice), setup.loginCommand && /* @__PURE__ */ import_react67.default.createElement("details", null, /* @__PURE__ */ import_react67.default.createElement("summary", null, "账号登录"), /* @__PURE__ */ import_react67.default.createElement("p", null, "在本机终端运行 ", /* @__PURE__ */ import_react67.default.createElement("code", null, setup.loginCommand), " 完成厂商登录，再在下方勾选“使用本机已登录账号”保存。")), /* @__PURE__ */ import_react67.default.createElement(CliChatProviders, { productApi, initialSetup: setup, onSaved: onConfigured })));
+  } }, "读取安装状态"), onOpenTools && /* @__PURE__ */ import_react67.default.createElement("button", { type: "button", onClick: onOpenTools }, "安装目录与来源", /* @__PURE__ */ import_react67.default.createElement(UiIcon, { name: "arrow", size: 13 }))), job && /* @__PURE__ */ import_react67.default.createElement("p", { role: "status" }, { running: "安装正在进行", succeeded: "安装完成，请核对入口和账号", failed: "安装失败", cancelled: "安装已取消" }[job.status] ?? "安装结果待核对", job.error && `：${job.error}`), !setup && !error && /* @__PURE__ */ import_react67.default.createElement("p", { role: "status" }, "正在检测此工具的安装入口…"), setup && /* @__PURE__ */ import_react67.default.createElement(import_react67.default.Fragment, null, /* @__PURE__ */ import_react67.default.createElement("p", null, setup.reason), setup.loginCommand && /* @__PURE__ */ import_react67.default.createElement("details", null, /* @__PURE__ */ import_react67.default.createElement("summary", null, "账号登录"), /* @__PURE__ */ import_react67.default.createElement("p", null, "在本机终端运行 ", /* @__PURE__ */ import_react67.default.createElement("code", null, setup.loginCommand), " 完成厂商登录，回到这里重新检测。聊天模型的账号可另行保存。")), toolId === "dsh-tui" && /* @__PURE__ */ import_react67.default.createElement("details", null, /* @__PURE__ */ import_react67.default.createElement("summary", null, "DeepSeek 执行账号"), /* @__PURE__ */ import_react67.default.createElement("p", null, "托管执行使用官方 dsh 后端。为启动 Harness 的环境设置 DEEPSEEK_API_KEY 后重新打开应用，再检测并保存工具授权；使用 API 按量计费。")), /* @__PURE__ */ import_react67.default.createElement("p", { role: "status" }, setup.execution?.ready ? "托管执行入口已核验。返回工具行，选择执行模式并保存授权。" : setup.execution?.reason ?? "执行入口尚待检测。"), setup.driver !== "execution-only" && /* @__PURE__ */ import_react67.default.createElement("details", { className: "bp-cli-setup-chat" }, /* @__PURE__ */ import_react67.default.createElement("summary", null, "另作聊天模型（可选）"), setup.entryNotice && /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-cli-setup-warning" }, setup.entryNotice), /* @__PURE__ */ import_react67.default.createElement(CliChatProviders, { productApi, initialSetup: setup, onSaved: onConfigured }))));
 }
 
 // apps/integration-client/binding-editor.jsx

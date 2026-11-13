@@ -5,7 +5,7 @@ import css from './official-tool-setup.css'
 import aiCss from './ai-providers.css'
 
 // Fixed display mapping only; the Host independently validates every id.
-export const hasCliSetup=toolId=>['gemini','stepcode','dsh-tui','opencode','pi','hermes','codex','claude-code','kimi-code'].includes(toolId)
+export const hasCliSetup=toolId=>['gemini','stepcode','dsh-tui','mimo-code','opencode','pi','hermes','codex','claude-code','kimi-code'].includes(toolId)
 let nextScope=0
 export function OfficialToolSetup(props){const key=useMemo(()=>++nextScope,[props.productApi,props.toolId]);return <ToolSetup key={key} {...props}/>}
 function ToolSetup({productApi,toolId,onClose,onConfigured,onOpenTools}){
@@ -59,9 +59,11 @@ function ToolSetup({productApi,toolId,onClose,onConfigured,onOpenTools}){
   </div>
   {job&&<p role="status">{({running:'安装正在进行',succeeded:'安装完成，请核对入口和账号',failed:'安装失败',cancelled:'安装已取消'})[job.status]??'安装结果待核对'}{job.error&&`：${job.error}`}</p>}
   {!setup&&!error&&<p role="status">正在检测此工具的安装入口…</p>}
-  {setup&&<><p>{setup.reason}</p>{setup.entryNotice&&<p className="bp-cli-setup-warning">{setup.entryNotice}</p>}
-   {setup.loginCommand&&<details><summary>账号登录</summary><p>在本机终端运行 <code>{setup.loginCommand}</code> 完成厂商登录，再在下方勾选“使用本机已登录账号”保存。</p></details>}
-   <CliChatProviders productApi={productApi} initialSetup={setup} onSaved={onConfigured}/>
+  {setup&&<><p>{setup.reason}</p>
+   {setup.loginCommand&&<details><summary>账号登录</summary><p>在本机终端运行 <code>{setup.loginCommand}</code> 完成厂商登录，回到这里重新检测。聊天模型的账号可另行保存。</p></details>}
+   {toolId==='dsh-tui'&&<details><summary>DeepSeek 执行账号</summary><p>托管执行使用官方 dsh 后端。为启动 Harness 的环境设置 DEEPSEEK_API_KEY 后重新打开应用，再检测并保存工具授权；使用 API 按量计费。</p></details>}
+   <p role="status">{setup.execution?.ready?'托管执行入口已核验。返回工具行，选择执行模式并保存授权。':setup.execution?.reason??'执行入口尚待检测。'}</p>
+   {setup.driver!=='execution-only'&&<details className="bp-cli-setup-chat"><summary>另作聊天模型（可选）</summary>{setup.entryNotice&&<p className="bp-cli-setup-warning">{setup.entryNotice}</p>}<CliChatProviders productApi={productApi} initialSetup={setup} onSaved={onConfigured}/></details>}
   </>}
  </section>
 }

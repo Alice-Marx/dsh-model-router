@@ -1,7 +1,8 @@
-import { mkdir, mkdtemp, writeFile, readFile, symlink, appendFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile, readFile, symlink, appendFile,copyFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { spawn, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { pathToFileURL } from 'node:url'
 // Uses a real installed Harness with a new, isolated home. No UI or API mocks.
 const repo=resolve(import.meta.dirname,'..'),passed=process.argv.slice(2)
 const option=name=>{const at=passed.indexOf(name);if(at<0)return null;if(!passed[at+1])throw Error('Missing '+name);return passed[at+1]}
@@ -15,7 +16,10 @@ const run=await mkdtemp(join(base,'case-')),home=join(run,'home'),profile=join(h
 await mkdir(join(profile,'node_modules/@ljwei-stak'),{recursive:true})
 await symlink(source,join(profile,'node_modules/@ljwei-stak/dsh-model-route-bot'),'junction')
 await writeFile(join(profile,'package.json'),JSON.stringify({private:true,dsh:{profile:{bundles:['@deepseek-ai/dsh-base','@deepseek-ai/dsh-web-app','@ljwei-stak/dsh-model-route-bot']}}},null,2))
-await writeFile(join(profile,'cordis.patch.yml'),'[]\n')
+const verificationPlugin=option('--verification-plugin')
+const verificationCache=option('--verification-cache')
+if(verificationPlugin&&verificationCache){await mkdir(join(home,'model-router'),{recursive:true});for(const file of ['npm-attestations.json','vendor-release-digests.json'])await copyFile(join(resolve(verificationCache),file),join(home,'model-router',file))}
+await writeFile(join(profile,'cordis.patch.yml'),verificationPlugin?JSON.stringify([{insert:[{id:'official-execution-verification',name:pathToFileURL(resolve(verificationPlugin)).href}]}]):'[]\n')
 const env={ELECTRON_RUN_AS_NODE:'1',DSH_HOME:home,DSH_STATE_HOME:home,DSH_TELEMETRY:'0'}
 for(const key of ['PATH','Path','PATHEXT','SystemRoot','windir','ComSpec','USERPROFILE','HOME','APPDATA','LOCALAPPDATA','TEMP','TMP','TMPDIR','LANG'])if(process.env[key])env[key]=process.env[key]
 for(const key of ['USERPROFILE','HOME','APPDATA','LOCALAPPDATA','TEMP','TMP','TMPDIR']){env[key]=join(run,'isolated-user',key.toLowerCase());await mkdir(env[key],{recursive:true})}

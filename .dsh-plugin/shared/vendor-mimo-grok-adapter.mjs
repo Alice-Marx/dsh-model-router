@@ -23,6 +23,7 @@ import { homedir } from 'node:os'
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { ensureNpmPrefixOnPath, preferredToolDirectories } from './official-tools-runtime.mjs'
 import { usageFromEvents } from './task-executors.mjs'
+import {attestVendorRelease} from './vendor-release-attestation.mjs'
 
 const TOOL_IDS = Object.freeze(['mimo-code', 'grok-build'])
 const PLATFORMS = Object.freeze({
@@ -134,7 +135,18 @@ async function findMiMoExecutable(workspace, platform, attestor, problems, modul
   const wrapperInfo = WRAPPERS['mimo-code']
   for (const modules of modulesRoots) {
     const wrapper = await manifestAt(packagePath(modules, wrapperInfo.name), wrapperInfo.name)
-    if (!wrapper || String(wrapper.manifest.bin?.[wrapperInfo.command]).replace(/^\.\//, '') !== wrapperInfo.bin) continue
+    if (!wrapper) continue
+    const bin=String(wrapper.manifest.bin?.[wrapperInfo.command]).replace(/^\.\//,'')
+    if(bin==='mimo.js'){
+      // 0.1.17+ ships a fixed FDS launcher and package-local vendor binary,
+      // rather than the old npm optional platform package.
+      const file=await realFileWithin(wrapper.root,join(wrapper.root,'vendor','mimo.exe'),workspace)
+      if(!file){problems.push('MiMo 的 vendor/mimo.exe 缺失，请修复安装');continue}
+      const checked=await attestVendorRelease({vendor:'mimo-code',version:wrapper.manifest.version,executable:file})
+      if(!checked.ok){problems.push(checked.reason);continue}
+      return {file,version:wrapper.manifest.version,source:checked.source}
+    }
+    if(bin!==wrapperInfo.bin)continue
     const optional = await optionalPackage(wrapper, platform, modules, workspace)
     if (!optional) continue
     const file = await realFileWithin(optional.root, join(optional.root, ...platform.file.split('/')), workspace)
@@ -332,7 +344,7 @@ export function createMiMoGrokParser(toolId) {
         const reported = toolId === 'mimo-code' ? usageFromEvents('mimo-steps', mimoSteps) : usageFromEvents('grok-end', grokSpend)
         return reported ? { usage: reported.usage, ...(reported.reportedCostUsd ? { reportedCostUsd: reported.reportedCostUsd } : {}) } : {}
       }
-      const good = exitCode === 0 && !protocolError && !vendorError
+      const good = exitCode === 0 && !protocolError && !vendorError && toolErrors === 0
         && terminal === 'completed' && finalText.trim().length > 0
         && (toolId !== 'grok-build' || Boolean(sessionId))
       return {

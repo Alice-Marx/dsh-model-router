@@ -14,6 +14,9 @@ const token = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:/@
 const sourceOf = tool => ['opencode', 'pi', 'hermes'].includes(tool.id) ? '开源第三方工具' : tool.id === 'zcode' ? '社区发行版' : '厂商官方 CLI'
 const rows = value => Array.isArray(value) ? value : Array.isArray(value?.tools) ? value.tools : []
 const copy = value => structuredClone(value)
+const executionReason=value=>typeof value==='string'&&/^(?:未|所选|官方|入口|缺少|首次|Step |Gemini |MiMo|DeepSeek|DSH|ZCode|Codex|Kimi|MiniMax|Grok)/.test(value)
+  ? value.replace(/\b[A-Za-z]:[\\/][^\s，；。]+/g,'[安装路径]').replace(/\bsk-[A-Za-z0-9_-]{12,}|Bearer\s+\S+/gi,'[凭据已隐藏]').slice(0,480)
+  : '执行入口尚未通过核验，请在“配置与修复”查看诊断并重新检测。'
 
 /**
  * Project only non-secret facts from Host probes. A ready executable is not a
@@ -41,7 +44,7 @@ export function buildBotOfficialToolsCatalog({ health = null, capabilities = [],
     if (loginState !== 'logged-in') return { ...result, status: 'login-unknown', reason: '尚无法确认 CLI 的账号状态，请登录并重新检测；仍未知时可在终端交互使用。' }
     const readyModes = capability?.supported === true && entry?.ready === true
       ? [...new Set((entry.readyModes ?? entry.modes ?? []).filter(mode => modes.has(mode) && capability.modes?.includes(mode)))] : []
-    if (!readyModes.length) return { ...result, status: 'unavailable', reason: '执行入口尚未通过核验，请在“安装与登录”页面查看诊断并修复。' }
+    if (!readyModes.length) return { ...result, status: 'unavailable', reason: executionReason(entry?.reason) }
     const exact = rows(legacyModels).filter(item => (item.toolId ?? 'codex') === tool.id && token(item.cliModel ?? item.model))
       .map(item => ({ model: item.cliModel ?? item.model, label: item.cliModel ?? item.model }))
       .filter(item => item.model !== BOT_CLI_DEFAULT_MODEL)
@@ -98,7 +101,11 @@ export function createBotOfficialToolsCatalog({ probeHealth, probeCapabilities, 
             controller.signal.throwIfAborted()
             const readiness = await Promise.all(rows(health).filter(item => item.installed === true)
               .map(async item => {
-                try { return { ...(await probeReadiness(item.id, { signal: controller.signal })), id: item.id } }
+                try {
+                  let timer
+                  const deadline=new Promise(resolve=>{timer=setTimeout(()=>resolve({id:item.id,ready:false,readyModes:[],reason:'入口摘要仍在核验，请稍后重新检测；其他工具和模型设置仍可使用。'}),Math.max(100,Math.min(7000,timeoutMs-250)))})
+                  try{return { ...(await Promise.race([probeReadiness(item.id,{signal:controller.signal}),deadline])),id:item.id }}finally{clearTimeout(timer)}
+                }
                 catch { return { id: item.id, ready: false, readyModes: [] } }
               }))
             controller.signal.throwIfAborted()

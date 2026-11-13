@@ -31,6 +31,8 @@ import { resolveMiMoGrokLaunch, createMiMoGrokParser, installedModuleRoots } fro
 import { emptyOutputError, outputIsEmpty, redactDiagnostic, usageFromEvents, usageFromOutput } from './task-executors.mjs'
 import { cliProfile } from './cli-profiles.mjs'
 import { officialModelId } from './bot-official-execution.mjs'
+import {resolveStepTask,resolveDshTask,geminiTaskArgs,createHeadlessParser} from './official-headless-adapters.mjs'
+import {managedRuntimeTool,prepareOfficialRuntime} from './official-runtime-state.mjs'
 
 const IS_WINDOWS = process.platform === 'win32'
 const MAX_TASK_BYTES = 64_000
@@ -71,17 +73,16 @@ const CAPABILITIES = Object.freeze({
     : { supported: false, reason: 'Grok 原生执行入口目前仅在 Windows 完成适配。' }),
   zcode: Object.freeze({ supported: true, modes: Object.freeze(['workspace-write']) }),
   gemini: Object.freeze({
-    supported: false,
-    reason: 'Gemini 由无界面适配器执行（gemini -p），不走签名沙箱入口；未安装或失败时回退模型目录 API。',
+    supported: true, modes: Object.freeze(['read-only','workspace-write']),
   }),
   opencode: Object.freeze({
     supported: false,
     reason: 'OpenCode 尚未完成受限执行入口核验；插件负责安装、检测与登录体检，执行仍需在终端中直接使用。',
   }),
   stepcode: Object.freeze({
-    supported: false,
-    reason: 'Step Code 尚未完成受限执行入口核验；插件负责安装、检测与登录体检，执行仍需在终端中直接使用。',
+    supported: IS_WINDOWS, modes: Object.freeze(IS_WINDOWS?['read-only','workspace-write']:[]),
   }),
+  'dsh-tui': Object.freeze({supported:true,modes:Object.freeze(['read-only','workspace-write'])}),
   hermes: Object.freeze({ supported: false, modes: Object.freeze([]), reason: 'Hermes 尚未核验托管受限执行；请在官方工具终端中交互使用。' }),
   pi: Object.freeze({ supported: false, modes: Object.freeze([]), reason: 'Pi 尚未核验托管受限执行；请在官方工具终端中交互使用。' }),
 })
@@ -89,6 +90,7 @@ const CAPABILITIES = Object.freeze({
 /** A UI/Host can show this without implying that installation means execution readiness. */
 export function officialToolExecutionCapabilities({ executionEnvironment = 'harness' } = {}) {
   return OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ...CAPABILITIES[tool.id],
+    ...(executionEnvironment==='cli-native'&&['gemini','stepcode','dsh-tui'].includes(tool.id)?{supported:false,modes:[],reason:'此工具使用 Host 托管沙箱执行，请选择受限执行环境。'}:{}),
     ...(executionEnvironment === 'cli-native' && IS_WINDOWS && tool.id === 'codex'
       ? { modes: ['read-only', 'workspace-write'] } : {}) }))
 }
@@ -152,7 +154,7 @@ function checkedTimeout(timeoutMs) {
 
 /** API-key variables removed when a run must use the CLI's own subscription login. */
 const API_KEY_VARIABLES = Object.freeze(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CODEX_API_KEY', 'OPENAI_API_KEY', 'KIMI_API_KEY',
-  'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY', 'ZAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'])
+  'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY', 'ZAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY','DEEPSEEK_API_KEY','STEP_API_KEY','STEPCODE_API_KEY'])
 
 export function executionEnvironment(toolId, { sessionOnly = false, env: source = process.env, extraKeys = [] } = {}) {
   const vendorKeys = {
@@ -164,7 +166,9 @@ export function executionEnvironment(toolId, { sessionOnly = false, env: source 
     'minimax-code': ['MINIMAX_API_KEY', 'MINIMAX_BASE_URL'],
     'mimo-code': ['MIMO_API_KEY'],
     'grok-build': ['XAI_API_KEY', 'GROK_HOME'],
-    'dsh-tui': ['DEEPSEEK_API_KEY', 'DEEPSEEK_BASE_URL', 'DSH_TUI_HOME'],
+    'dsh-tui': ['DEEPSEEK_API_KEY', 'DEEPSEEK_BASE_URL', 'DSH_TUI_HOME','DSH_HOME','DSH_STATE_HOME'],
+    gemini:['GEMINI_API_KEY','GOOGLE_API_KEY','GEMINI_CONFIG_DIR','GEMINI_CLI_HOME','GOOGLE_CLOUD_PROJECT'],
+    stepcode:['STEP_API_KEY','STEPCODE_API_KEY','STEP_BASE_URL','STEP_CODING_AGENT_DIR','STEPCODE_AUTH_PATH'],
     zcode: ['ZCODE_DATA_BASE_DIR', 'ZCODE_PERSONAL_PROVIDER_CONFIG_FILE', 'ZCODE_STORAGE_DIR',
       'ZCODE_SESSION_DB_PATH', 'ZCODE_LOG_DIR', 'ZCODE_HTTP_PROXY', 'ZCODE_NO_PROXY', 'ZCODE_AGENT_CA_CERT'],
   }
@@ -458,7 +462,18 @@ export function signatureAccepted(signature, expectedSigner) {
 export const OFFICIAL_SIGNERS = Object.freeze({ codex: CODEX_SIGNER, 'claude-code': CLAUDE_SIGNER })
 
 /** PATH or package metadata alone is insufficient: verify the Windows EXE publisher. */
-function hasOfficialWindowsSignature(entry, expectedSigner) {
+const signatureCache=new Map(),signaturePending=new Map()
+async function hasOfficialWindowsSignature(entry,expectedSigner){
+  let stamp
+  try{const info=await stat(entry);stamp=`${info.size}:${info.mtimeMs}:${info.ctimeMs}`}catch{return false}
+  const key=entry+'\0'+expectedSigner,known=signatureCache.get(key)
+  if(known?.stamp===stamp)return true
+  const previous=signaturePending.get(key)
+  if(previous?.stamp===stamp)return previous.promise
+  const promise=verifyOfficialWindowsSignature(entry,expectedSigner).then(valid=>{if(valid)signatureCache.set(key,{stamp});return valid}).finally(()=>{if(signaturePending.get(key)?.promise===promise)signaturePending.delete(key)})
+  signaturePending.set(key,{stamp,promise});return promise
+}
+function verifyOfficialWindowsSignature(entry, expectedSigner) {
   // Some launch environments inherit a PowerShell module path where the
   // built-in Security module does not autoload. Import its fixed system path
   // explicitly, and fail closed if that import or the signature check fails.
@@ -502,6 +517,14 @@ function hasOfficialWindowsSignature(entry, expectedSigner) {
 }
 
 async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readiness.', selectionOptions = {}) {
+  if(toolId==='gemini'){
+    const {resolvePortableToolLaunch}=await import('./task-executors.mjs')
+    const entry=await resolvePortableToolLaunch({id:'gemini'},workspace,{selection:officialToolEntrySelection(toolId,selectionOptions)})
+    if(entry.reason)return {unsupported:entry.reason.replace(/；?已回退模型目录 API。?/g,'。')}
+    return {...entry,args:[...entry.args,...geminiTaskArgs(mode,modelId)],format:'gemini-json',env:{GEMINI_CLI_NO_RELAUNCH:'1'}}
+  }
+  if(toolId==='stepcode')return resolveStepTask(workspace,mode,modelId,officialToolEntrySelection(toolId,selectionOptions),selectionOptions)
+  if(toolId==='dsh-tui')return resolveDshTask(workspace,mode,modelId,officialToolEntrySelection(toolId,selectionOptions),{findEntries:findGlobalPackageEntries,findNode:findNodeExecutable})
   if (toolId === 'claude-code') {
     const selection = officialToolEntrySelection(toolId, selectionOptions)
     const native = selection.plan.kind === 'script'
@@ -814,6 +837,15 @@ function stopProcessTree(child) {
   }
 }
 
+export function parseGeminiProcessOutput(stdout,exitCode){
+  let result
+  try{result=JSON.parse(stdout)}catch{return {status:'failed',exitCode,error:'Gemini 未返回有效的结果 JSON。'}}
+  if(!result||typeof result!=='object'||Array.isArray(result))return {status:'failed',exitCode,error:'Gemini 结果格式无效。'}
+  const ok=exitCode===0&&!result.error&&!(result.stats?.tools?.totalFail>0)&&typeof result.response==='string'&&result.response.trim()
+  return {status:ok?'succeeded':'failed',exitCode,terminalEvent:ok?'completed':'failed',finalText:typeof result.response==='string'?result.response:'',
+    ...(!ok?{error:'Gemini 调用未成功完成，请查看工具诊断。'}:{}),...(usageFromOutput('gemini-json',stdout)??{})}
+}
+
 /** Parse the complete Claude terminal JSON even when its process exits nonzero. */
 export function parseClaudeProcessOutput(stdout, exitCode, { secrets = [] } = {}) {
   let result
@@ -1000,7 +1032,7 @@ export function finalizeOfficialProcessResult(result, evidence = {}) {
 function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessionOnly = false, extraEnv = {}) {
   return new Promise(resolveResult => {
     let child
-    const childEnvironment = { ...executionEnvironment(toolId, { sessionOnly }), ...extraEnv }
+    const childEnvironment = { ...executionEnvironment(toolId, { sessionOnly }), ...spec.env, ...extraEnv }
     try {
       child = spawn(spec.file, spec.args, {
         cwd: workspace,
@@ -1035,6 +1067,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
     const miniMaxParser = spec.format === 'minimax-stream-json' ? createMiniMaxStreamParser() : null
     const nativeParser = spec.format === 'mimo-jsonl' || spec.format === 'grok-jsonl'
       ? createMiMoGrokParser(toolId) : null
+    const headlessParser=['step-jsonl','dsh-headless-jsonl'].includes(spec.format)?createHeadlessParser(spec.format):null
     let kimiAssistant = false
     const stdoutDecoder = new StringDecoder('utf8')
     const stderrDecoder = new StringDecoder('utf8')
@@ -1044,6 +1077,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
       if (nativeParser) nativeParser.push(line)
       try {
         const event = JSON.parse(line)
+        if(headlessParser){headlessParser.push(event);return}
         accounting.push(event)
         if (nativeParser) return
         if (spec.format === 'zcode-stream-json') {
@@ -1132,6 +1166,8 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
         })
       } else if (miniMaxParser) {
         evidence = officialToolTerminalEvidence(spec.format, miniMaxParser.finish(result.exitCode))
+      } else if(headlessParser){evidence=headlessParser.finish(result.exitCode)
+      } else if(spec.format==='gemini-json'){evidence=parseGeminiProcessOutput(stdout,result.exitCode)
       }
       resolveResult({ stdoutTail, stderrTail, terminalEvent: terminal, finalText,
         ...finalizeOfficialProcessResult(result, evidence) })
@@ -1149,7 +1185,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
       outputBytes += bytes.length
       const chunk = stdoutDecoder.write(bytes)
       stdoutTail = tail(stdoutTail, chunk)
-      if (spec.format === 'claude-json') stdout += chunk
+      if (spec.format === 'claude-json'||spec.format==='gemini-json') stdout += chunk
       else if (miniMaxParser) miniMaxParser.push(chunk)
       else readJsonl(chunk)
       if (outputBytes > MAX_OUTPUT_BYTES) requestStop('output-limit')
@@ -1167,7 +1203,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
       const finalStdout = stdoutDecoder.end()
       if (finalStdout) {
         stdoutTail = tail(stdoutTail, finalStdout)
-        if (spec.format === 'claude-json') stdout += finalStdout
+        if (spec.format === 'claude-json'||spec.format==='gemini-json') stdout += finalStdout
         else if (miniMaxParser) miniMaxParser.push(finalStdout)
         else readJsonl(finalStdout)
       }
@@ -1191,6 +1227,8 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
         settle({ exitCode: code, ...nativeParser.finish(code) })
         return
       }
+      if(headlessParser){const result=headlessParser.finish(code);settle(protocolError?{...result,status:'failed',error:protocolError}:result);return}
+      if(spec.format==='gemini-json'){settle(parseGeminiProcessOutput(stdout,code));return}
       if (spec.format === 'claude-json') {
         settle({ ...parseClaudeProcessOutput(stdout, code, {
           secrets: [...API_KEY_VARIABLES, 'CLAUDE_CODE_OAUTH_TOKEN'].map(key => childEnvironment[key]),
@@ -1288,22 +1326,28 @@ export async function runOfficialTool({
   }
   const spec = await launchSpec(tool.id, cwd, executionMode, requestedModel, prompt)
   if (spec.unsupported) return { toolId: tool.id, status: 'unsupported', reason: spec.unsupported }
-  let confined
+  let confined,managed
   try {
-    confined = await sandbox.confine([spec.file, ...spec.args], policy, signal)
+    if(managedRuntimeTool(tool.id))managed=await prepareOfficialRuntime(spec,tool.id,cwd,executionMode)
+    const launch=managed?.spec??spec
+    confined = await sandbox.confine([launch.file, ...launch.args], managed?.policy??policy, signal)
   } catch (error) {
+    await managed?.dispose()
     return { toolId: tool.id, status: 'unsupported', reason: `官方进程沙箱拒绝启动：${String(error?.message ?? error).slice(0, 300)}` }
   }
   if (!Array.isArray(confined?.argv) || confined.argv.length < 2 || !['full', 'partial'].includes(confined.enforcement)) {
+    await managed?.dispose()
     return { toolId: tool.id, status: 'unsupported', reason: '官方进程沙箱未返回有效的受限启动参数。' }
   }
   if (tool.id === 'codex' && !codexStateSandboxContract(confined, [spec.file, ...spec.args], policy)) {
     return { toolId: tool.id, status: 'unsupported', reason: 'Codex 的只读任务需要已核验的 Harness Windows ACL 状态目录沙箱；当前 runner 契约不匹配，拒绝直接或不受限启动。' }
   }
   const startedAt = Date.now()
-  const outcome = await captureProcess({ ...spec, file: confined.argv[0], args: confined.argv.slice(1) },
+  let outcome
+  try{outcome = await captureProcess({ ...(managed?.spec??spec), file: confined.argv[0], args: confined.argv.slice(1) },
     prompt, cwd, signal, timeout, tool.id, sessionOnly === true,
     { ...runnerEnvironment(confined.argv[0]), ...(tool.id === 'codex' ? { CODEX_HOME: policy.workspaceRoot } : {}) })
+  }finally{await managed?.dispose()}
   return {
     toolId: tool.id,
     mode: executionMode,
@@ -1321,3 +1365,6 @@ export async function runOfficialTool({
 }
 
 export const runOfficialToolTask = runOfficialTool
+// Host composition and isolated process verification share the exact builders
+// and parser. These are library seams, never model-facing or HTTP actions.
+export {launchSpec as resolveOfficialToolLaunch,captureProcess as captureOfficialProcess}

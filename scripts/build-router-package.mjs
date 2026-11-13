@@ -47,6 +47,7 @@ export async function buildRouterPackage({ root = ROOT, output = join(ROOT, 'dis
   if (files.has('.dsh-plugin/shared/cli-terminal.mjs')) externals.add('@lydell/node-pty')
   if ([...files].some(forbidden)) throw new Error('Router Host imports Bot product source')
   // These helpers are launched by file path rather than imported by JavaScript.
+  if(files.has('.dsh-plugin/shared/official-runtime-state.mjs'))files.add('.dsh-plugin/shared/official-runtime-bootstrap.mjs')
   if ([...files].some(path => path.startsWith('packages/cli-runtime/src/'))) {
     for (const file of ['native-peer.ps1', 'native-peer.py', 'native-terminal-peer.ps1']) files.add(`packages/cli-runtime/src/${file}`)
   }
