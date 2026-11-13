@@ -16,47 +16,11 @@ This is a community plugin. It manages independent AI connections and reuses Hos
 
 **Current stable version: 0.71.0 · Windows Remote Agent: 0.1.3**
 
-**Release 0.71.0: Antigravity, metered DeepSeek ACP and dsh 0.2.2-rc.2 compatibility.** Manage separate models and accounts under **Settings → AI → CLI chat connections**. Antigravity verifies both official runtime and harness hashes and uses its own OAuth account. DeepSeek ACP uses the dsh 0.2.2-rc.2 Node entry, a separate API key and API funding: one model request per turn, at most 4096 output tokens, no retries or extra tool calls, and actual usage reporting. Real short requests passed through Codex, Kimi and DeepSeek ACP. Installation, account and network limitations for other drivers are recorded separately; a protocol handshake is not inference verification. Actual Host SDK/Cordis 4.1/schemastery 3.19 smoke tests passed, including the updated tool activation policy. Windows Agent remains 0.1.3.
+Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
-Bot settings now load the saved model and editable form before checking official CLIs in the background. A stalled CLI cannot keep the settings drawer or Host startup waiting. The Host ends a detection attempt after 12 seconds; the client stops waiting for a refresh after 15 seconds. Timed-out tools remain unavailable until a successful recheck. Switching tabs, editing and closing the drawer stay available, unsaved changes survive detection, and late results from an old check cannot replace a newer selection.
+Version changes, fixes and verification records live in [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases) and the [GitLab documentation archive](https://gitlab.com/Alice_marx/dsh-model-router/-/tree/main/docs).
 
-Bot official tools now use their own CLI configuration independently of the chat model. In a Bot’s model settings, choose **Install and sign in**, install or select the CLI, complete the vendor login yourself, then use **Recheck**. Supported, ready entries offer **Vendor default model**, an execution mode and **Save binding**; this also works when the Bot chats through another provider. Rechecking preserves unsaved settings. Missing, signed-out, unknown and terminal-only tools show their actual state and cannot be granted for managed execution. Ordinary Bots can run only their saved tool, CLI model and mode; every launch rechecks committed authorization and live readiness. Integrated, independent and native conversation tools use the same runner and execution records. A default model means the CLI’s own configuration, not a claim that its actual model ID has been verified. Bot failures never silently use an API or an unrestricted terminal. Unadapted tools remain available for manual terminal use.
-
-**Workspace interface:** the full Bot edition now includes a redesigned workspace overview, task inbox, searchable team directory, task boards, and workspace search (**Ctrl/Cmd K** on product pages). Goals move into the existing review-and-confirm flow; display preferences offer Host-following, light, dark, and compact layouts. [Implementation and verification](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-workspace-upgrade.md).
-
-The ongoing [OpenMausBot migration](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-openmaus-full-migration.md) makes Bot contacts and chat the main interface, with contextual model, computer, memory, voice, task and library controls. The plugin adds two-minute QR device invitations, six-digit confirmation, pinned Noise encryption and Host-mediated desktop streams for web and native clients. Desktop tools include reviewed text entry, keyboard shortcuts, two-finger scrolling, fit/original scaling and fullscreen; recorded routines retain acknowledged input releases. Use the matching Agent 0.1.3 package linked below. Protocol, installed-runtime and isolated desktop tests are recorded in the [pairing implementation notes](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261107-secure-pairing.md); a real remote desktop and the complete upstream feature set have not yet been accepted. Paid cloud-desktop subscriptions are excluded. Invitation imports require a code typed from the target device; interrupted credential saves are reconciled before completing registration.
-
-The workspace also shows live task attention below contacts and adds receipt filters by date, Bot, source and status, grouping, and CSV export. Partial task lists and unknown amounts are labeled; receipt dates follow the Host timezone. [Receipt exploration and verification](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261108-receipt-explorer.md).
-
-The product redesign now follows OpenMausBot's Bot setup flow, with a separate official-tool module. The notification centre opens the original Bot, task and execution attempt and stores read status on the Host. Bot-isolated CSV/TSV/JSON import, SQLite queries, bar/line/area charts and CSV export are available; additional upstream formats remain in progress. [Current implementation and validation boundaries](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261108-openmaus-product-direction.md).
-
-Bot conversation engines are being ported separately from task CLI tools. The source catalog records all 26 upstream drivers. The plugin can register an explicitly configured Claude text/subscription session in the Host model catalog and bind it through the existing Bot settings. Whole-product offline child-process tests cover retained turns, committed personality, private credentials and one receipt per request. Independent chat now previews generated text and offers an explicit new conversation: old messages and unsent drafts remain, the next turn uses only the new context, and unknown retirement results require reconciliation. Live CLI/account acceptance and the remaining engine ports are still in progress. [Engine configuration and implementation status](packages/bot-engines/README.md).
-
-The chat-side Bot settings drawer separates **Models & tools** from **Identity & personality**. Edit the Bot's name, short role and standing instructions without leaving the conversation; changing tabs keeps unsaved text. Profile edits save only after an explicit click, reject conflicting updates and never send a message or start a model reply. Independent mode reads the committed identity and instructions on each model request. This release supports these three text fields; the remaining OpenMausBot identity features are still part of the migration.
-
-Team delegation stores assignments and returns results to the originating conversation. Each target uses its own saved model, permissions and funding; Main can use multiple saved model routes and all committed Host capabilities. Both chat surfaces show bounded native-tool activity, cancellation requests and confirmed process stops without treating an uncertain outcome as success.
-
-Model controls distinguish the Host's saved choice from its last applied model and indicate when they differ. An unsaved choice remains a draft; the applied record does not certify the model used by a particular response.
-
-The appearance menu also offers standard, wide and full chat widths plus coloured or neutral user-message bubbles. Display preferences survive reloads and do not change execution settings.
-
-Conversation drafts are kept separately for each Host, Bot, group and thread. A confirmed send clears only its own draft; an unanswered send keeps the text with explicit restore and clear controls. Draft recovery restores text only. Pinned web pages appear in the contacts sidebar and update after a confirmed edit. Live Host acceptance remains pending.
-
-Independent conversations retain each reply's producing model route and correlate tool requests with their results. Changing a Bot's model does not relabel earlier replies. Old records without model provenance and interrupted tool batches appear as labeled historical context, preserving the saved text without replaying the tools.
-
-Independent mode gives independent Bots a contacts-and-chat page with saved text drafts, full paged history, and a request-stop control. Each send is recorded on the Host before acknowledgement; reloading or retrying the same request checks its existing result without sending it again. Tool schemas follow the Bot's live grants, and file writes use the existing durable task journal. The installed SDK, authenticated owner channel, isolated SQLite and a loopback remote Agent have been exercised together; live Host acceptance and full upstream message, attachment and tool coverage remain pending.
-
-Independent chat renders Markdown, highlighted code, tables and mathematics through the Host's renderer. Copy a code block or the original message with explicit success or failure feedback, and inspect recorded tool calls and results without executing them again.
-
-While a reply is running, independent chat polls a live text preview marked as unfinished. It follows the conversation when the window resizes; scrolling back keeps your reading position. The preview is not a saved answer or a browser draft, and disappears on failure, cancellation or Host restart. Reloading inspects the existing request without sending it again. Each call also uses the Bot's committed thinking level; clearing it restores the model default. An unsupported saved level is refused before dispatch, and call arguments cannot override the owner's saved choice.
-
-API-funded calls require model capacity metadata from the Host. The saved input allowance must cover the model's full declared context window, and admission reserves against that allowance. A request above the output allowance must be reduced before sending or granted a larger allowance; a request that cannot be changed is refused. Missing model metadata is reported explicitly. Committed adapter identities are rechecked around preparation and dispatch; an incompatible configuration change is refused.
-
-The chat header switches between a Bot's threads and its original conversation while keeping the Bot's model, memory, computer, voice and attachment controls. Archived or revoked threads refuse new model calls. Thread-directory saves retry a transient local sharing violation and roll back failed writes; an unreadable catalog stops sending and explains how to recover, without repeating Session creation.
-
-Release 0.67.1 fixes thread navigation returning to the default chat and create-request identifiers repeating after a client reload. The client preserves thread selection, refreshes the native roster before opening a newly created thread, and gives each new create intent a unique bounded identifier while retaining the same identifier for retries. A new Bot's automatic greeting waits until the owner saves its committed model, inference permission and funding binding; its model button shows **Complete Bot setup** while waiting. Live validation on 2026-11-11 covered one configured subscription model, thread chat, memory, CSV/SQL/chart/export, and a separate local Agent's encrypted pairing and file API. Cross-computer desktop and full feature acceptance remain pending.
-
-[Choose an edition](#editions) · [Install](#install) · [First task](#quick-evaluation) · [Bot delegation](#bot-routing) · [Remote computers](#computers) · [Support](#troubleshooting)
+[Choose an edition](#editions) · [Install](#install) · [AI connections](#ai-connections) · [First task](#quick-evaluation) · [Bot delegation](#bot-routing) · [Remote computers](#computers) · [Support](#troubleshooting)
 
 <a id="editions"></a>
 
@@ -90,6 +54,24 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 | Pinned web pages | Pin the dashboards and boards you use, keep the list in the Host across restarts, and open a page in a framed view or in your browser. | Full Bot |
 | Display preferences | Pick the chat measure and bubble style, and keep them across reloads, without touching any conversation. | Full Bot |
 
+<a id="ai-connections"></a>
+
+## AI connections and Bot settings
+
+**The full Bot edition manages its own model connections under Settings → AI.** Save multiple connections for a provider with separate names, accounts, models and capacities, then select a route in the Bot's **Models & tools** settings. Chat models and official execution tools have separate grants.
+
+| Connection | Configuration | Purpose |
+| --- | --- | --- |
+| API models | Add a provider or compatible API connection with its endpoint, separate credentials and model capacities. | OpenAI, Anthropic and Google Gemini protocols, plus Ollama; uses API funding settings. |
+| Native CLI chat | Select a driver, verify its executable/version and optional entry script, then save the connection's own account and model ID. | Retains a native CLI session under the Bot's saved route and funding configuration. |
+| Official execution tools | Choose **Install and sign in** in Bot settings, complete the vendor login, recheck readiness and save the tool binding. | Grants supported file, command and other execution capabilities alongside a chat model from another provider. |
+
+CLI chat drivers include Claude Code, Codex, Pi, Muse Code, Antigravity, Grok, Gemini, Kimi Code, Droid, Cursor, OpenCode, Qwen, Hermes, Cline, Copilot, Command Code, DeepSeek ACP and custom ACP. Availability depends on the local installation, account and model access. Connection states distinguish configuration, required attention and a verified conversation.
+
+Antigravity uses its matching official runtime and harness files with separate OAuth credentials. DeepSeek ACP uses the dsh **0.2.2-rc.2** Node entry, its own API key and API funding, with one model request and at most 4096 output tokens per turn. Other subscription CLIs use their respective plan accounts. See the [CLI chat connection guide](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/cli-chat-providers.md) for installation and configuration.
+
+Edit the Bot's name, role and standing instructions under **Identity & personality**, then save to apply them. Chat supports separate threads, text drafts, paged history, Markdown, code and mathematics. Notifications open the relevant Bot and task. Main Bot supports multiple saved model routes; workers use their own models, permissions and funding.
+
 <a id="install"></a>
 
 ## Installation
@@ -98,7 +80,7 @@ Use **one edition per Harness profile**. Both editions share the routing configu
    - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.71.0`
    - Routing only: `@ljwei-stak/dsh-model-router@0.71.0`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
-3. Configure provider credentials and models in the official Harness **Models** settings. Open the Bot workspace for the full edition, or **Model Router** in the sidebar for the routing-only edition.
+3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
 CLI installation is also supported. Choose the command for your edition:
 
@@ -166,11 +148,11 @@ An interactive terminal exposes the installed tool's own workflow and capabiliti
 
 ## Build a persistent Bot workspace
 
-**Full Bot edition.** Create a Bot, select an exact configured model, and set its role and work directory. In **Bot bindings**, commit tools, computer/workspace access, and funding settings for execution Bots. In this release, **Main** has full Host authority across all connected model routes and tools and inherits the verified access ceiling of paired computers. Its binding configures the default model, workspace, funding and official-tool execution; worker capability checkboxes do not narrow Main. Actual model support, funding configuration, installed tools and pairing revocation still determine what can run.
+**Full Bot edition.** Create a Bot, select an exact configured model, and set its role and work directory. In **Bot bindings**, commit tools, computer/workspace access, and funding settings for execution Bots. **Main** has full Host authority across all connected model routes and tools and inherits the verified access ceiling of paired computers. Its binding configures the default model, workspace, funding and official-tool execution; worker capability checkboxes do not narrow Main. Actual model support, funding configuration, installed tools and pairing revocation still determine what can run.
 
 In **Main → Model and tools → Configure multiple model routes**, add the exact provider and model for each route. Enable its funding scope, then set shared API budgets and subscription call limits. Each API route has its own prices and request bounds. Choose an enabled route as the default and save the settings together. A Host chat session can select another enabled route while keeping the saved default. For the integrated Claude subscription route, a switch can carry completed text history into a private process context. The native process receives only the new user turn. Histories with attachments, tool calls, or unconfirmed turns require a fresh conversation on that route.
 
-A Host Claude conversation profile can enable `hostTools: true` to offer paired-computer file, approved container command, browser, desktop, operation, artifact and Task tools through its private MCP connection. This works in integrated and independent chat. Main inherits the paired computer's verified scope. Workers use their committed grants. File writes and commands create durable Tasks. Browser and desktop calls retain a conversation-owned operation record; an unknown effect blocks later mutations until the original Agent operation is reconciled. Screenshots arrive as bounded MCP PNG images. Calls require an active turn, and repeated bridge requests are refused. Bots with data-analysis permission also receive `data_load`, `data_describe`, `data_sql`, `data_show` and `data_export`, using their existing private database and library. These data tools are also available in API independent chat. Current data support is CSV/TSV/JSON, SQLite, bar/line/area charts and CSV export; saved results can be opened in the Data panel. Cancellation interrupts the data worker and prevents a cancelled library read from starting a later write. Already committed changes may remain, so inspect the existing data before repeating a cancelled or timed-out write. Other data formats remain in scope. [Claude profile configuration](packages/bot-engines/README.md).
+A Host Claude conversation profile can enable `hostTools: true` to offer paired-computer file, approved container command, browser, desktop, operation, artifact and Task tools through its private MCP connection. This works in integrated and independent chat. Main inherits the paired computer's verified scope. Workers use their committed grants. File writes and commands create durable Tasks. Browser and desktop calls retain a conversation-owned operation record; an unknown effect blocks later mutations until the original Agent operation is reconciled. Screenshots arrive as bounded MCP PNG images. Calls require an active turn, and repeated bridge requests are refused. Bots with data-analysis permission also receive `data_load`, `data_describe`, `data_sql`, `data_show` and `data_export`, using their existing private database and library. These data tools are also available in API independent chat. Current data support is CSV/TSV/JSON, SQLite, bar/line/area charts and CSV export; saved results can be opened in the Data panel. Cancellation interrupts the data worker and prevents a cancelled library read from starting a later write. Already committed changes may remain, so inspect the existing data before repeating a cancelled or timed-out write.  [Claude profile configuration](packages/bot-engines/README.md).
 
 The workspace shows native tool activity in both chat modes, scoped to the selected Bot and conversation. Open the activity indicator to inspect earlier entries. “Returned” records a CLI response; the task or remote-operation receipt determines whether the operation succeeded. Cancellation and confirmed process shutdown are separate facts. Unconfirmed turns remain marked for review, and recording failures are shown explicitly.
 
@@ -191,13 +173,11 @@ Integration mode reuses Harness Sessions. An optional independent runtime has it
 
 ## Multi-Bot task progress and pending items
 
-**Available in the full Bot edition 0.71.0.** On **Tasks**, inspect task counts per Bot, filter by **All / In progress / Needs attention / Ended**, or search task names and task, plan, or operation IDs. Counts and filters cover loaded records; funding admission is in progress, while budget waiting needs attention.
+**Available in the full Bot edition.** On **Tasks**, inspect task counts per Bot, filter by **All / In progress / Needs attention / Ended**, or search task names and task, plan, or operation IDs. Counts and filters cover loaded records; funding admission is in progress, while budget waiting needs attention.
 
 **Needs your attention** reports the full count and expands beyond six items. Each reminder opens the original task; approval reminders can open the owning Bot's conversation to show its original request. Open a task's **timeline** for queue, admission, execution, stop-request, and reconciliation events, with the original identities for each attempt. Reading history does not dispatch tasks or invoke models; stop requests still require confirmation. Older Hosts without history support retain existing receipt details.
 
 The Host loads at most **512 tasks**, prioritizing pending and active work before newer historical records, and explicitly reports loaded and total counts when truncated. History reads the latest **80 events** on demand and reports its total when truncated. These are durable managed-task records; they do not cover every chat message or live provider output.
-
-This iteration draws on [Agents Anywhere](https://github.com/anywhere-labs/Agents-Anywhere)'s timeline and capability-based actions. See the [task workspace notes](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/integration/agents-anywhere-tasks.md) for implementation and verification.
 
 <a id="bot-routing"></a>
 
@@ -292,11 +272,11 @@ Binary transfers preserve the original bytes, with a **16 MiB per-file limit**; 
 
 The Host owns committed model, tool, computer, funding, and operation identity. Bot dispatch, model-originated tools, and owner workbench actions follow this authority. Worktree isolation organizes code changes; vendor-native processes use the current user's system access.
 
-Provider credentials and authenticated sessions are managed by Harness. Routing state, receipts, committed Bot bindings, private libraries, and routine ledgers live under `<DSH_HOME>/model-router/`. The configured Bot home stores upstream conversations, memory, browser state, and team files. Agent configuration and pairing credentials remain on the controlled computer. Back up these locations before changing runtime ownership; keep pairing files, recordings, logs, and private files out of public reports.
+Credentials for independent plugin AI connections are saved through the Host credential service; existing Harness routes use the Host's own authentication settings. Routing state, receipts, committed Bot bindings, private libraries, and routine ledgers live under `<DSH_HOME>/model-router/`. The configured Bot home stores upstream conversations, memory, browser state, and team files. Agent configuration and pairing credentials remain on the controlled computer. Back up these locations before changing runtime ownership; keep pairing files, recordings, logs, and private files out of public reports.
 
 | Component | Current scope |
 | --- | --- |
-| Harness integration | Declared Host versions are listed in [package.json](package.json); integration verification uses the actual Harness SDK **0.2.1-rc.4**. |
+| Harness integration | Declared Host versions are listed in [package.json](package.json); the current compatibility baseline is Harness SDK **0.2.2-rc.2**, Cordis **4.1** and schemastery **3.19**. |
 | Bot foundation | Pinned [DS Bot](https://github.com/Fei2411/DS-Bot) **0.2.7**, with project-specific integration and product overlays. |
 | Remote desktop | Windows x64 Agent **0.1.3**, with an available signed-in interactive desktop. |
 | Tool execution | Availability depends on the local platform, installed CLI, account, exact model, and supported execution adapter shown by the workbench. |

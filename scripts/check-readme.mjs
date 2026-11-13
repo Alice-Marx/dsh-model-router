@@ -179,6 +179,18 @@ export function checkReadmePair(english, chinese, names = ['README.md', 'README.
     inlineMath: { [names[0]]: left.inlineMath, [names[1]]: right.inlineMath } }
 }
 
+/** README is a current product guide; release/task history belongs in Releases/GitLab. */
+export function checkReadmeEditorial(markdown, name = 'README.md') {
+  const errors = []
+  const markers = /(?:^#{1,6}\s+.*(?:changelog|release notes|更新日志|版本更新|变更日志)|^\*{0,2}(?:Release\s+\d+\.\d+\.\d+|\d+\.\d+\.\d+\s*(?:正式版[：:]|修复|新增|更新))|本版新增|本次新增|本轮参考|this release (?:adds|supports)|this iteration draws on)/i
+  let fence = false
+  for (const [index, line] of String(markdown).split(/\r?\n/).entries()) {
+    if (/^\s*(?:```|~~~)/.test(line)) { fence = !fence; continue }
+    if (!fence && markers.test(line)) errors.push(`${name}:${index + 1}: Keep release/task history in GitHub Releases and GitLab docs; describe current product behavior here`)
+  }
+  return { ok: errors.length === 0, errors }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2)
   if (args.length !== 0 && args.length !== 2) {
@@ -189,6 +201,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       const paths = args.length ? args.map(path => resolve(path)) : ['README.md', 'README.zh.md'].map(path => resolve(root, path))
       const bytes = paths.map(path => readFileSync(path))
       const result = checkReadmePair(...bytes.map(value => value.toString('utf8')), paths)
+      for (const [index, value] of bytes.entries()) result.errors.push(...checkReadmeEditorial(value.toString('utf8'), paths[index]).errors)
+      result.ok = result.errors.length === 0
       if (!args.length) {
         const pairing = readFileSync(resolve(root, 'README.i18n.yaml'), 'utf8')
         for (const [index, name] of ['README.md', 'README.zh.md'].entries()) {
