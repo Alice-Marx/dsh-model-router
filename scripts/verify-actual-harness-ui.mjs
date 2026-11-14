@@ -60,11 +60,20 @@ try{
  await page.getByRole('button',{name:'Bot 设置',exact:true}).click();await page.locator('.bp-bot-settings-dialog .bb-root').waitFor()
  await capture('harness-bot-settings-light')
  if(process.argv.includes('--cli-setup')){
-  for(const [toolId,driver,name]of [['stepcode','stepAgent','step'],['gemini','geminiAgent','gemini'],['dsh-tui','deepseekAgent','deepseek']]){
+  for(const [toolId,driver,name]of [['stepcode','stepAgent','step'],['gemini','geminiAgent','gemini'],['dsh-tui','deepseekAgent','deepseek'],['qwen-code','qwenAgent','qwen'],['codebuddy-code','execution-only','codebuddy']]){
    const row=page.locator(`.bp-bot-settings-dialog details[data-tool-id="${toolId}"]`)
    if(!await row.evaluate(node=>node.open))await row.locator('summary').first().click()
    await row.getByRole('button',{name:'配置与修复',exact:true}).click()
    const setup=row.locator('.bp-cli-setup')
+   if(driver==='execution-only'){
+    await setup.getByRole('heading',{name:'配置与修复 · CodeBuddy Code',exact:true}).waitFor({timeout:35000})
+    assert.equal(await setup.getByText('另作聊天模型（可选）',{exact:true}).count(),0)
+    await setup.getByRole('button',{name:'安装/修复 CLI',exact:true}).waitFor()
+    await setup.evaluate(node=>{const pane=node.closest('.bp-bot-settings-body');pane.scrollTop+=node.getBoundingClientRect().top-pane.getBoundingClientRect().top-8})
+    await noOverflow();await capture('harness-codebuddy-setup-light')
+    await page.setViewportSize({width:390,height:844});await noOverflow();await capture('harness-codebuddy-setup-phone');await page.setViewportSize({width:1360,height:1000})
+    await setup.getByLabel('关闭工具配置').click();continue
+   }
    await setup.getByText('另作聊天模型（可选）',{exact:true}).click()
    await setup.getByLabel('CLI 聊天驱动',{exact:true}).waitFor({timeout:35000})
    assert.equal(await setup.getByLabel('CLI 聊天驱动',{exact:true}).inputValue(),driver)
@@ -82,7 +91,7 @@ try{
   }
   assert.deepEqual(repairStarts,[])
   assert.equal(actions.includes('cliProviders.save'),false)
-  checks.push('real Bot settings open Step, Gemini and DeepSeek configuration; detection starts no installer, imports no credentials and saves no chat/binding')
+  checks.push('real Bot settings open Step, Gemini, DeepSeek, Qwen and CodeBuddy configuration; detection starts no installer, imports no credentials and saves no chat/binding; CodeBuddy execution does not expose an unsupported chat driver')
  }
  await page.getByLabel('关闭 Bot 设置').click()
  checks.push('the production toolbar opens AI and the committed Main Bot settings through real owner actions')

@@ -1,7 +1,7 @@
 // An explicit test-only plugin loaded into a new isolated official Harness.
 // It exposes no free-form command/task/path input and accepts only the owner.
 import {mkdir,mkdtemp,writeFile,readFile} from 'node:fs/promises'
-import {join} from 'node:path'
+import {join,resolve} from 'node:path'
 import {spawn} from 'node:child_process'
 import {officialToolReadiness,runOfficialTool,officialToolEntrySelection,findNodeExecutable,resolveOfficialToolLaunch} from '../../.dsh-plugin/shared/official-tool-executor.mjs'
 import {setInstallPreferences} from '../../.dsh-plugin/shared/official-tools-runtime.mjs'
@@ -15,9 +15,9 @@ export function apply(ctx){
   const admission=ctx.connection.admit(request)
   if(!admission||'rejection'in admission||admission.peer?.principal?.kind!=='owner')return Response.json({error:'OWNER_REQUIRED'},{status:403})
   const input=await request.json()
-  if(!input||Object.keys(input).some(key=>!['toolId','operation'].includes(key))||!['gemini','stepcode','dsh-tui','mimo-code'].includes(input.toolId)||!['readiness','sandbox','diagnostics','prepare','prepare-read-only'].includes(input.operation))return Response.json({error:'INVALID_FIXED_CHECK'},{status:400})
+  if(!input||Object.keys(input).some(key=>!['toolId','operation'].includes(key))||!['codebuddy-code','qwen-code','gemini','stepcode','dsh-tui','mimo-code'].includes(input.toolId)||!['readiness','sandbox','diagnostics','prepare','prepare-read-only'].includes(input.operation))return Response.json({error:'INVALID_FIXED_CHECK'},{status:400})
   try{
-   setInstallPreferences({installDir:'D:/AI/tools',registry:'https://registry.npmjs.org/',methods:{},scriptUrls:{},allowScriptInstall:true})
+   setInstallPreferences({installDir:['qwen-code','codebuddy-code'].includes(input.toolId)?resolve(process.env.DSH_STATE_HOME,'../../../qwen-cli-install'):'D:/AI/tools',registry:'https://registry.npmjs.org/',methods:{},scriptUrls:{},allowScriptInstall:true})
    if(input.operation==='diagnostics'){
     const node='D:/Program Files/node-v24.20.0-win-x64/node.exe'
     const probe=await new Promise(resolve=>{const child=spawn(node,['--version'],{windowsHide:true,stdio:['ignore','pipe','pipe']});let stdout='',stderr='';child.stdout.on('data',b=>stdout+=b);child.stderr.on('data',b=>stderr+=b);child.once('close',code=>resolve({code,stdout,stderr}));child.once('error',e=>resolve({error:e.message}))})

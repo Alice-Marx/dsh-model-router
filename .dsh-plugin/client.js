@@ -27749,6 +27749,40 @@ function scriptMethod(id3, label, {
 }
 var OFFICIAL_TOOLS = Object.freeze([
   Object.freeze({
+    id: "codebuddy-code",
+    label: "CodeBuddy Code",
+    vendor: "Tencent",
+    purpose: "腾讯官方编程 CLI，使用 codebuddy 命令登录与执行任务。",
+    package: "@tencent-ai/codebuddy-code",
+    manager: "npm",
+    installArgs: ["install", "-g", "@tencent-ai/codebuddy-code@latest", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "@tencent-ai/codebuddy-code"],
+    probeExecutables: ["codebuddy"],
+    providerHints: ["codebuddy", "codebuddy-code"],
+    headlessAdapter: !0,
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "@tencent-ai/codebuddy-code@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@tencent-ai/codebuddy-code@latest")
+    ])
+  }),
+  Object.freeze({
+    id: "qwen-code",
+    label: "Qwen Code",
+    vendor: "Qwen / Alibaba",
+    purpose: "Qwen 官方编程 CLI，支持账号登录、ACP 聊天和托管任务执行。",
+    package: "@qwen-code/qwen-code",
+    manager: "npm",
+    installArgs: ["install", "-g", "@qwen-code/qwen-code@latest", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "@qwen-code/qwen-code"],
+    probeExecutables: ["qwen"],
+    providerHints: ["qwen", "qwen-code", "dashscope"],
+    headlessAdapter: !0,
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "@qwen-code/qwen-code@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@qwen-code/qwen-code@latest")
+    ])
+  }),
+  Object.freeze({
     id: "kimi-code",
     label: "Kimi Code · Node",
     vendor: "Moonshot AI",
@@ -40156,7 +40190,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.73.4", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.74.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -40188,6 +40222,8 @@ var TERMINAL_TOOL_IDS = Object.freeze(OFFICIAL_TOOLS.filter((tool) => !tool.unsu
   minRows: 3,
   maxRows: 300
 }), TERMINAL_LOGIN_ARGS = Object.freeze({
+  "qwen-code": Object.freeze([]),
+  "codebuddy-code": Object.freeze([]),
   codex: Object.freeze(["login"]),
   "claude-code": Object.freeze(["auth", "login"]),
   "kimi-code": Object.freeze(["login"]),
@@ -43904,7 +43940,7 @@ html body[data-bot-product-ui] .bp-ai-sidebar:hover { background:var(--bp-hover)
 `;
 
 // apps/integration-client/official-tool-setup.jsx
-var hasCliSetup = (toolId) => ["gemini", "stepcode", "dsh-tui", "mimo-code", "opencode", "pi", "hermes", "codex", "claude-code", "kimi-code"].includes(toolId), nextScope2 = 0;
+var hasCliSetup = (toolId) => ["codebuddy-code", "qwen-code", "gemini", "stepcode", "dsh-tui", "mimo-code", "opencode", "pi", "hermes", "codex", "claude-code", "kimi-code"].includes(toolId), nextScope2 = 0;
 function OfficialToolSetup(props) {
   let key = (0, import_react67.useMemo)(() => ++nextScope2, [props.productApi, props.toolId]);
   return /* @__PURE__ */ import_react67.default.createElement(ToolSetup, { key, ...props });

@@ -15,12 +15,15 @@
 import { OFFICIAL_TOOLS, getOfficialTool } from './official-tool-registry.mjs'
 import { compareReleaseVersions } from './latest-versions.mjs'
 import { loginLaunchForProbe } from './official-tools-runtime.mjs'
+import {codeBuddyAccountFile} from './vendor-codebuddy-adapter.mjs'
 
 export const LOGIN_CHECK_TIMEOUT_MS = 5_000
 export const HEALTH_CACHE_MS = 10 * 60_000
 
 /** How to log in. Commands are display-only; the plugin never starts an interactive login. */
 export const LOGIN_GUIDES = Object.freeze({
+  'codebuddy-code':Object.freeze({command:'codebuddy',steps:'在终端运行 codebuddy 并完成登录；也可在启动 Harness 的环境中设置 CODEBUDDY_API_KEY 或 CODEBUDDY_AUTH_TOKEN。中国版 API Key 同时配置 CODEBUDDY_INTERNET_ENVIRONMENT=internal。完成后重新检测。'}),
+  'qwen-code': Object.freeze({command:'qwen',steps:'在终端运行 qwen，按首次启动提示登录，或输入 /auth 配置账号；也可在 Qwen Code 中配置 API 模型。完成后重新检测。'}),
   'claude-code': Object.freeze({ command: 'claude auth login', steps: '在终端运行 claude auth login（或启动 claude 后输入 /login），按浏览器提示登录 Anthropic 账号。也可以在 Harness 模型页为 Anthropic 配置 API Key，插件只把它传给该 CLI 进程。' }),
   codex: Object.freeze({ command: 'codex login', steps: '在终端运行 codex login，按浏览器提示登录 ChatGPT 账号；或设置 OPENAI_API_KEY 后运行 codex login --with-api-key。' }),
   gemini: Object.freeze({ command: 'gemini', steps: '在终端运行 gemini，选择 “Login with Google” 完成登录；或在环境变量中设置 GEMINI_API_KEY。' }),
@@ -38,6 +41,8 @@ export const LOGIN_GUIDES = Object.freeze({
 
 /** Environment variable names whose presence means a CLI can authenticate without a session. */
 const KEY_ENV = Object.freeze({
+  'codebuddy-code':['CODEBUDDY_API_KEY','CODEBUDDY_AUTH_TOKEN'],
+  'qwen-code':['OPENAI_API_KEY'],
   'claude-code': ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN'],
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY'],
   gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
@@ -59,6 +64,8 @@ const KEY_ENV = Object.freeze({
 export function credentialFileFor(toolId, { home = '', env = process.env } = {}) {
   const value = name => (typeof env?.[name] === 'string' && env[name].trim() ? env[name].trim().replace(/[\\/]+$/u, '') : '')
   const base = home ? String(home).replace(/[\\/]+$/u, '') : ''
+  if(toolId==='codebuddy-code')return codeBuddyAccountFile(base)
+  if(toolId==='qwen-code'){const root=value('QWEN_HOME')||(base&&`${base}/.qwen`);return root?`${root}/oauth_creds.json`:''}
   if (toolId === 'kimi-code') { const root = value('KIMI_CODE_HOME') || (base && `${base}/.kimi-code`); return root ? `${root}/credentials/kimi-code.json` : '' }
   if (toolId === 'mimo-code') { const root = value('XDG_DATA_HOME') || (base && `${base}/.local/share`); return root ? `${root}/mimocode/auth.json` : '' }
   if (toolId === 'grok-build') { const root = value('GROK_HOME') || (base && `${base}/.grok`); return root ? `${root}/auth.json` : '' }
@@ -97,6 +104,8 @@ function grokHomeHint(env) {
 
 /** Variables that make the CLI bill an API account rather than a subscription login. */
 const API_KEY_ENV = Object.freeze({
+  'codebuddy-code':['CODEBUDDY_API_KEY'],
+  'qwen-code':['OPENAI_API_KEY'],
   'claude-code': ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'],
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY'],
   gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
@@ -202,12 +211,13 @@ export async function checkLogin(toolId, {
       accountLogin: /chatgpt/i.test(output) ? true : /api key/i.test(output) ? false : null }
     return viaKey ?? { state: 'unknown', detail: 'codex login status 未给出明确结果。' }
   }
-  if (toolId === 'gemini') {
-    const credentialFile = credentialFileFor('gemini', { home, env })
+  if (toolId === 'gemini'||toolId==='qwen-code'||toolId==='codebuddy-code') {
+    const label=toolId==='codebuddy-code'?'CodeBuddy Code':toolId==='qwen-code'?'Qwen Code':'Gemini CLI'
+    const credentialFile = credentialFileFor(toolId, { home, env })
     const hasFile = Boolean(credentialFile) && await exists(credentialFile)
     if (viaKey) return { ...viaKey, accountLogin: hasFile }
-    if (hasFile) return { state: 'logged-in', detail: '检测到 Gemini CLI 登录凭据文件（未验证是否过期）。', source: 'file', billing: 'subscription', accountLogin: true }
-    return { state: 'unknown', detail: 'Gemini CLI 没有登录状态命令；首次运行时会提示登录。' }
+    if (hasFile) return { state: 'logged-in', detail: `检测到 ${label} 登录凭据文件（未验证是否过期）。`, source: 'file', billing:toolId==='gemini'?'subscription':'unknown', accountLogin: true }
+    return { state: 'unknown', detail: `${label} 登录状态尚未确认；首次运行时可配置账号。` }
   }
   if (FILE_LOGIN[toolId]) {
     const text = FILE_LOGIN[toolId]

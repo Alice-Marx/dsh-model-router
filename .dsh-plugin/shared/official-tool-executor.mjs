@@ -33,6 +33,8 @@ import { cliProfile } from './cli-profiles.mjs'
 import { officialModelId } from './bot-official-execution.mjs'
 import {resolveStepTask,resolveDshTask,geminiTaskArgs,createHeadlessParser} from './official-headless-adapters.mjs'
 import {managedRuntimeTool,prepareOfficialRuntime} from './official-runtime-state.mjs'
+import {qwenTaskArgs,createQwenParser} from './vendor-qwen-adapter.mjs'
+import {codeBuddyTaskArgs,createCodeBuddyParser} from './vendor-codebuddy-adapter.mjs'
 
 const IS_WINDOWS = process.platform === 'win32'
 const MAX_TASK_BYTES = 64_000
@@ -55,6 +57,8 @@ const ENVIRONMENT_KEYS = Object.freeze([
 ])
 
 const CAPABILITIES = Object.freeze({
+  'codebuddy-code': Object.freeze({supported:true,modes:Object.freeze(['read-only','workspace-write'])}),
+  'qwen-code': Object.freeze({supported:true,modes:Object.freeze(['read-only','workspace-write'])}),
   'claude-code': Object.freeze(IS_WINDOWS
     ? { supported: true, modes: Object.freeze(['read-only', 'workspace-write']) }
     : { supported: false, reason: 'Claude 的受限原生入口目前仅在 Windows 完成适配。' }),
@@ -90,7 +94,7 @@ const CAPABILITIES = Object.freeze({
 /** A UI/Host can show this without implying that installation means execution readiness. */
 export function officialToolExecutionCapabilities({ executionEnvironment = 'harness' } = {}) {
   return OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ...CAPABILITIES[tool.id],
-    ...(executionEnvironment==='cli-native'&&['gemini','stepcode','dsh-tui'].includes(tool.id)?{supported:false,modes:[],reason:'此工具使用 Host 托管沙箱执行，请选择受限执行环境。'}:{}),
+    ...(executionEnvironment==='cli-native'&&['gemini','stepcode','dsh-tui','qwen-code','codebuddy-code'].includes(tool.id)?{supported:false,modes:[],reason:'此工具使用 Host 托管沙箱执行，请选择受限执行环境。'}:{}),
     ...(executionEnvironment === 'cli-native' && IS_WINDOWS && tool.id === 'codex'
       ? { modes: ['read-only', 'workspace-write'] } : {}) }))
 }
@@ -154,10 +158,12 @@ function checkedTimeout(timeoutMs) {
 
 /** API-key variables removed when a run must use the CLI's own subscription login. */
 const API_KEY_VARIABLES = Object.freeze(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CODEX_API_KEY', 'OPENAI_API_KEY', 'KIMI_API_KEY',
-  'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY', 'ZAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY','DEEPSEEK_API_KEY','STEP_API_KEY','STEPCODE_API_KEY'])
+  'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY', 'ZAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY','DEEPSEEK_API_KEY','STEP_API_KEY','STEPCODE_API_KEY','CODEBUDDY_API_KEY'])
 
 export function executionEnvironment(toolId, { sessionOnly = false, env: source = process.env, extraKeys = [] } = {}) {
   const vendorKeys = {
+    'codebuddy-code':['CODEBUDDY_API_KEY','CODEBUDDY_AUTH_TOKEN','CODEBUDDY_BASE_URL','CODEBUDDY_INTERNET_ENVIRONMENT','CODEBUDDY_CONFIG_DIR','CODEBUDDY_HOME'],
+    'qwen-code':['OPENAI_API_KEY','OPENAI_BASE_URL','OPENAI_MODEL','QWEN_HOME','QWEN_RUNTIME_DIR'],
     'claude-code': ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL',
       'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL',
       'ANTHROPIC_SMALL_FAST_MODEL', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR'],
@@ -517,6 +523,12 @@ function verifyOfficialWindowsSignature(entry, expectedSigner) {
 }
 
 async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readiness.', selectionOptions = {}) {
+  if(toolId==='qwen-code'||toolId==='codebuddy-code'){
+    const {resolvePortableToolLaunch}=await import('./task-executors.mjs')
+    const entry=await resolvePortableToolLaunch({id:toolId},workspace,{selection:officialToolEntrySelection(toolId,selectionOptions)})
+    if(entry.reason)return {unsupported:entry.reason.replace(/；?已回退模型目录 API。?/g,'。')}
+    return {...entry,args:[...entry.args,...(toolId==='qwen-code'?qwenTaskArgs(mode,modelId):codeBuddyTaskArgs(mode,modelId))],format:toolId==='qwen-code'?'qwen-jsonl':'codebuddy-jsonl'}
+  }
   if(toolId==='gemini'){
     const {resolvePortableToolLaunch}=await import('./task-executors.mjs')
     const entry=await resolvePortableToolLaunch({id:'gemini'},workspace,{selection:officialToolEntrySelection(toolId,selectionOptions)})
@@ -1067,7 +1079,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
     const miniMaxParser = spec.format === 'minimax-stream-json' ? createMiniMaxStreamParser() : null
     const nativeParser = spec.format === 'mimo-jsonl' || spec.format === 'grok-jsonl'
       ? createMiMoGrokParser(toolId) : null
-    const headlessParser=['step-jsonl','dsh-headless-jsonl'].includes(spec.format)?createHeadlessParser(spec.format):null
+    const headlessParser=spec.format==='codebuddy-jsonl'?createCodeBuddyParser():spec.format==='qwen-jsonl'?createQwenParser():['step-jsonl','dsh-headless-jsonl'].includes(spec.format)?createHeadlessParser(spec.format):null
     let kimiAssistant = false
     const stdoutDecoder = new StringDecoder('utf8')
     const stderrDecoder = new StringDecoder('utf8')

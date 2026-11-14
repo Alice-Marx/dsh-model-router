@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-route-bot",
-  "version": "0.73.4",
+  "version": "0.74.0",
   "type": "module",
   "description": "DSH Bot workspace with integrated model routing, official tools and remote computers",
   "repository": {
@@ -340,7 +340,9 @@
     ".dsh-plugin/shared/official-headless-adapters.mjs",
     ".dsh-plugin/shared/vendor-release-attestation.mjs",
     ".dsh-plugin/shared/official-runtime-state.mjs",
-    ".dsh-plugin/shared/official-runtime-bootstrap.mjs"
+    ".dsh-plugin/shared/official-runtime-bootstrap.mjs",
+    ".dsh-plugin/shared/vendor-qwen-adapter.mjs",
+    ".dsh-plugin/shared/vendor-codebuddy-adapter.mjs"
   ],
   "scripts": {
     "build:client": "node scripts/build-client.mjs",

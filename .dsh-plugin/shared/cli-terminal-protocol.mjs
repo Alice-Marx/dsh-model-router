@@ -41,6 +41,8 @@ export const TERMINAL_LIMITS = Object.freeze({
  * (LOGIN_GUIDES in tool-health.mjs). Gemini signs in from its interactive UI.
  */
 export const TERMINAL_LOGIN_ARGS = Object.freeze({
+  'qwen-code':Object.freeze([]),
+  'codebuddy-code':Object.freeze([]),
   codex: Object.freeze(['login']),
   'claude-code': Object.freeze(['auth', 'login']),
   'kimi-code': Object.freeze(['login']),

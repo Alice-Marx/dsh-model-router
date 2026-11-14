@@ -3,15 +3,27 @@ import {readFile,writeFile,mkdir,mkdtemp,copyFile} from 'node:fs/promises'
 import {homedir,tmpdir} from 'node:os'
 import {join,dirname} from 'node:path'
 import {spawn} from 'node:child_process'
+import {codeBuddyAccountFile} from './vendor-codebuddy-adapter.mjs'
 
 const {toolId,spec}=JSON.parse(await readFile(process.argv[2],'utf8'))
-if(!['gemini','stepcode','dsh-tui','mimo-code'].includes(toolId))throw Error('Unsupported managed runtime')
+if(!['gemini','stepcode','dsh-tui','mimo-code','qwen-code','codebuddy-code'].includes(toolId))throw Error('Unsupported managed runtime')
 const source=homedir(),home=await mkdtemp(join(tmpdir(),'official-cli-'))
 const env={...process.env,...spec.env,HOME:home,USERPROFILE:home,APPDATA:join(home,'appdata'),LOCALAPPDATA:join(home,'local'),
  XDG_CONFIG_HOME:join(home,'.config'),XDG_DATA_HOME:join(home,'.local/share'),XDG_CACHE_HOME:join(home,'.cache')}
 for(const dir of [env.APPDATA,env.LOCALAPPDATA,env.XDG_CONFIG_HOME,env.XDG_DATA_HOME,env.XDG_CACHE_HOME])await mkdir(dir,{recursive:true})
 const copy=async(from,to)=>{try{await mkdir(dirname(to),{recursive:true});await copyFile(from,to)}catch(error){if(error.code!=='ENOENT')throw error}}
-if(toolId==='gemini'){
+if(toolId==='codebuddy-code'){
+ const original=process.env.CODEBUDDY_CONFIG_DIR||process.env.CODEBUDDY_HOME||join(source,'.codebuddy'),target=join(home,'.codebuddy');await mkdir(target,{recursive:true})
+ for(const file of ['settings.json','models.json'])await copy(join(original,file),join(target,file))
+ await copy(codeBuddyAccountFile(source),codeBuddyAccountFile(home))
+ env.CODEBUDDY_CONFIG_DIR=target;env.CODEBUDDY_HOME=target
+ env.DISABLE_AUTOUPDATER='1';env.CODEBUDDY_CODE_DISABLE_BACKGROUND_TASKS='1'
+}else if(toolId==='qwen-code'){
+ const original=process.env.QWEN_HOME||join(source,'.qwen'),target=join(home,'.qwen');await mkdir(target,{recursive:true})
+ for(const file of ['oauth_creds.json','settings.json'])await copy(join(original,file),join(target,file))
+ env.QWEN_HOME=target;env.QWEN_RUNTIME_DIR=target
+ env.QWEN_CODE_SAFE_MODE='true';env.QWEN_CODE_NO_RELAUNCH='true'
+}else if(toolId==='gemini'){
  const original=join(process.env.GEMINI_CLI_HOME||source,'.gemini'),target=join(home,'.gemini');await mkdir(target,{recursive:true})
  for(const file of ['oauth_creds.json','google_accounts.json'])await copy(join(original,file),join(target,file))
  let settings={};try{settings=JSON.parse(await readFile(join(original,'settings.json'),'utf8'))}catch(error){if(error.code!=='ENOENT')throw error}

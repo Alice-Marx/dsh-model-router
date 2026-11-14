@@ -3,8 +3,8 @@ import { getOfficialTool } from '../../../.dsh-plugin/shared/official-tool-regis
 import { probeOfficialTool, startRepair, installStatus, cancelInstall } from '../../../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { findGlobalPackageEntries, findNodeExecutable,officialToolReadiness } from '../../../.dsh-plugin/shared/official-tool-executor.mjs'
 
-export const CLI_TOOL_DRIVERS=Object.freeze({gemini:'geminiAgent',stepcode:'stepAgent','dsh-tui':'deepseekAgent','mimo-code':'execution-only',opencode:'opencodeGo',pi:'pi',hermes:'hermesAgent',codex:'codex','claude-code':'claude','kimi-code':'kimiAgent'})
-const login=Object.freeze({gemini:'gemini',stepcode:'step login','mimo-code':'mimo auth login',opencode:'opencode auth login',pi:'pi',hermes:'hermes login',codex:'codex login','claude-code':'claude auth login','kimi-code':'kimi'})
+export const CLI_TOOL_DRIVERS=Object.freeze({'codebuddy-code':'execution-only','qwen-code':'qwenAgent',gemini:'geminiAgent',stepcode:'stepAgent','dsh-tui':'deepseekAgent','mimo-code':'execution-only',opencode:'opencodeGo',pi:'pi',hermes:'hermesAgent',codex:'codex','claude-code':'claude','kimi-code':'kimiAgent'})
+const login=Object.freeze({'codebuddy-code':'codebuddy','qwen-code':'qwen',gemini:'gemini',stepcode:'step login','mimo-code':'mimo auth login',opencode:'opencode auth login',pi:'pi',hermes:'hermes login',codex:'codex login','claude-code':'claude auth login','kimi-code':'kimi'})
 const fail=()=>{throw Object.assign(new Error('请选择支持配置的官方工具。'),{code:'CLI_SETUP_INVALID'})}
 const validate=(payload,context,operations)=>{
  if(context?.kind!=='owner')throw Object.assign(new Error('请使用已认证的拥有者配置 CLI。'),{code:'REMOTE_OWNER_REQUIRED'})

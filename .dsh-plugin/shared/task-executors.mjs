@@ -76,6 +76,10 @@ function additionalApiFields(value) {
 
 /** Portable headless adapters. Registry tools without an entry here use the verified runner. */
 export const TASK_ADAPTERS = Object.freeze([
+  Object.freeze({id:'codebuddy-code',label:'CodeBuddy Code',executable:null,portable:false,apiKeyEnv:'CODEBUDDY_API_KEY',
+    sessionEnv:Object.freeze(['CODEBUDDY_AUTH_TOKEN','CODEBUDDY_BASE_URL','CODEBUDDY_CONFIG_DIR','CODEBUDDY_HOME','CODEBUDDY_INTERNET_ENVIRONMENT']),format:'codebuddy-jsonl',buildArgs(){return []}}),
+  Object.freeze({id:'qwen-code',label:'Qwen Code',executable:null,portable:false,apiKeyEnv:'OPENAI_API_KEY',
+    sessionEnv:Object.freeze(['QWEN_HOME','QWEN_RUNTIME_DIR','OPENAI_BASE_URL','OPENAI_MODEL']),format:'qwen-jsonl',buildArgs(){return []}}),
   Object.freeze({
     id: 'claude-code',
     label: 'Claude Code',
@@ -764,15 +768,17 @@ function officialSuccess({ route, adapter, preference, answer, exitCode, version
   }
 }
 
-/** Gemini's Windows npm shim cannot be spawned without a shell; use its selected package bin. */
+/** Verify each selected Node CLI package and launch its bin without a shell shim. */
 export async function resolvePortableToolLaunch(adapter, workspace, {
-  selection = adapter?.id === 'gemini' ? officialToolEntrySelection('gemini') : null,
+  selection = ['gemini','qwen-code','codebuddy-code'].includes(adapter?.id) ? officialToolEntrySelection(adapter.id) : null,
   findEntries = findGlobalPackageEntries, findNode = findNodeExecutable, attestor = npmAttestor,
 } = {}) {
-  if (adapter?.id !== 'gemini') return { file: adapter.executable, args: [] }
-  const entries = await findEntries('@google/gemini-cli', 'gemini', 'dist/index.js', workspace, { selection })
+  if (!['gemini','qwen-code','codebuddy-code'].includes(adapter?.id)) return { file: adapter.executable, args: [] }
+  const qwen=adapter.id==='qwen-code',buddy=adapter.id==='codebuddy-code',name=buddy?'@tencent-ai/codebuddy-code':qwen?'@qwen-code/qwen-code':'@google/gemini-cli',command=buddy?'codebuddy':qwen?'qwen':'gemini',label=buddy?'CodeBuddy Code':qwen?'Qwen Code':'Gemini'
+  const problem=reason=>({reason:reason.replaceAll('Gemini',label).replaceAll('@google/gemini-cli',name).replaceAll('gemini 入口',command+' 入口')})
+  const entries = await findEntries(name, command, buddy?'bin/codebuddy':qwen?'cli-entry.js':'dist/index.js', workspace, { selection })
   const found = entries[0]
-  if (!found) return { reason: '未在所选安装目录中找到 @google/gemini-cli 的 gemini 入口；已回退模型目录 API。' }
+  if (!found) return problem('未在所选安装目录中找到 @google/gemini-cli 的 gemini 入口；已回退模型目录 API。')
   const inside = (root, entry) => {
     const part = relative(root, entry)
     return part !== '' && part !== '..' && !part.startsWith(`..${sep}`) && !isAbsolute(part)
@@ -780,7 +786,7 @@ export async function resolvePortableToolLaunch(adapter, workspace, {
   const roots = Array.isArray(selection?.plan?.packageModuleRoots) ? selection.plan.packageModuleRoots
     : await installedModuleRoots(selection?.directories ?? [], { manager: selection?.plan?.manager })
   const prefix = selection?.plan?.installDir ? await realpath(selection.plan.installDir).catch(() => null) : null
-  if (selection?.plan?.installDir && !prefix) return { reason: 'Gemini 所选安装根无法确认，已拒绝启动并回退模型目录 API。' }
+  if (selection?.plan?.installDir && !prefix) return problem('Gemini 所选安装根无法确认，已拒绝启动并回退模型目录 API。')
   let contained = false
   for (const declared of roots) {
     const boundary = await realpath(declared).catch(() => null)
@@ -789,17 +795,24 @@ export async function resolvePortableToolLaunch(adapter, workspace, {
     if (inside(boundary, found.packageRoot) && inside(found.packageRoot, found.entry)
       && !inside(workspace, found.packageRoot) && found.packageRoot !== workspace) { contained = true; break }
   }
-  if (!contained) return { reason: 'Gemini 包或入口离开了所选安装目录的包存储树，已拒绝启动并回退模型目录 API。' }
+  if (!contained) return problem('Gemini 包或入口离开了所选安装目录的包存储树，已拒绝启动并回退模型目录 API。')
   // The manifest controls bin/import resolution, so attest it as well as all
   // package code. Checking name/version or a signed Node alone is insufficient.
-  const include = new RegExp(`${CODE_FILE.source}|(?:^|/)package\\.json$`, 'i')
-  const checked = await attestor.matchesPackage(found.packageRoot, '@google/gemini-cli', found.version, include)
-  if (!checked.ok) return { reason: `Gemini 安装文件未通过官方 npm 摘要核验：${checked.reason}；已回退模型目录 API。` }
+  const include = new RegExp(`${CODE_FILE.source}|${qwen||buddy?'\\.json$':'(?:^|/)package\\.json$'}`, 'i')
+  const checked = await attestor.matchesPackage(found.packageRoot, name, found.version, include)
+  if (!checked.ok) return problem(`Gemini 安装文件未通过官方 npm 摘要核验：${checked.reason}；已回退模型目录 API。`)
   const member = relative(found.packageRoot, found.entry).split(sep).join('/')
-  const entryChecked = await attestor.matches(found.entry, '@google/gemini-cli', found.version, member)
-  if (!entryChecked.ok) return { reason: `Gemini 入口未通过官方 npm 摘要核验：${entryChecked.reason}；已回退模型目录 API。` }
-  const node = await findNode(workspace, [20, 0, 0])
-  if (!node) return { reason: '未找到工作区外的 Node.js 20+ 可执行文件；已回退模型目录 API。' }
+  const entryChecked = await attestor.matches(found.entry, name, found.version, member)
+  if (!entryChecked.ok) return problem(`Gemini 入口未通过官方 npm 摘要核验：${entryChecked.reason}；已回退模型目录 API。`)
+  const node = await findNode(workspace, qwen?[22,0,0]:[20, 0, 0])
+  if (!node) return problem(`未找到工作区外的 Node.js ${qwen?'22':'20'}+ 可执行文件；已回退模型目录 API。`)
+  if(qwen){
+    // The verified Windows bootstrap relaunches Node; launch its attested
+    // runtime directly under the outer sandbox and supply the same GC flag.
+    const runtime=await realpath(join(found.packageRoot,'cli.js')).catch(()=>null)
+    if(!runtime||!inside(found.packageRoot,runtime)||!(await attestor.matches(runtime,name,found.version,'cli.js')).ok)return problem('Qwen Code 运行入口未通过官方摘要核验。')
+    return {file:node,args:['--expose-gc',runtime],version:found.version,source:'official-npm-registry-attested'}
+  }
   return { file: node, args: [found.entry], version: found.version, source: 'official-npm-registry-attested' }
 }
 

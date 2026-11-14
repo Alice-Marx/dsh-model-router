@@ -3,7 +3,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 
-export const managedRuntimeTool=id=>['gemini','stepcode','dsh-tui','mimo-code'].includes(id)
+export const managedRuntimeTool=id=>['gemini','stepcode','dsh-tui','mimo-code','qwen-code','codebuddy-code'].includes(id)
 /** The ACL runner chooses its private writable TEMP only after it starts.
  * Provision CLI caches there, never in the user's account home or project. */
 export async function prepareOfficialRuntime(spec,toolId,workspace,mode){

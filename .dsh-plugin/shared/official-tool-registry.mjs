@@ -79,6 +79,31 @@ function scriptMethod(id, label, {
 
 export const OFFICIAL_TOOLS = Object.freeze([
   Object.freeze({
+    id:'codebuddy-code',label:'CodeBuddy Code',vendor:'Tencent',
+    purpose:'腾讯官方编程 CLI，使用 codebuddy 命令登录与执行任务。',
+    package:'@tencent-ai/codebuddy-code',manager:'npm',
+    installArgs:['install','-g','@tencent-ai/codebuddy-code@latest','--registry=https://registry.npmjs.org/'],
+    uninstallArgs:['uninstall','-g','@tencent-ai/codebuddy-code'],
+    probeExecutables:['codebuddy'],providerHints:['codebuddy','codebuddy-code'],headlessAdapter:true,
+    installMethods:Object.freeze([
+      packageManagerMethod('npm','npm','npm','@tencent-ai/codebuddy-code@latest'),
+      packageManagerMethod('pnpm','pnpm','pnpm','@tencent-ai/codebuddy-code@latest'),
+    ]),
+  }),
+  Object.freeze({
+    id: 'qwen-code', label: 'Qwen Code', vendor: 'Qwen / Alibaba',
+    purpose: 'Qwen 官方编程 CLI，支持账号登录、ACP 聊天和托管任务执行。',
+    package: '@qwen-code/qwen-code', manager: 'npm',
+    installArgs: ['install', '-g', '@qwen-code/qwen-code@latest', '--registry=https://registry.npmjs.org/'],
+    uninstallArgs: ['uninstall', '-g', '@qwen-code/qwen-code'],
+    probeExecutables: ['qwen'], providerHints: ['qwen', 'qwen-code', 'dashscope'],
+    headlessAdapter: true,
+    installMethods: Object.freeze([
+      packageManagerMethod('npm', 'npm', 'npm', '@qwen-code/qwen-code@latest'),
+      packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@qwen-code/qwen-code@latest'),
+    ]),
+  }),
+  Object.freeze({
     id: 'kimi-code',
     label: 'Kimi Code · Node',
     vendor: 'Moonshot AI',

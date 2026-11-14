@@ -5,7 +5,7 @@ import css from './official-tool-setup.css'
 import aiCss from './ai-providers.css'
 
 // Fixed display mapping only; the Host independently validates every id.
-export const hasCliSetup=toolId=>['gemini','stepcode','dsh-tui','mimo-code','opencode','pi','hermes','codex','claude-code','kimi-code'].includes(toolId)
+export const hasCliSetup=toolId=>['codebuddy-code','qwen-code','gemini','stepcode','dsh-tui','mimo-code','opencode','pi','hermes','codex','claude-code','kimi-code'].includes(toolId)
 let nextScope=0
 export function OfficialToolSetup(props){const key=useMemo(()=>++nextScope,[props.productApi,props.toolId]);return <ToolSetup key={key} {...props}/>}
 function ToolSetup({productApi,toolId,onClose,onConfigured,onOpenTools}){

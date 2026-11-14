@@ -22,7 +22,7 @@ async function withDom(work){const dom=new JSDOM('<div id="root"></div>',{url:'h
  for(const [key,value]of Object.entries({window:dom.window,document:dom.window.document,Element:dom.window.Element,HTMLElement:dom.window.HTMLElement,IS_REACT_ACT_ENVIRONMENT:true})){previous[key]=Object.getOwnPropertyDescriptor(globalThis,key);Object.defineProperty(globalThis,key,{value,configurable:true,writable:true})}
  const {createRoot}=await import('react-dom/client'),root=createRoot(document.getElementById('root')),container=document.getElementById('root')
  const flush=async()=>act(async()=>{await new Promise(setImmediate);await new Promise(setImmediate)})
- const render=async api=>{await act(async()=>{root.render(React.createElement(OfficialToolSetup,{productApi:api,toolId:'stepcode'}));await new Promise(setImmediate)});await flush()}
+ const render=async(api,toolId='stepcode')=>{await act(async()=>{root.render(React.createElement(OfficialToolSetup,{productApi:api,toolId}));await new Promise(setImmediate)});await flush()}
  const field=label=>container.querySelector(`[aria-label="${label}"]`)
  const click=async label=>{const button=[...container.querySelectorAll('button')].find(item=>item.textContent.trim()===label);assert.ok(button,label);assert.equal(button.disabled,false);await act(async()=>{button.click();await new Promise(setImmediate)});await flush()}
  const fill=async(label,value)=>act(async()=>{const input=field(label);Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new dom.window.Event('input',{bubbles:true}));await new Promise(setImmediate)})
@@ -48,5 +48,12 @@ test('changing Host drops a secret draft and late old setup/status results canno
  await withDom(async({render,fill,field,flush})=>{let resolveStatus;const old=fixture((action)=>action==='cliProviders.repair'?new Promise(resolve=>{resolveStatus=resolve}):undefined),current=fixture();await render(old);await fill('CLI 登录资料 JSON','old-private-draft');await render(current)
   assert.equal(field('CLI 登录资料 JSON').value,'');assert.ok(old.calls.find(call=>call.action==='cliProviders.repair').signal.aborted)
   resolveStatus({toolId:'stepcode',job:{status:'failed',error:'old-error'}});await flush();assert.doesNotMatch(document.body.textContent,/old-error|old-private-draft/)
+ })
+})
+
+test('CodeBuddy exposes execution repair and login without an unsupported chat configuration',async()=>{
+ await withDom(async({render,container,click})=>{const api=fixture((action,payload)=>action==='cliProviders.setup'?{schemaVersion:1,toolId:payload.toolId,label:'CodeBuddy Code',driver:'execution-only',loginCommand:'codebuddy',reason:'托管执行',execution:{ready:true}}:undefined)
+  await render(api,'codebuddy-code');assert.match(container.textContent,/CodeBuddy Code/);assert.match(container.textContent,/账号登录/);assert.doesNotMatch(container.textContent,/另作聊天模型/)
+  await click('安装/修复 CLI');assert.deepEqual(api.calls.find(call=>call.payload?.operation==='start').payload,{toolId:'codebuddy-code',operation:'start'});assert.equal(api.calls.some(call=>call.action==='cliProviders.save'),false)
  })
 })
