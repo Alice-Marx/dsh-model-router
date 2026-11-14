@@ -87,3 +87,6 @@
 /native/** -text
 /remote-computer-agent/** -text
 /scripts/** -text
+
+# Preserve the built-in avatar sources and generation manifest in release archives.
+/assets/model-avatars/** -text

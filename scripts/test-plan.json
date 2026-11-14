@@ -23,7 +23,8 @@
       "tests/bot-attention.test.mjs",
       "tests/readme-math.test.mjs",
       "tests/remote-agent-build.test.mjs",
-      "tests/bot-runtime-ui.test.mjs"
+      "tests/bot-runtime-ui.test.mjs",
+      "tests/model-avatar-picker.test.mjs"
     ],
     [
       "--test",

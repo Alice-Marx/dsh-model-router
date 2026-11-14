@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 import { syncDsBot } from './sync-ds-bot.mjs'
+import { generateModelAvatarCatalog } from './build-model-avatar-catalog.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 // One shipped client bundle: the unified product (DS surface + MR panel +
@@ -37,6 +38,7 @@ export async function bundleProductClient({root=ROOT}={}) {
 }
 
 export async function generateProductClient({ output = DEFAULT_OUTPUT, check = false } = {}) {
+  await generateModelAvatarCatalog({ check: true })
   await syncDsBot({ check })
   const result = await bundleProductClient()
   if (check) {

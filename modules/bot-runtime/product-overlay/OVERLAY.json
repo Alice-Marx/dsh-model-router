@@ -193,6 +193,43 @@
       "path": "src/client/product-ai-settings.js",
       "kind": "product-file",
       "summary": "The product-owned React settings bridge exposes no credentials or model authority."
+    },
+    {
+      "path": "src/client/bot-settings.js",
+      "kind": "patched",
+      "summary": "Adds the offline model-persona avatar picker and reopens saved presets on their source tab.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "f5c7eeaa226728763bc793510d0478371e486775418f8d1b52e6fb00c9624c5d"
+      }
+    },
+    {
+      "path": "src/client/i18n.js",
+      "kind": "patched",
+      "summary": "Names the built-in model avatar page and its accessible selection controls in Chinese and English.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "f09a491b4c3d0506427dddf41aa3a39b3a6126b0216f31c4f2161117139c03cf"
+      }
+    },
+    {
+      "path": "src/client/styles.js",
+      "kind": "patched",
+      "summary": "Fits four avatar-source tabs and a scrollable, named model avatar grid inside the existing avatar popover.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "b789349121d050381dc5da82b7473361551a12b20cdd87d382fbb7cd7d7787c5"
+      }
+    },
+    {
+      "path": "src/client/model-avatar-catalog.js",
+      "kind": "product-file",
+      "summary": "Embeds 19 optimized Q-version model persona portraits from user-provided standing art as offline WebP data URLs."
+    },
+    {
+      "path": "src/client/model-avatar-picker.js",
+      "kind": "product-file",
+      "summary": "Renders named built-in model portraits and recognizes saved selections through the existing avatar.image contract."
     }
   ]
 }

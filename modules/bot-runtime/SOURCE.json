@@ -197,6 +197,43 @@
       "path": "src/client/product-ai-settings.js",
       "kind": "product-file",
       "summary": "The product-owned React settings bridge exposes no credentials or model authority."
+    },
+    {
+      "path": "src/client/bot-settings.js",
+      "kind": "patched",
+      "summary": "Adds the offline model-persona avatar picker and reopens saved presets on their source tab.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "f5c7eeaa226728763bc793510d0478371e486775418f8d1b52e6fb00c9624c5d"
+      }
+    },
+    {
+      "path": "src/client/i18n.js",
+      "kind": "patched",
+      "summary": "Names the built-in model avatar page and its accessible selection controls in Chinese and English.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "f09a491b4c3d0506427dddf41aa3a39b3a6126b0216f31c4f2161117139c03cf"
+      }
+    },
+    {
+      "path": "src/client/styles.js",
+      "kind": "patched",
+      "summary": "Fits four avatar-source tabs and a scrollable, named model avatar grid inside the existing avatar popover.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "b789349121d050381dc5da82b7473361551a12b20cdd87d382fbb7cd7d7787c5"
+      }
+    },
+    {
+      "path": "src/client/model-avatar-catalog.js",
+      "kind": "product-file",
+      "summary": "Embeds 19 optimized Q-version model persona portraits from user-provided standing art as offline WebP data URLs."
+    },
+    {
+      "path": "src/client/model-avatar-picker.js",
+      "kind": "product-file",
+      "summary": "Renders named built-in model portraits and recognizes saved selections through the existing avatar.image contract."
     }
   ],
   "files": [
@@ -252,8 +289,8 @@
     {
       "path": "vendor/ds-bot/client.js",
       "sourcePath": "ds-bot/client.js",
-      "sha256": "6c44503d5fbfbe47416c56dcacea9ef06ae492de9c1c18cbaf356212c4804581",
-      "gitBlob": "3a6c870164aa36a7b2dc67ce1db7e6193367b1ac",
+      "sha256": "96709b1cd45b0028d1a4f669426992c281f5b0db843fff955252e83634ee11da",
+      "gitBlob": "21b61a6010d839e2f5a646243b9a0152ff9de940",
       "origin": "generated"
     },
     {
@@ -623,9 +660,9 @@
     {
       "path": "vendor/ds-bot/src/client/bot-settings.js",
       "sourcePath": "ds-bot/src/client/bot-settings.js",
-      "sha256": "f5c7eeaa226728763bc793510d0478371e486775418f8d1b52e6fb00c9624c5d",
-      "gitBlob": "f1b7ad7beb8adb41ffa2637b1d28b6f701bfc547",
-      "origin": "upstream"
+      "sha256": "f42b935c6c6aaa2edb4f5f98747c57a43d1a91bef98ea36a6f11ab43216af7a1",
+      "gitBlob": "5366a4fe9eb6f281cc917948cd7c8aae043c557e",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/browser-overlap.js",
@@ -854,9 +891,9 @@
     {
       "path": "vendor/ds-bot/src/client/i18n.js",
       "sourcePath": "ds-bot/src/client/i18n.js",
-      "sha256": "f09a491b4c3d0506427dddf41aa3a39b3a6126b0216f31c4f2161117139c03cf",
-      "gitBlob": "fe4fdbae608e0fa50fbb2ca7f6ac3648b6b95a58",
-      "origin": "upstream"
+      "sha256": "c2fe9ed0cb2f41b5390507f3a6bb1ff91f59b92bf0c5053959fae0b2d3686688",
+      "gitBlob": "311a781020578e0e5a24fc515ce57bc158513344",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/icons.js",
@@ -920,6 +957,20 @@
       "sha256": "31f4fe75a1c816039895ab6fc3bec890a907f11bf01a404e265e48ad231b4b0e",
       "gitBlob": "d2716b327eaa35fa45245b20e7fb369f2e88595f",
       "origin": "upstream"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/model-avatar-catalog.js",
+      "sourcePath": "ds-bot/src/client/model-avatar-catalog.js",
+      "sha256": "5d42c7de4b0f603e592d45314176dcf412b9fe1f94983c54f487fe00d161b40a",
+      "gitBlob": "774b8a754e0460ed370e1ffba9d841a7aff7b92b",
+      "origin": "overlay"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/model-avatar-picker.js",
+      "sourcePath": "ds-bot/src/client/model-avatar-picker.js",
+      "sha256": "5e50836f2b51ec7ef4c88efcbe03df81d0d89bf73ad1e82dd5252677a51b1e5a",
+      "gitBlob": "e451b199828995d63c549bee3304b473c381d956",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/model-menu.js",
@@ -1085,9 +1136,9 @@
     {
       "path": "vendor/ds-bot/src/client/styles.js",
       "sourcePath": "ds-bot/src/client/styles.js",
-      "sha256": "b789349121d050381dc5da82b7473361551a12b20cdd87d382fbb7cd7d7787c5",
-      "gitBlob": "94144c855a04cb5c1f8a4132d9688c9af899c412",
-      "origin": "upstream"
+      "sha256": "64f438e2c3dd66dcc6c6457be81defe32cd27d08bf956fc765b4f50d030adf7d",
+      "gitBlob": "76c173e257b6867ae5ac89dffa89ec91247d71eb",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/surface.js",

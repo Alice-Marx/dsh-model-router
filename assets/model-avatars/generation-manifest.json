@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "generationTool": "OpenAI built-in image_gen",
+  "source": "User-provided model persona standing portraits",
+  "styleReference": "chatgpt",
+  "export": {
+    "width": 256,
+    "height": 256,
+    "format": "webp",
+    "quality": 88
+  },
+  "items": [
+    {
+      "id": "chatgpt",
+      "label": "ChatGPT",
+      "image": "chatgpt.webp",
+      "sourceFile": "ChatGPT/ChatGPT1.png",
+      "sourceSha256": "07bf55a5595bef51b301152b8e42e9d633b7179152db43bd1e04244f33581ac8",
+      "generatedSha256": "7d1879450079f4e79ed6c1e8b635885733a5f6e2f4bdfe0053cbecba31afc7d8",
+      "prompt": "Use case: style-transfer. Asset type: a single square built-in Bot profile avatar. Reference image 1 defines the character identity. Redraw this exact white-haired fantasy character as a polished Japanese anime Q-version (chibi) head-and-shoulders portrait. Preserve the long snowy white hair, lavender eyes, pair of pearly curved dragon horns, pointed ears, spiral-knot hair ornament and white/lavender high-collar clothing. Friendly reserved expression, large expressive eyes, soft round face, small shoulders; head roughly 70 percent of image height. Clean confident dark-plum line art, soft pastel cel shading, tiny highlights, restrained details readable at 48px. Centered frontal/very slight three-quarter view, both horns fully visible, generous safe margin for circular cropping. Simple solid very pale lavender background. One character only. No words, no label, no watermark, no border, no extra mascot. Output a square finished avatar.",
+      "imageSha256": "746cf4a638f7697058a1d9e9ba60ffe120b49e9ccbc0bfafdd5c25228f8d4294"
+    },
+    {
+      "id": "claude",
+      "label": "Claude",
+      "image": "claude.webp",
+      "sourceFile": "Claude/Claude.png",
+      "sourceSha256": "d265f4c424929ab68f0427adabe8faec968d55d00b6fcc9dd7011ec4622e0c5a",
+      "generatedSha256": "0ee0e94dca273b72f742442a2572a37a76e4947c6ae7fb8c782cf6964230811d",
+      "prompt": "Use case: style-transfer. Asset type: a single square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 is a STYLE AND FRAMING reference only. Redraw character 1 as a polished Japanese anime Q-version (chibi) head-and-shoulders portrait matching the clean outlines, rounded face, large expressive eyes and soft pastel cel shading of image 2. Identity details to preserve: long warm orange hair, amber eyes, orange daisy hair ornament with black ribbon, ivory ruffled blouse and small orange daisy brooch, black bow, scholarly calm gentle smile. One character, centered near-front view, small shoulders, head about 65 percent of frame, whole head and head accessories comfortably within the central safe area for circular cropping, no hands. Simple solid very pale warm cream background. No text, no labels, no watermark, no frame, no other characters. Do not transfer horns, ears, colors or costume from the style reference. Finished square avatar.",
+      "imageSha256": "5eefa3d8f4000cf9b386143640640a64a8f3dddf9737c3a54f4336d5a8b33725"
+    },
+    {
+      "id": "deepseek",
+      "label": "DeepSeek",
+      "image": "deepseek.webp",
+      "sourceFile": "DeepSeek/DeepSeek1.png",
+      "sourceSha256": "1ee43fb06f5d0c6a9b342d37b0dd74859b73b375946f0e938b7bdc41c42833f0",
+      "generatedSha256": "338285d0569086fc4cbd7165c1f29c32e29693e72fb064932159fafec9c0d8c2",
+      "prompt": "Use case: style-transfer. Asset type: a single square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 is a STYLE AND FRAMING reference only. Redraw character 1 as a polished Japanese anime Q-version (chibi) head-and-shoulders portrait matching the clean outlines, rounded face, large expressive eyes and soft pastel cel shading of image 2. Identity details to preserve: long deep ocean-blue hair with light blue tips, aqua blue eyes, fin-like blue ears, frilled white maid headband, small blue hair bow, navy-and-white maid outfit with dark neck bow and small blue jewel, cheerful open smile. One character, centered near-front view, small shoulders, head about 65 percent of frame, whole head and head accessories comfortably within the central safe area for circular cropping, no hands. Simple solid very pale blue background. No text, no labels, no watermark, no frame, no other characters. Do not transfer horns, ears, colors or costume from the style reference. Finished square avatar.",
+      "imageSha256": "be334d4e078dc2c28d7d24a03a68e0f146e34e270cc6fea8c126a45602494616"
+    },
+    {
+      "id": "gemini",
+      "label": "Gemini",
+      "image": "gemini.webp",
+      "sourceFile": "Gemini/Gemini1.png",
+      "sourceSha256": "f21b6dae197d5de60d41444c947c765bbec7b6345427e64b7bf2f647791d8796",
+      "generatedSha256": "095e9c9983f9220cda6b75d470004d08f472104346054a219389eaffa07a685d",
+      "prompt": "Use case: style-transfer. Asset type: a single square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 is a STYLE AND FRAMING reference only. Redraw character 1 as a polished Japanese anime Q-version (chibi) head-and-shoulders portrait matching the clean outlines, rounded face, large expressive eyes and soft pastel cel shading of image 2. Identity details to preserve: long blue-purple gradient hair with lilac ends, furry cat ears, small side hair buns, one pink eye and one golden eye, iridescent four-point star hair clip, navy-purple and white star-themed high-collar outfit, playful gentle smile. One character, centered near-front view, small shoulders, head about 65 percent of frame, whole head and head accessories comfortably within the central safe area for circular cropping, no hands. Simple solid very pale periwinkle background. No text, no labels, no watermark, no frame, no other characters. Do not transfer horns, ears, colors or costume from the style reference. Finished square avatar.",
+      "imageSha256": "f2ba640e81f021889a19f17edc004c6b638a59a9f8c555a6bae3844aac439a02"
+    },
+    {
+      "id": "qwen",
+      "label": "Qwen",
+      "image": "qwen.webp",
+      "sourceFile": "qwen/Qwen1.png",
+      "sourceSha256": "8afa33723ee50968dcee7ec6586a22e60075ac6165a1b2c0335d92fafe6e850c",
+      "generatedSha256": "c107fa1f80e3e1d63bce3d9d9a7807f176a68c81d21b6d3e1067cb0f01f2cba6",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY character identity reference; image 2 is the rendering STYLE reference only. Make a polished Japanese anime Q-version (chibi) head-and-shoulders portrait with the same rounded face, large eyes, clean dark-plum outlines and soft pastel cel shading as image 2. Preserve: long soft periwinkle-blue hair with a thick side braid, violet eyes, little tilted navy-and-white frilled cap with blue geometric emblem, white Chinese-style high-collar blouse with frog closures, navy-and-gold shawl, blue gemstone brooch, gentle elegant smile. Head about 65 percent of frame, small shoulders, no hands, centered near-frontal composition, all head accessories in the circular crop safe area with comfortable margins. Solid very pale cool lavender background. No words or caption, no watermark, no border, no extra character. Never copy the white dragon character's horns or costume from image 2. Finished square avatar.",
+      "imageSha256": "351262bd9771f8f057a20ae806265559d8b1202c6f476986381b65211e267e05"
+    },
+    {
+      "id": "kimi",
+      "label": "Kimi",
+      "image": "kimi.webp",
+      "sourceFile": "Kimi/Kimi1.png",
+      "sourceSha256": "d807ae640a6c17a56334608c892e18f832815cdcee42cd19d317f7ba3d56247c",
+      "generatedSha256": "58bd31769befbd7f96d1be0d9532a608fa741b9360815b4f80dd6e7361bc8ddd",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY character identity reference; image 2 is the rendering STYLE reference only. Make a polished Japanese anime Q-version (chibi) head-and-shoulders portrait with the same rounded face, large eyes, clean dark-plum outlines and soft pastel cel shading as image 2. Preserve: long silver-white hair with pale blue shadows, soft gray-blue eyes, white frilled headband, navy side ribbon with silver crescent, small black triangular prism accessory with a tiny rainbow accent, musical note charm, navy-and-white ruffled high-collar maid outfit, quiet gentle expression. Head about 65 percent of frame, small shoulders, no hands, centered near-frontal composition, all head accessories in the circular crop safe area with comfortable margins. Solid very pale blue-gray background. No words or caption, no watermark, no border, no extra character. Never copy the white dragon character's horns or costume from image 2. Finished square avatar.",
+      "imageSha256": "2920bff8f5abbb82ccd03f3383b193b606e20830d26d9672fed2bfd70b0743bd"
+    },
+    {
+      "id": "glm",
+      "label": "GLM",
+      "image": "glm.webp",
+      "sourceFile": "glm/GLM1.png",
+      "sourceSha256": "e00df1a19859deed093f1554b6d376d32eb1861f8e966acd4e91c97209b5ef1d",
+      "generatedSha256": "b8dab95879aa7ac289e72ca05f34c01c70a122e4d4c1af90e2d1dc402a52be67",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY character identity reference; image 2 is the rendering STYLE reference only. Make a polished Japanese anime Q-version (chibi) head-and-shoulders portrait with the same rounded face, large eyes, clean dark-plum outlines and soft pastel cel shading as image 2. Preserve: long black hair with blue undertones, gray eyes, large black fox ears with white tufts, white frilled headband with a black sleeping eye-mask resting ABOVE the forehead, paired silver bell hair ornaments, small Z-shaped emblem, black-and-white ruffled scholarly outfit and navy bow, composed gentle smile. Head about 65 percent of frame, small shoulders, no hands, centered near-frontal composition, all head accessories in the circular crop safe area with comfortable margins. Solid very pale slate-blue background. No words or caption, no watermark, no border, no extra character. Never copy the white dragon character's horns or costume from image 2. Finished square avatar.",
+      "imageSha256": "8543b9acdd1eebc54ec6e46960be34a904c153f249cc973947845a12d838d789"
+    },
+    {
+      "id": "grok",
+      "label": "Grok",
+      "image": "grok.webp",
+      "sourceFile": "grok/Grok1.png",
+      "sourceSha256": "bf17cf85e0f275e9306949d3d4a41e96280a83fdaa0b05ebe519eb979b066c49",
+      "generatedSha256": "c629e2ed0cbb68c80726130ef4f998099a81767fcc25f2634427f87e13dac0bf",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY character identity reference; image 2 is the rendering STYLE reference only. Redraw character 1 as polished Japanese anime Q-version (chibi) head-and-shoulders portrait, matching the rounded face, huge expressive eyes, clean dark-plum line art, soft pastel cel shading and small shoulders of image 2. Preserve: long blonde twin ponytails with black bows, vivid blue eyes, pointed elf ears, tiny black-and-gold crown, small black bat-wing hair ornaments, a little fang in a cheeky open smile, black gothic outfit with gold details and raised burgundy collar. Head about 65 percent of frame; centered near-frontal composition, no hands, accessories kept within the circular crop safe area with comfortable margins. Solid very pale champagne background. Single character, no props, no words, no watermark, no border. Do not copy dragon horns, hair or costume from image 2. Finished square avatar.",
+      "imageSha256": "2566ee2d7f6fb3e34dbf8e01a02f3b8f6cfa30073e771fe3c8b427c491794067"
+    },
+    {
+      "id": "minimax",
+      "label": "MiniMax",
+      "image": "minimax.webp",
+      "sourceFile": "Minmax/Minmax1.png",
+      "sourceSha256": "f88d4bece71981d8596110f64c8cb5f54733c319be0f192dab4d830e0d8847ac",
+      "generatedSha256": "5ca8e0fd95458b35449d0037b3bca470fb96a86dc2fa96c86a25eb4cb399dc36",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY character identity reference; image 2 is the rendering STYLE reference only. Redraw character 1 as polished Japanese anime Q-version (chibi) head-and-shoulders portrait, matching the rounded face, huge expressive eyes, clean dark-plum line art, soft pastel cel shading and small shoulders of image 2. Preserve: short wavy peach-orange hair with pink tips, warm coral-pink eyes, cream beret with a pink wave-shaped emblem and small rose bow, cream collared blouse and coat with pink trim, black choker and little shell earrings, energetic happy smile. Head about 65 percent of frame; centered near-frontal composition, no hands, accessories kept within the circular crop safe area with comfortable margins. Solid very pale peach background. Single character, no props, no words, no watermark, no border. Do not copy dragon horns, hair or costume from image 2. Finished square avatar.",
+      "imageSha256": "4833982adae54406bafdaa172a261a5b21f60e6e15b7c9f19f1c07f94144a541"
+    },
+    {
+      "id": "mimo",
+      "label": "MiMo",
+      "image": "mimo.webp",
+      "sourceFile": "mimo/Mimo.png",
+      "sourceSha256": "93e675bcee1937c06c6b621e84e16dd276420d60b651b3e9cc0928372c6f0cf1",
+      "generatedSha256": "66f494283258a0ac8b5d0bdfb7bcfe5e62ee6248882910b81ed94241befcae9e",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY character identity reference; image 2 is the rendering STYLE reference only. Redraw character 1 as polished Japanese anime Q-version (chibi) head-and-shoulders portrait, matching the rounded face, huge expressive eyes, clean dark-plum line art, soft pastel cel shading and small shoulders of image 2. Preserve: silver-white twin ponytails with orange streaks and orange ribbon ties, orange eyes, bright orange X-shaped hair clip, white hood with tall white rabbit ears with orange inner panels and black/orange buckles, orange-and-white sporty jacket with black accents, quiet slightly pouty face. Head about 65 percent of frame; centered near-frontal composition, no hands, accessories kept within the circular crop safe area with comfortable margins. Solid very pale warm ivory background. Single character, no props, no words, no watermark, no border. Do not copy dragon horns, hair or costume from image 2. Finished square avatar.",
+      "imageSha256": "5dd0fd5fc11c3ca3c6aa658916f302be3db59f04fd4cbd2394cf0d4ddcbe8e69"
+    },
+    {
+      "id": "stepfun",
+      "label": "StepFun",
+      "image": "stepfun.webp",
+      "sourceFile": "stepfun/stepfun.png",
+      "sourceSha256": "0453c1fa600fc6e6b85a7cf4f1e77e5c22d958c233c4c98f9487d7ac6f7dd8c0",
+      "generatedSha256": "dd5bf97741ccf4887acc159077e9256002cd50fe4609ee30e679fb0bfb9f2832",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 provides ONLY the rendering style. Turn character 1 into a polished anime Q-version (chibi) head-and-shoulders avatar matching image 2: big rounded face, huge expressive eyes, small shoulders, clean confident dark-plum linework and soft pastel cel shading. Preserve: long dark navy hair with brilliant blue ends, one neat side bun, bright blue eyes, gold-edged staircase of three black square hairpins, white collared shirt with vivid blue bow tie, black waistcoat with fine gold piping, friendly poised smile. Centered near-frontal bust, head about 65 percent of image height, leave comfortable margins for circular cropping, no hands or held objects, no additional mascot. Solid very pale sky blue background. No text, no caption, no watermark, no border. Do not transfer horns, hair or costume from image 2. Square final avatar.",
+      "imageSha256": "2ddfee9f42fa90143e03376bf6d5173de5673df8ab4c3cebda7ad4e838e8772e"
+    },
+    {
+      "id": "doubao",
+      "label": "Doubao",
+      "image": "doubao.webp",
+      "sourceFile": "doubao/Doubao1.png",
+      "sourceSha256": "b7b6b6d3ad578319eb90c4e152c4e2e2568d76c0c78ecfac1a39c7ab5356fd27",
+      "generatedSha256": "e49ba7c3402736c080b9bc89f40f2da9d6e7abd49ba6295152b2264ace3815e4",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 provides ONLY the rendering style. Turn character 1 into a polished anime Q-version (chibi) head-and-shoulders avatar matching image 2: big rounded face, huge expressive eyes, small shoulders, clean confident dark-plum linework and soft pastel cel shading. Preserve: purple hair fading to cyan at the ends in a high side ponytail, violet eyes, large teal-and-purple ring-shaped ponytail tie, white sporty high-neck top with blue-violet and turquoise trim, lively open smile. Centered near-frontal bust, head about 65 percent of image height, leave comfortable margins for circular cropping, no hands or held objects, no additional mascot. Solid very pale aqua background. No text, no caption, no watermark, no border. Do not transfer horns, hair or costume from image 2. Square final avatar.",
+      "imageSha256": "ffe81b9da945111affe60d9d57d098646fc0bee66e147699073b71620f83f966"
+    },
+    {
+      "id": "hunyuan",
+      "label": "Hunyuan",
+      "image": "hunyuan.webp",
+      "sourceFile": "HY/HY1.png",
+      "sourceSha256": "58f8caf88c4c89f3c851d864a716209e93a7bd7a0ed4d838c8be49c293c5f9c3",
+      "generatedSha256": "81ee1ee9b632f1c33b86f161e0bcc3f93c068187f35c7e865836603311437f8b",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 provides ONLY the rendering style. Turn character 1 into a polished anime Q-version (chibi) head-and-shoulders avatar matching image 2: big rounded face, huge expressive eyes, small shoulders, clean confident dark-plum linework and soft pastel cel shading. Preserve: long blue-black hair, gray-teal eyes, delicate gold Chinese hairpin with pale blue tassel, pale blue bead earrings, bright red scarf, pale blue Chinese high-collar clothing and black winter cloak with soft white fur trim, warm gentle smile. Centered near-frontal bust, head about 65 percent of image height, leave comfortable margins for circular cropping, no hands or held objects, no additional mascot. Solid very pale icy blue background. No text, no caption, no watermark, no border. Do not transfer horns, hair or costume from image 2. Square final avatar.",
+      "imageSha256": "73c7cfe02005c3b419046de87b29e4f8e0eed9ea7eb02f8aed665801d93733d1"
+    },
+    {
+      "id": "ernie",
+      "label": "ERNIE",
+      "image": "ernie.webp",
+      "sourceFile": "Ernie/ERNIE1.png",
+      "sourceSha256": "245cca340a9ac072245c98e5e47418aa7c31d94615735f83a086f160da70f045",
+      "generatedSha256": "8cd5ee2d9860ca307d1dc35db024a5b3bca63d67378fe570b015af1a0e8acd07",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 provides ONLY drawing style and avatar framing. Redraw character 1 as polished Japanese anime Q-version (chibi) head-and-shoulders portrait: large rounded face and eyes, small shoulders, clean confident dark-plum outlines and soft pastel cel shading matching image 2. Preserve: long deep cobalt blue hair with a narrow red streak, soft blue eyes, blue hollow cube-shaped hair ornament near her temple, white frilled high-collar blouse, small blue bow and royal-blue shoulder cape with white geometric detail, shy serene expression. Centered near-frontal view, head roughly 65 percent of image height, no hands or held objects, leave comfortable margins for circular cropping. Solid very pale blue background. One character only, no words, no caption, no watermark, no border. No dragon features copied from image 2. Finished square avatar.",
+      "imageSha256": "fa7fff51563e1e20af4dc61ec6d6ba032473f46af4bb0bed2eb303b28449b67c"
+    },
+    {
+      "id": "jev",
+      "label": "JEV",
+      "image": "jev.webp",
+      "sourceFile": "JEV/JEV.png",
+      "sourceSha256": "3eaf540d9b3d2af09779a677696f93f0412ff3d8cab02ae60af17c719974d879",
+      "generatedSha256": "880e980305b1c1bcdc5f681edfcbc23f7d5c254403bf41e8eb45da88e7a73912",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 provides ONLY drawing style and avatar framing. Redraw character 1 as polished Japanese anime Q-version (chibi) head-and-shoulders portrait: large rounded face and eyes, small shoulders, clean confident dark-plum outlines and soft pastel cel shading matching image 2. Preserve: long black hair with vivid magenta inner streaks and ends, silver-gray eyes with small golden highlights, three white feathers with pink tips as hair accessory, black-and-white formal outfit with feathered white shoulder collar tipped pink, black neck bow, delicate black flowering vine ornament across her lower face with tiny pink flowers and a small hexagonal dark seal at the right cheek, composed gentle expression. Centered near-frontal view, head roughly 65 percent of image height, no hands or held objects, leave comfortable margins for circular cropping. Solid very pale rose-gray background. One character only, no words, no caption, no watermark, no border. No dragon features copied from image 2. Finished square avatar.",
+      "imageSha256": "ddea21445415eb79d308790a95e2d0776229e41c0d76c1af9e1615a3f35b2224"
+    },
+    {
+      "id": "llama",
+      "label": "Llama",
+      "image": "llama.webp",
+      "sourceFile": "llama/llama.png",
+      "sourceSha256": "eb11e3da5053ed509f79d30a693d81bc3b5581c6fb4b24733177ced75aff1760",
+      "generatedSha256": "686f1723648425d0a29d8b85d9fab236c4db3dbe7cf181e9f91bda90e7fef4f6",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 provides ONLY drawing style and avatar framing. Redraw character 1 as polished Japanese anime Q-version (chibi) head-and-shoulders portrait: large rounded face and eyes, small shoulders, clean confident dark-plum outlines and soft pastel cel shading matching image 2. Preserve: long fluffy creamy-white hair, two tall soft llama ears, sleepy light-blue eyes, tiny blue infinity hair clip, oversized cozy cream hoodie with blue drawstrings ending in fluffy pom-poms and blue infinity emblem, gentle drowsy smile. Centered near-frontal view, head roughly 65 percent of image height, no hands or held objects, leave comfortable margins for circular cropping. Solid very pale ivory background. One character only, no words, no caption, no watermark, no border. No dragon features copied from image 2. Finished square avatar.",
+      "imageSha256": "357f36dc2e8581bea1885ffda0c31f69cfa9a6b6c139bca856b9ebef49a7f892"
+    },
+    {
+      "id": "mistral",
+      "label": "Mistral",
+      "image": "mistral.webp",
+      "sourceFile": "Mistral/Mistral.png",
+      "sourceSha256": "e37b2af0e4037df1a659b6e14bce51f9b3525b4f27f48e184c80db580f938e0f",
+      "generatedSha256": "56e8fde3a9ae09f1e705fbe47a6e91b7d466ec0b3843d2dfbe36f895f010e20d",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 provides ONLY drawing style and avatar framing. Redraw character 1 as polished Japanese anime Q-version (chibi) head-and-shoulders portrait: large rounded face and eyes, small shoulders, clean confident dark-plum line art and soft pastel cel shading matching image 2. Preserve: long golden-orange hair fading to red, amber eyes, fluffy orange fox ears with pale inner fur, large red musketeer-style hat with gold trim and white plume, ivory-and-red ornate collared outfit with gold details and dark red bow, confident gentle smile. Centered near-frontal view; whole head and prominent accessories fit comfortably in the image with circular crop safe margins; head about 65 percent of frame. No hands or held objects. Solid very pale warm apricot background. One character only, no words, no caption, no watermark, no border. Do not copy dragon horns or outfit from the style reference. Finished square avatar.",
+      "imageSha256": "e83f52cbb8dd79c1512479be5ef69c6164fc9a7a8ca5a1f26a1853bd34bcee16"
+    },
+    {
+      "id": "perplexity",
+      "label": "Perplexity",
+      "image": "perplexity.webp",
+      "sourceFile": "perplexity/Perplexity.png",
+      "sourceSha256": "c7de0c4de06056c748890a30eae98d55625ce660ad80f705e0f70d4ccc6d2191",
+      "generatedSha256": "b2e777131c657e46ee29b56d0378f7d13d3c9ae1746e374c957a51d719ae603c",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 provides ONLY drawing style and avatar framing. Redraw character 1 as polished Japanese anime Q-version (chibi) head-and-shoulders portrait: large rounded face and eyes, small shoulders, clean confident dark-plum line art and soft pastel cel shading matching image 2. Preserve: long teal-blue hair with straight bangs, teal eyes, thin rectangular glasses, dark headphones with teal ring accents, tiny silver P-shaped hair clip, white collared blouse under deep teal scholarly robe with pale shoulder accents, thoughtful gentle smile. Centered near-frontal view; whole head and prominent accessories fit comfortably in the image with circular crop safe margins; head about 65 percent of frame. No hands or held objects. Solid very pale mint background. One character only, no words, no caption, no watermark, no border. Do not copy dragon horns or outfit from the style reference. Finished square avatar.",
+      "imageSha256": "d31f6ed1d3a8b73e9884c7bf40d338b2bdaf19a065b52532c9c2c9fcd04feffc"
+    },
+    {
+      "id": "rwkv",
+      "label": "RWKV",
+      "image": "rwkv.webp",
+      "sourceFile": "rwkv/RWKV.png",
+      "sourceSha256": "93c4560abd932adf75c9c656f37be5a65526f59ff184eb18a07720643148eacc",
+      "generatedSha256": "32cf5e77f4a5721ec6aa61f70bd90530b32c959c7f4d6355e73582445fdc3697",
+      "prompt": "Use case: style-transfer. Asset type: one square built-in Bot avatar. Image 1 is the ONLY identity reference; image 2 provides ONLY drawing style and avatar framing. Redraw character 1 as polished Japanese anime Q-version (chibi) head-and-shoulders portrait: large rounded face and eyes, small shoulders, clean confident dark-plum line art and soft pastel cel shading matching image 2. Preserve: long vivid indigo-purple hair with straight bangs, violet eyes, dark metallic spiked circular halo behind her head, small dark raven feather ornaments by her ears, black feathered high collar and black-purple gothic outfit, a few dark wing feathers framing the shoulders, calm mysterious smile. Centered near-frontal view; whole head and prominent accessories fit comfortably in the image with circular crop safe margins; head about 65 percent of frame. No hands or held objects. Solid very pale lilac-gray background. One character only, no words, no caption, no watermark, no border. Do not copy dragon horns or outfit from the style reference. Finished square avatar.",
+      "imageSha256": "6a5f54bef983cd0a60f6514c522a1654cd0726647763a42bf33c0fac808843f2"
+    }
+  ]
+}

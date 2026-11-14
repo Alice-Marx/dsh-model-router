@@ -1,0 +1,17 @@
+--- a/src/client/i18n.js
++++ b/src/client/i18n.js
+@@ -358,6 +358,14 @@
+   'Avatar editor': '形象编辑',
+   'Avatar source': '形象来源',
+   Upload: '上传',
++  Personas: '模型角色',
++  'Built-in model avatars': '内置模型头像',
++  'Use {name} avatar': '使用 {name} 头像',
++  Doubao: '豆包',
++  Hunyuan: '混元',
++  StepFun: '阶跃星辰',
++  ERNIE: '文心',
++  Qwen: '通义千问',
+   'Reset character to default': '恢复默认形象',
+   Reset: '恢复默认',
+   'Character shape': '形状',
