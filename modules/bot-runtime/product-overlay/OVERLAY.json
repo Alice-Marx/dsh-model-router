@@ -30,7 +30,7 @@
     {
       "path": "src/client/index.js",
       "kind": "patched",
-      "summary": "Opens each thread's own Session, keeps homeToMainBot from redirecting known threads, refreshes thread projections and supplies bounded header navigation with native roster and Session readiness.",
+      "summary": "Opens each thread's own Session, keeps homeToMainBot from redirecting known threads, refreshes thread projections and supplies bounded header navigation with native roster and Session readiness. Product appearance and classic visual isolation follow the Bot shell lifetime; late classic sidebar registrations trigger ownership recovery.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "4fd22b26d817ca3ae5454e5a8042c1c4b806ff4ae78c9e38f90ee5ee3c996b9a"

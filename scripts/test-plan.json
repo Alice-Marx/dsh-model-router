@@ -92,6 +92,7 @@
       "tests/architecture-boundaries.test.mjs",
       "tests/test-plan-coverage.test.mjs",
       "tests/chat-surface.integration.test.mjs",
+      "tests/bot-surface.test.mjs",
       "tests/chat-design.test.mjs",
       "tests/contact-attention.integration.test.mjs",
       "tests/notifications-store.native.mjs",

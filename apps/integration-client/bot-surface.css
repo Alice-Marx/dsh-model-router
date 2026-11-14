@@ -1,0 +1,24 @@
+/* Bot mode owns an opaque canvas, even when a classic skin keeps its saved
+   background and floating decoration nodes mounted outside the Host root. */
+html[data-dsh-bot-surface=bot] body[data-bot-product-ui] {
+  background: var(--bp-chat-canvas) !important;
+  color: var(--bp-chat-ink);
+  --dsw-alias-bg-base: var(--bp-chat-canvas) !important;
+  --dsw-specific-sidebar-fill: var(--bp-chat-sidebar) !important;
+  --bt-leftcol-fill: var(--bp-chat-sidebar) !important;
+}
+body[data-bot-product-ui] > #root {
+  background: var(--bp-chat-canvas) !important;
+}
+body[data-bot-product-ui]::before,
+body[data-bot-product-ui]::after {
+  content: none !important;
+}
+body[data-bot-product-ui] :is(
+  [data-dsh-skin-layer], [data-skin-owner], [data-dsh-composer-frost],
+  #dsh-wallpaper-engine-layer, #dsh-wallpaper-engine-scrim,
+  #dsh-wallpaper-engine-rope-dock, .we-layer, .we-rope,
+  .we-repo-panel, .we-update-notice
+) {
+  display: none !important;
+}

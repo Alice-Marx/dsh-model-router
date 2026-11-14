@@ -14,7 +14,7 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.74.2 · Windows Remote Agent：0.1.3**
+**当前正式版：0.74.3 · Windows Remote Agent：0.1.3**
 
 以 Bot 联系人和聊天为主要入口，集中使用独立 AI 连接、多模型路线、团队委派、私有资料库、数据分析与自有 Windows 电脑。任务、通知和执行记录保存在工作空间中，Main Bot 可在已保存的多条模型路线之间调度。
 
@@ -77,8 +77,8 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.74.2`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.74.2`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.74.3`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.74.3`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 完整版本进入 Bot 工作区，在 **设置 → AI** 添加独立模型连接，再为 Bot 选择模型。纯路由版本从侧栏打开 **模型路由**，使用 Harness 已配置路线。
 
@@ -86,10 +86,10 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.74.2
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.74.3
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.74.2
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.74.3
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -166,6 +166,7 @@ Main 可通过 `coordinate_bots` 委派任务；普通 Bot 需要已提交的团
 | 网页与文档 | 打开当前 Bot 浏览器面板管理页面；附加支持的 Office 文档读取/预览；按需配置连接器并通过密钥卡片输入凭据。 |
 | 定时执行 | 开启 Host 的 Automation tasks 服务，选择目标 Bot/群、任务和时间规则，保存后检查下次执行状态。Host 与相关 Agent 需保持运行。 |
 | 工作区外观 | 在账户 → Bot 设置 → Bot → 头像 → 模型角色中选择 19 个内置 Q 版模型头像，也可上传图片或使用头像库；团队外观与私有文件资料库分别管理。 |
+| 界面模式 | DS Bot 使用自己的侧栏和聊天外观，隔离经典 Agent 的皮肤、壁纸与悬浮装饰。账户 → 切换经典 Agent 模式会恢复已保存的经典外观；点击经典侧栏底部的 DS Bot 返回 Bot。 |
 
 集成模式复用 Harness Sessions；可选独立运行时拥有自己的会话存储。切换时需显式转移运行时所有权，同一 Bot 同时由一个运行时服务。
 

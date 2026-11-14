@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.74.2 · Windows Remote Agent: 0.1.3**
+**Current stable version: 0.74.3 · Windows Remote Agent: 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -77,8 +77,8 @@ Edit the Bot's name, role and standing instructions under **Identity & personali
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.74.2`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.74.2`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.74.3`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.74.3`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -86,10 +86,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.74.2
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.74.3
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.74.2
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.74.3
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -166,6 +166,7 @@ The plugin adds team coordination. Main can delegate using `coordinate_bots`; wo
 | Work with pages and documents | Open the current Bot's browser panel, manage pages, and attach supported Office documents for reading/preview. Configure connectors and enter secrets through credential cards when needed. |
 | Schedule recurring work | Enable the Host's Automation tasks service, choose the target Bot/group, task, and schedule, then check the next-run state. The Host and relevant Agent must remain running. |
 | Customize the workspace | Choose from 19 built-in Q-version model persona avatars in Account → Bot settings → Bot → avatar → Personas, or use uploads and the avatar library; manage team appearance independently of the private file library. |
+| Interface mode | DS Bot owns its sidebar and chat appearance, isolating classic Agent skins, wallpaper and floating ornaments. Account → Switch to classic Agent mode restores the saved classic appearance; the DS Bot footer button returns to Bot. |
 
 Integration mode reuses Harness Sessions. An optional independent runtime has its own session store; switch ownership explicitly so a Bot is served by one runtime at a time.
 

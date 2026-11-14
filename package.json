@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-route-bot",
-  "version": "0.74.2",
+  "version": "0.74.3",
   "type": "module",
   "description": "DSH Bot workspace with integrated model routing, official tools and remote computers",
   "repository": {

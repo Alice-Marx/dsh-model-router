@@ -22690,6 +22690,8 @@ function apply(ctx) {
     };
   };
   const installShell = () => [
+    // Product appearance and classic visual isolation share the shell lifetime.
+    () => ctx.botProductSurface?.(),
     () => installCompiledStyles(SHELL_CSS, "shell"),
     () => installCompiledStyles(SIDEBAR_CSS, "sidebar"),
     () => installCompiledStyles(SECRET_CSS, "secrets"),
@@ -22831,7 +22833,9 @@ function apply(ctx) {
       let landed = false;
       let declared = true;
       try {
-        landed = ctx.slots.entries("sidebar.workspaces").some((entry) => entry.component === TeamSidebar || entry.component?.dsBotTeamSidebar === TeamSidebar);
+        const entries2 = ctx.slots.entries("sidebar.workspaces");
+        const priority = Math.min(...entries2.map((entry) => entry.options?.priority ?? 0));
+        landed = entries2.some((entry) => (entry.options?.priority ?? 0) === priority && (entry.component === TeamSidebar || entry.component?.dsBotTeamSidebar === TeamSidebar));
         declared = ctx.slots.spec?.("sidebar.workspaces") !== void 0;
       } catch {
         declared = false;
@@ -22856,11 +22860,16 @@ function apply(ctx) {
       verifyAttempts = 0;
       verifyTimer = setTimeout(verifySidebar, 250);
     };
+    const offSidebar = ctx.slots.subscribe("sidebar.workspaces", () => {
+      clearTimeout(verifyTimer);
+      verifyTimer = setTimeout(verifySidebar, 250);
+    });
     reconcile();
     if (surface.getSnapshot().mode === "bot") ensureBotHome();
     const unsub = surface.subscribe(reconcile);
     return () => {
       unsub();
+      offSidebar();
       clearTimeout(verifyTimer);
       groups.dispose();
     };

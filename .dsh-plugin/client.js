@@ -27607,6 +27607,8 @@ function apply(ctx) {
       for (let off of offs) off();
     };
   }, installShell = () => [
+    // Product appearance and classic visual isolation share the shell lifetime.
+    () => ctx.botProductSurface?.(),
     () => installCompiledStyles(SHELL_CSS, "shell"),
     () => installCompiledStyles(SIDEBAR_CSS, "sidebar"),
     () => installCompiledStyles(SECRET_CSS, "secrets"),
@@ -27721,7 +27723,8 @@ function apply(ctx) {
       if (!groupsFor(surface.getSnapshot()).shell) return;
       let landed = !1, declared = !0;
       try {
-        landed = ctx.slots.entries("sidebar.workspaces").some((entry) => entry.component === TeamSidebar || entry.component?.dsBotTeamSidebar === TeamSidebar), declared = ctx.slots.spec?.("sidebar.workspaces") !== void 0;
+        let entries2 = ctx.slots.entries("sidebar.workspaces"), priority = Math.min(...entries2.map((entry) => entry.options?.priority ?? 0));
+        landed = entries2.some((entry) => (entry.options?.priority ?? 0) === priority && (entry.component === TeamSidebar || entry.component?.dsBotTeamSidebar === TeamSidebar)), declared = ctx.slots.spec?.("sidebar.workspaces") !== void 0;
       } catch {
         declared = !1;
       }
@@ -27734,11 +27737,13 @@ function apply(ctx) {
       }
     }, reconcile = () => {
       groups.reconcile(groupsFor(surface.getSnapshot())), clearTimeout(verifyTimer), verifyAttempts = 0, verifyTimer = setTimeout(verifySidebar, 250);
-    };
+    }, offSidebar = ctx.slots.subscribe("sidebar.workspaces", () => {
+      clearTimeout(verifyTimer), verifyTimer = setTimeout(verifySidebar, 250);
+    });
     reconcile(), surface.getSnapshot().mode === "bot" && ensureBotHome();
     let unsub = surface.subscribe(reconcile);
     return () => {
-      unsub(), clearTimeout(verifyTimer), groups.dispose();
+      unsub(), offSidebar(), clearTimeout(verifyTimer), groups.dispose();
     };
   }, "ds-bot: surface");
 }
@@ -40259,7 +40264,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.74.2", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.74.3", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -51767,6 +51772,85 @@ html body[data-bot-product-ui] .bb-save .bb-overview { margin-top: 12px; }
 @media (prefers-reduced-motion: reduce) { .bp-computers-page * { scroll-behavior: auto !important; } }
 `;
 
+// apps/integration-client/bot-surface.css
+var bot_surface_default = `/* Bot mode owns an opaque canvas, even when a classic skin keeps its saved
+   background and floating decoration nodes mounted outside the Host root. */
+html[data-dsh-bot-surface=bot] body[data-bot-product-ui] {
+  background: var(--bp-chat-canvas) !important;
+  color: var(--bp-chat-ink);
+  --dsw-alias-bg-base: var(--bp-chat-canvas) !important;
+  --dsw-specific-sidebar-fill: var(--bp-chat-sidebar) !important;
+  --bt-leftcol-fill: var(--bp-chat-sidebar) !important;
+}
+body[data-bot-product-ui] > #root {
+  background: var(--bp-chat-canvas) !important;
+}
+body[data-bot-product-ui]::before,
+body[data-bot-product-ui]::after {
+  content: none !important;
+}
+body[data-bot-product-ui] :is(
+  [data-dsh-skin-layer], [data-skin-owner], [data-dsh-composer-frost],
+  #dsh-wallpaper-engine-layer, #dsh-wallpaper-engine-scrim,
+  #dsh-wallpaper-engine-rope-dock, .we-layer, .we-rope,
+  .we-repo-panel, .we-update-notice
+) {
+  display: none !important;
+}
+`;
+
+// apps/integration-client/bot-surface.mjs
+var VISUAL_STYLES = [
+  "link[data-dsh-skin-link]",
+  "style[data-skin-owner]",
+  "style[data-dsh-shell-rendering]",
+  "style[data-dsh-scene-neutralizer]",
+  "style[data-dsh-custom-theme-style]",
+  'style[data-dsh-compat="responsive"]',
+  'style[data-plugin="dsh-wallpaper-engine"]',
+  'style[data-plugin^="dsh-plugin-wallpaper-engine"]',
+  "style#we-font-scope",
+  "style#we-font-patch",
+  "style#we-caret-patch"
+].join(",");
+function classicVisualStyle(node, win) {
+  if (node.matches(VISUAL_STYLES)) return !0;
+  if (node.tagName !== "LINK" || node.rel !== "stylesheet") return !1;
+  try {
+    let url = new URL(node.href, win.location.href);
+    return url.origin === win.location.origin && /^\/api\/skin-center\/v2\/skins\/[^/]+\/(stylesheet|patches)$/.test(url.pathname);
+  } catch {
+    return !1;
+  }
+}
+function installBotSurface(win = window) {
+  let doc = win.document, body = doc.body, html = doc.documentElement, previous = [body.getAttribute("data-bot-product-ui"), html.getAttribute("data-dsh-bot-surface")];
+  body.setAttribute("data-bot-product-ui", "1"), html.setAttribute("data-dsh-bot-surface", "bot");
+  let suspended = /* @__PURE__ */ new Map(), suspend = () => {
+    for (let node of doc.head.querySelectorAll('style,link[rel="stylesheet"]')) {
+      if (!classicVisualStyle(node, win)) continue;
+      let media = node.getAttribute("media");
+      (!suspended.has(node) || media !== "not all") && suspended.set(node, media), media !== "not all" && node.setAttribute("media", "not all");
+    }
+  }, observer = new win.MutationObserver(suspend);
+  observer.observe(doc.head, {
+    childList: !0,
+    subtree: !0,
+    attributes: !0,
+    attributeFilter: ["media", "href", "rel", "data-plugin", "data-skin-owner", "data-dsh-skin-link"]
+  }), suspend();
+  let disposed = !1;
+  return () => {
+    if (!disposed) {
+      disposed = !0, observer.disconnect();
+      for (let [node, media] of suspended)
+        node.getAttribute("media") === "not all" && (media === null ? node.removeAttribute("media") : node.setAttribute("media", media));
+      for (let [node, name, value] of [[body, "data-bot-product-ui", previous[0]], [html, "data-dsh-bot-surface", previous[1]]])
+        value === null ? node.removeAttribute(name) : node.setAttribute(name, value);
+    }
+  };
+}
+
 // apps/integration-client/index.jsx
 var inject2 = [.../* @__PURE__ */ new Set([...inject, "remote"])];
 function productSlots(slots, openPanel, productApi, client) {
@@ -51796,12 +51880,24 @@ async function apply3(ctx) {
       globalThis.__dshBotAiProvidersUi === bridge2 && (previous ? globalThis.__dshBotAiProvidersUi = previous : delete globalThis.__dshBotAiProvidersUi);
     };
   }, "bot-product: AI settings");
-  let slots = productSlots(ctx.slots, openPanel, api, { sessionBindingOf: (id3) => ctx.sessions.binding(id3), openSession: (id3) => ctx.uiWorkspace.openSession(id3) }), dsContext = new Proxy(ctx, { get: (target, key) => key === "slots" ? slots : Reflect.get(target, key, target) });
+  let slots = productSlots(ctx.slots, openPanel, api, { sessionBindingOf: (id3) => ctx.sessions.binding(id3), openSession: (id3) => ctx.uiWorkspace.openSession(id3) }), mountProductSurface = () => {
+    let disposeSurface = installBotSurface(window);
+    try {
+      let disposeAppearance = installWorkspaceAppearance(window);
+      return () => {
+        try {
+          disposeAppearance();
+        } finally {
+          disposeSurface();
+        }
+      };
+    } catch (error) {
+      throw disposeSurface(), error;
+    }
+  }, dsContext = new Proxy(ctx, { get: (target, key) => key === "slots" ? slots : key === "botProductSurface" ? mountProductSurface : Reflect.get(target, key, target) });
   ctx.effect(() => {
-    let previous = document.body.getAttribute("data-bot-product-ui");
-    document.body.setAttribute("data-bot-product-ui", "1");
     let style = document.createElement("style");
-    style.dataset.botProduct = "1", style.textContent = `${product_default}
+    return style.dataset.botProduct = "1", style.textContent = `${product_default}
 ${workspace_default}
 ${chat_default}
 ${desktop_default}
@@ -51814,11 +51910,8 @@ ${composer_draft_default}
 ${bot_thread_header_bridge_default}
 ${independent_chat_default}
 ${ai_providers_default}
-${product_refinement_default}`, document.head.append(style);
-    let disposeAppearance = installWorkspaceAppearance(window);
-    return () => {
-      disposeAppearance(), style.remove(), previous === null ? document.body.removeAttribute("data-bot-product-ui") : document.body.setAttribute("data-bot-product-ui", previous);
-    };
+${product_refinement_default}
+${bot_surface_default}`, document.head.append(style), () => style.remove();
   }, "bot-product: styles"), apply(dsContext);
   let disposeMr = await apply2(ctx);
   ctx.effect(() => ctx.slots.inject("main", () => ctx.slots.register({

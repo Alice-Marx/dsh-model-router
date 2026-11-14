@@ -34,7 +34,7 @@
     {
       "path": "src/client/index.js",
       "kind": "patched",
-      "summary": "Opens each thread's own Session, keeps homeToMainBot from redirecting known threads, refreshes thread projections and supplies bounded header navigation with native roster and Session readiness.",
+      "summary": "Opens each thread's own Session, keeps homeToMainBot from redirecting known threads, refreshes thread projections and supplies bounded header navigation with native roster and Session readiness. Product appearance and classic visual isolation follow the Bot shell lifetime; late classic sidebar registrations trigger ownership recovery.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "4fd22b26d817ca3ae5454e5a8042c1c4b806ff4ae78c9e38f90ee5ee3c996b9a"
@@ -289,8 +289,8 @@
     {
       "path": "vendor/ds-bot/client.js",
       "sourcePath": "ds-bot/client.js",
-      "sha256": "96709b1cd45b0028d1a4f669426992c281f5b0db843fff955252e83634ee11da",
-      "gitBlob": "21b61a6010d839e2f5a646243b9a0152ff9de940",
+      "sha256": "36efd19297854e085f8067170f70cacd16eec995983991fb802586a50ffb44ba",
+      "gitBlob": "60378ba339a90ae14e1f6b1a50d33d183f99f61d",
       "origin": "generated"
     },
     {
@@ -905,8 +905,8 @@
     {
       "path": "vendor/ds-bot/src/client/index.js",
       "sourcePath": "ds-bot/src/client/index.js",
-      "sha256": "58d1abfaed5ef2401949c7227dcbdfc3b9e3cf38c882a374741b8f91fc10e7e2",
-      "gitBlob": "207c8c39bf56dbafb07a7e281118f660dbc2615c",
+      "sha256": "a765eee77937e60176f2f3d564cc4c19c8cc4aefbc9df755bb8acfbd7f669c01",
+      "gitBlob": "82758bb70ef542f27d7131a25cdf6dce6b6ccba8",
       "origin": "overlay"
     },
     {

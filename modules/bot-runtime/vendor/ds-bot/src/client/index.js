@@ -933,6 +933,8 @@ export function apply(ctx) {
   // group re-skins the session itself. Each step returns a disposer from slots.inject,
   // so a surface change withdraws the whole group and the outlets re-render.
   const installShell = () => [
+    // Product appearance and classic visual isolation share the shell lifetime.
+    () => ctx.botProductSurface?.(),
     () => installCompiledStyles(SHELL_CSS, 'shell'),
     () => installCompiledStyles(SIDEBAR_CSS, 'sidebar'),
     () => installCompiledStyles(SECRET_CSS, 'secrets'),
@@ -1095,7 +1097,9 @@ export function apply(ctx) {
       let landed = false
       let declared = true
       try {
-        landed = ctx.slots.entries('sidebar.workspaces').some(entry => entry.component === TeamSidebar || entry.component?.dsBotTeamSidebar === TeamSidebar)
+        const entries = ctx.slots.entries('sidebar.workspaces')
+        const priority = Math.min(...entries.map(entry => entry.options?.priority ?? 0))
+        landed = entries.some(entry => (entry.options?.priority ?? 0) === priority && (entry.component === TeamSidebar || entry.component?.dsBotTeamSidebar === TeamSidebar))
         declared = ctx.slots.spec?.('sidebar.workspaces') !== undefined
       } catch {
         declared = false
@@ -1121,11 +1125,18 @@ export function apply(ctx) {
       verifyAttempts = 0
       verifyTimer = setTimeout(verifySidebar, 250)
     }
+    // A classic sidebar may arrive after our initial mount. An inactive Bot
+    // registration must not count as a successfully mounted Bot interface.
+    const offSidebar = ctx.slots.subscribe('sidebar.workspaces', () => {
+      clearTimeout(verifyTimer)
+      verifyTimer = setTimeout(verifySidebar, 250)
+    })
     reconcile()
     if (surface.getSnapshot().mode === 'bot') ensureBotHome()
     const unsub = surface.subscribe(reconcile)
     return () => {
       unsub()
+      offSidebar()
       clearTimeout(verifyTimer)
       groups.dispose()
     }

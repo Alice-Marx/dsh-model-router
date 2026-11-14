@@ -25,6 +25,8 @@ import independentChatCss from './independent-chat.css'
 import { AiProvidersPage } from './ai-providers.jsx'
 import aiProvidersCss from './ai-providers.css'
 import refinementCss from './product-refinement.css'
+import surfaceCss from './bot-surface.css'
+import { installBotSurface } from './bot-surface.mjs'
 import { requestWorkbenchView } from '../../.dsh-plugin/client/workbench-state.mjs'
 
 export const inject = [...new Set([...dsInject, 'remote'])]
@@ -50,18 +52,17 @@ export async function apply(ctx) {
     return () => { if (globalThis.__dshBotAiProvidersUi === bridge) { if (previous) globalThis.__dshBotAiProvidersUi = previous; else delete globalThis.__dshBotAiProvidersUi } }
   }, 'bot-product: AI settings')
   const slots = productSlots(ctx.slots, openPanel, api, { sessionBindingOf: id => ctx.sessions.binding(id), openSession: id => ctx.uiWorkspace.openSession(id) })
-  const dsContext = new Proxy(ctx, { get: (target, key) => key === 'slots' ? slots : Reflect.get(target, key, target) })
+  const mountProductSurface = () => {
+    const disposeSurface = installBotSurface(window)
+    try {
+      const disposeAppearance = installWorkspaceAppearance(window)
+      return () => { try { disposeAppearance() } finally { disposeSurface() } }
+    } catch (error) { disposeSurface(); throw error }
+  }
+  const dsContext = new Proxy(ctx, { get: (target, key) => key === 'slots' ? slots : key === 'botProductSurface' ? mountProductSurface : Reflect.get(target, key, target) })
   ctx.effect(() => {
-    const previous = document.body.getAttribute('data-bot-product-ui')
-    document.body.setAttribute('data-bot-product-ui', '1')
-    const style = document.createElement('style'); style.dataset.botProduct = '1'; style.textContent = `${css}\n${workspaceCss}\n${chatCss}\n${desktopCss}\n${usageCss}\n${notificationsCss}\n${dataCss}\n${botThreadsCss}\n${webPanelCss}\n${composerDraftCss}\n${botThreadHeaderCss}\n${independentChatCss}\n${aiProvidersCss}\n${refinementCss}`; document.head.append(style)
-    const disposeAppearance = installWorkspaceAppearance(window)
-    return () => {
-      disposeAppearance()
-      style.remove()
-      if (previous === null) document.body.removeAttribute('data-bot-product-ui')
-      else document.body.setAttribute('data-bot-product-ui', previous)
-    }
+    const style = document.createElement('style'); style.dataset.botProduct = '1'; style.textContent = `${css}\n${workspaceCss}\n${chatCss}\n${desktopCss}\n${usageCss}\n${notificationsCss}\n${dataCss}\n${botThreadsCss}\n${webPanelCss}\n${composerDraftCss}\n${botThreadHeaderCss}\n${independentChatCss}\n${aiProvidersCss}\n${refinementCss}\n${surfaceCss}`; document.head.append(style)
+    return () => style.remove()
   }, 'bot-product: styles')
   applyDs(dsContext)
   const disposeMr = await applyMr(ctx)
