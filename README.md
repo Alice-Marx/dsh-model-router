@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.74.0 · Windows Remote Agent: 0.1.3**
+**Current stable version: 0.74.1 · Windows Remote Agent: 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -68,7 +68,7 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 
 CLI chat drivers include Claude Code, Codex, Pi, Step Code, Muse Code, Antigravity, Grok, Gemini, Kimi Code, Droid, Cursor, OpenCode, Qwen, Hermes, Cline, Copilot, Command Code, DeepSeek ACP and custom ACP. Availability depends on the local installation, account and model access. Connection states distinguish configuration, required attention and a verified conversation.
 
-Antigravity uses its matching official runtime and harness files with separate OAuth credentials. DeepSeek ACP uses the dsh **0.2.2-rc.2** Node entry, its own API key and API funding, with one model request and at most 4096 output tokens per turn. Other subscription CLIs use their respective plan accounts. See the [CLI chat connection guide](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/cli-chat-providers.md) for installation and configuration.
+Antigravity uses its matching official runtime and harness files with separate OAuth credentials. DeepSeek ACP uses the dsh **0.2.2-rc.3** Node entry, its own API key and API funding, with one model request and at most 4096 output tokens per turn. Other subscription CLIs use their respective plan accounts. See the [CLI chat connection guide](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/cli-chat-providers.md) for installation and configuration.
 
 Edit the Bot's name, role and standing instructions under **Identity & personality**, then save to apply them. Chat supports separate threads, text drafts, paged history, Markdown, code and mathematics. Notifications open the relevant Bot and task. Main Bot supports multiple saved model routes; workers use their own models, permissions and funding.
 
@@ -77,8 +77,8 @@ Edit the Bot's name, role and standing instructions under **Identity & personali
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.74.0`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.74.0`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.74.1`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.74.1`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -86,10 +86,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.74.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.74.1
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.74.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.74.1
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -278,7 +278,7 @@ Credentials for independent plugin AI connections are saved through the Host cre
 
 | Component | Current scope |
 | --- | --- |
-| Harness integration | Declared Host versions are listed in [package.json](package.json); the current compatibility baseline is Harness SDK **0.2.2-rc.2**, Cordis **4.1** and schemastery **3.19**. |
+| Harness integration | Declared Host versions are listed in [package.json](package.json); the current compatibility baseline is Harness SDK **0.2.2-rc.3**, Cordis **4.1** and schemastery **3.19**. |
 | Bot foundation | Pinned [DS Bot](https://github.com/Fei2411/DS-Bot) **0.2.7**, with project-specific integration and product overlays. |
 | Remote desktop | Embedded plugin access or Windows x64 Agent **0.1.3**, with an available signed-in interactive desktop. |
 | Tool execution | Availability depends on the local platform, installed CLI, account, exact model, and supported execution adapter shown by the workbench. |
