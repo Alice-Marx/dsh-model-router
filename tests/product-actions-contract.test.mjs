@@ -35,6 +35,14 @@ test('CLI configuration and repair pass both the read-model allowlist and the ow
  }
 })
 
+test('subscription account controls use the v2 owner-only action contract and never become model tools',()=>{
+ const door=readFileSync(new URL('../modules/bot-runtime/read-model.mjs',import.meta.url),'utf8')
+ const actions=JSON.parse(readFileSync(new URL('../contracts/product-action/v2/actions.json',import.meta.url),'utf8')).actions
+ for(const action of ['subscriptions.list','subscriptions.enable','subscriptions.stop','subscriptions.refresh','subscriptions.login','subscriptions.loginStatus','subscriptions.callback','subscriptions.cancelLogin','subscriptions.remove']){
+  assert.ok(door.includes(`'${action}'`));assert.match(source,new RegExp(`'${action.replaceAll('.','\\.')}':\\s*ownerOnly\\(`));assert.equal(actions[action].caller,'owner')
+ }
+})
+
 test('product channel: a task action declares that it belongs to the owner console', () => {
   // These six move, stop or re-open somebody's work. Each one names its caller
   // class at its own entry rather than inheriting whatever the authorization

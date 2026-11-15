@@ -1,0 +1,26 @@
+.bp-subscriptions{display:flex;flex-direction:column;gap:16px;min-width:0}
+.bp-subscriptions .bp-ai-section-head{align-items:flex-start;margin:0}
+.bp-subscriptions .bp-ai-section-head .bp-ai-hint{margin:6px 0 0}
+.bp-sub-service{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px;border:1px solid var(--bp-border);border-radius:14px;background:var(--bp-surface)}
+.bp-sub-service p,.bp-sub-login p{margin:6px 0;color:var(--bp-muted);font-size:13px;line-height:1.6}
+.bp-sub-service button{flex-shrink:0}
+.bp-sub-options{color:var(--bp-muted);font-size:12px}
+.bp-sub-options summary{cursor:pointer}
+.bp-sub-options label{display:flex;flex-direction:column;gap:6px;max-width:420px;margin-top:12px}
+.bp-sub-options input{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid var(--bp-border);border-radius:9px;background:var(--bp-surface);color:var(--bp-ink)}
+.bp-sub-options p{line-height:1.6}
+.bp-sub-login{display:flex;flex-direction:column;gap:8px;padding:16px;border:1px solid var(--bp-border);border-radius:14px;background:var(--bp-surface)}
+.bp-sub-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bp-sub-actions a{display:inline-flex;align-items:center;gap:6px;padding:9px 13px;border-radius:9px;text-decoration:none}
+.bp-sub-login small{color:var(--bp-muted)}
+.bp-sub-providers{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.bp-sub-providers>button{display:flex;align-items:center;gap:10px;padding:12px;text-align:left;border:1px solid var(--bp-border);border-radius:12px;background:var(--bp-surface);color:var(--bp-ink);font:inherit;cursor:pointer}
+.bp-sub-providers>button:disabled{opacity:.5;cursor:default}
+.bp-sub-providers span{min-width:0;font-size:13px}
+.bp-sub-providers small{display:block;margin-top:4px;color:var(--bp-muted);font-size:11px}
+.bp-sub-account details{margin-top:6px;font-size:12px}
+.bp-sub-account details summary{cursor:pointer}
+.bp-sub-account ul{max-height:150px;overflow:auto;margin:8px 0;padding-left:18px;line-height:1.8}
+.bp-sub-account .bp-ai-copy{overflow-wrap:anywhere}
+.bp-ai-tabs{flex-wrap:wrap}
+@media(max-width:500px){.bp-sub-service{align-items:flex-start;flex-direction:column}.bp-sub-providers{grid-template-columns:minmax(0,1fr)}.bp-sub-account{flex-wrap:wrap}.bp-subscriptions .bp-ai-section-head{gap:8px;flex-wrap:wrap}}

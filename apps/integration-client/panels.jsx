@@ -11,6 +11,7 @@ import { UsageExplorer } from './usage-explorer.jsx'
 import { DesktopWorkbench } from './desktop-pane.jsx'
 import { RoutinesPanel } from './routines-panel.jsx'
 import { UiIcon } from './ui-icons.jsx'
+import { useWorkspaceInset } from './workspace-inset.jsx'
 import { NotificationsPanel } from './notifications-panel.jsx'
 import { DataPanel } from './data-panel.jsx'
 import { BotThreadsPanel } from './bot-threads-panel.jsx'
@@ -865,6 +866,8 @@ export function RoleCatalog({ dispatch, busy }) {
 }
 
 export function ProductPage({ section, productApi, openSession, openPanel }) {
+  const workspaceRef = useRef(null)
+  useWorkspaceInset(workspaceRef)
   const pageRef = useRef(null)
   const [settingsBot, setSettingsBot] = useState(null)
   useLayoutEffect(() => { if (pageRef.current) { pageRef.current.scrollTop = 0; pageRef.current.scrollLeft = 0 } }, [section, productApi])
@@ -953,7 +956,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
   const meta = WORKSPACE_SECTIONS.find(row => row.section === section) ?? { title: '工作空间', icon: 'home', description: '' }
   const title = meta.title
   const currentBot = snapshotApi.current === productApi ? snapshot?.bots?.find(bot => bot.id === (focus?.botId ?? snapshot.mainBotId)) : null
-  return <div className="bp-workspace"><WorkspaceToolbar title={title} section={section} onHome={() => onNavigate({ section: 'home' })} onSearch={() => setSearchOpen(true)}
+  return <div className="bp-workspace" ref={workspaceRef}><WorkspaceToolbar title={title} section={section} onHome={() => onNavigate({ section: 'home' })} onSearch={() => setSearchOpen(true)}
     onNavigate={target => onNavigate({ section: target, botId: currentBot?.id })} botName={currentBot?.name}
     onOpenBotSettings={!disabled && currentBot && snapshot.availableActions?.includes('binding.inspect') ? () => setSettingsBot({ api: productApi, botId: currentBot.id }) : undefined}
     onRefresh={() => refresh()} refreshing={busy} syncing={!snapshot} stale={snapshotStale}/><main ref={pageRef} className="bp-page" data-section={section}><div className="bp-page-inner"><div className="bp-page-body">

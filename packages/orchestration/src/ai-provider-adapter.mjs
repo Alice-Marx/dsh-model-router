@@ -63,7 +63,7 @@ export class AiProviderAdapter extends LlmAdapter {
     const entry = this.profile.models.find(item => item.id === model)
     if (provider !== this.profile.route || !this.profile.enabled || !entry) throw new LlmError('此独立模型连接已停用或不存在。', 'NO_MODEL')
     return { provider, id: model, name: entry.name, inputModalities: ['text'], context: { contextWindow: entry.contextWindow }, defaultMaxTokens: entry.maxTokens,
-      ...(entry.reasoning ? { reasoning: { efforts: ['low', 'medium', 'high'].map(id => ({ id, name: id })) } } : {}) }
+      ...(entry.reasoning ? { reasoning: { efforts: (entry.reasoningEfforts ?? ['low', 'medium', 'high']).map(id => ({ id, name: id })) } } : {}) }
   }
   async *stream(options) {
     if (options.stop !== undefined) throw new LlmError('此独立连接尚未支持自定义停止序列。', 'UNSUPPORTED_OPTION')

@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.74.4 · Windows Remote Agent: 0.1.3**
+**Current stable version: 0.75.0 · Windows Remote Agent: 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -58,13 +58,16 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 
 ## AI connections and Bot settings
 
-**The full Bot edition manages its own model connections under Settings → AI.** Save multiple connections for a provider with separate names, accounts, models and capacities, then select a route in the Bot's **Models & tools** settings. Use the **Model API**, **CLI chat** and **Official tools** sections to manage each connection type. In Bot settings, expand a tool row to choose its identity and execution mode, then save. Chat models and official execution tools have separate grants. Use **Computer** or **AI connections** above the Bot contact list to open these pages; the page toolbar also opens settings for the current Bot. Use **Configure and repair** to check the managed execution entry and repair its installation. Qwen Code, CodeBuddy Code, Gemini CLI, Step Code, MiMo Code and dsh-TUI support read-only and isolated workspace editing through the Host sandbox. Complete the vendor login, refresh detection, then choose the CLI model and mode and save the Bot grant. dsh-TUI managed tasks use the official dsh backend with `DEEPSEEK_API_KEY` in the Harness launch environment and API billing. **Native chat (optional)** creates a separate chat connection; it does not grant execution permissions.
+**The full Bot edition manages its own model connections under Settings → AI.** Save multiple connections for a provider with separate names, accounts, models and capacities, then select a route in the Bot's **Models & tools** settings. Use the **Model API**, **Subscription accounts**, **CLI chat** and **Official tools** sections to manage each connection type. In Bot settings, expand a tool row to choose its identity and execution mode, then save. Chat models and official execution tools have separate grants. Use **Computer** or **AI connections** above the Bot contact list to open these pages; the page toolbar also opens settings for the current Bot. Use **Configure and repair** to check the managed execution entry and repair its installation. Qwen Code, CodeBuddy Code, Gemini CLI, Step Code, MiMo Code and dsh-TUI support read-only and isolated workspace editing through the Host sandbox. Complete the vendor login, refresh detection, then choose the CLI model and mode and save the Bot grant. dsh-TUI managed tasks use the official dsh backend with `DEEPSEEK_API_KEY` in the Harness launch environment and API billing. **Native chat (optional)** creates a separate chat connection; it does not grant execution permissions.
 
 | Connection | Configuration | Purpose |
 | --- | --- | --- |
 | API models | Add a provider or compatible API connection with its endpoint, separate credentials and model capacities. | OpenAI, Anthropic and Google Gemini protocols, plus Ollama; uses API funding settings. |
+| Subscription accounts | Enable the local login service under **AI connections → Subscription accounts**, then authorize your own ChatGPT/Codex, Claude, Google Antigravity, Kimi Code, Grok Build, Muse Code or Devin account. | Uses the account model catalog and subscription funding. Set the Bot subscription call allowance before chatting. |
 | Native CLI chat | Select a driver, verify its executable/version and optional entry script, then save the connection's own account and model ID. | Retains a native CLI session under the Bot's saved route and funding configuration. |
 | Official execution tools | Choose **Install and sign in** in Bot settings, complete the vendor login, recheck readiness and save the tool binding. | Grants supported file, command and other execution capabilities alongside a chat model from another provider. |
+
+Subscription login uses a managed [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) component on this computer. Credentials remain in its private local directory. Model access and vendor limits follow the authorized account; catalog access is shown separately from verified inference. Models missing capacity metadata are withheld from the picker. Coding plans without supported OAuth login can use their vendor-provided API connection or an available native CLI driver.
 
 CLI chat drivers include Claude Code, Codex, Pi, Step Code, Muse Code, Antigravity, Grok, Gemini, Kimi Code, Droid, Cursor, OpenCode, Qwen, Hermes, Cline, Copilot, Command Code, DeepSeek ACP and custom ACP. Availability depends on the local installation, account and model access. Connection states distinguish configuration, required attention and a verified conversation.
 
@@ -77,8 +80,8 @@ Edit the Bot's name, role and standing instructions under **Identity & personali
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.74.4`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.74.4`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.75.0`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.75.0`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -86,10 +89,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.74.4
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.75.0
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.74.4
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.75.0
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.

@@ -26,6 +26,8 @@ const ACTIONS = new Set([
   'binding.inspect', 'binding.save', 'funding.account.save', 'machine.secret', 'machine.pair', 'machine.pair.invite', 'machine.bind', 'machine.probe',
   'aiProviders.list', 'aiProviders.suggestions', 'aiProviders.save', 'aiProviders.remove', 'aiProviders.check', 'aiProviders.cliStatus',
   'cliProviders.list', 'cliProviders.save', 'cliProviders.remove', 'cliProviders.inspect', 'cliProviders.setup', 'cliProviders.repair',
+  'subscriptions.list', 'subscriptions.enable', 'subscriptions.stop', 'subscriptions.refresh',
+  'subscriptions.login', 'subscriptions.loginStatus', 'subscriptions.callback', 'subscriptions.cancelLogin', 'subscriptions.remove',
   'machine.revoke', 'machine.reconcile', 'machine.artifact', 'machine.desktop.view', 'machine.desktop.act',
   'machine.host.status', 'machine.host.configure', 'machine.host.start', 'machine.host.stop', 'machine.host.invite', 'machine.host.devices', 'machine.host.revoke',
   'machine.desktop.open', 'machine.desktop.renew', 'machine.desktop.close',

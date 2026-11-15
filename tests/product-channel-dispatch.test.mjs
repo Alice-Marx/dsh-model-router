@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { createProductReadModel } from '../modules/bot-runtime/read-model.mjs'
 
 test('every declared product action reaches its registered handler through the real dispatcher', async () => {
-  const contract = JSON.parse(await readFile(new URL('../contracts/product-action/v1/actions.json', import.meta.url), 'utf8'))
+  const contract = JSON.parse(await readFile(new URL('../contracts/product-action/v2/actions.json', import.meta.url), 'utf8'))
   const names = Object.keys(contract.actions)
   assert.ok(names.length >= 70)
   const calls = []

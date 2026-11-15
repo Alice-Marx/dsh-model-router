@@ -31,7 +31,7 @@ test('contracts: validation names the exact path that broke', () => {
 })
 
 test('contracts: every committed fixture passes its own schema', async () => {
-  const dirs = ['task-request/v1', 'task-event/v1', 'product-action/v1']
+  const dirs = ['task-request/v1', 'task-event/v1', 'product-action/v1', 'product-action/v2']
   for (const id of dirs) {
     const base = join(root, 'contracts', ...id.split('/'))
     const schema = JSON.parse(await readFile(join(base, 'schema.json'), 'utf8'))

@@ -1,0 +1,6 @@
+{
+  "action": "botRouting.save",
+  "payload": {
+    "enabled": true
+  }
+}

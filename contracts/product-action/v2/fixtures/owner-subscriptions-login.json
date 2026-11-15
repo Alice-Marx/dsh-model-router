@@ -1,0 +1,6 @@
+{
+  "action": "subscriptions.login",
+  "payload": {
+    "provider": "codex"
+  }
+}

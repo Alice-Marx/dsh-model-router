@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { UiIcon } from './ui-icons.jsx'
 import { CliChatProviders } from './cli-chat-providers.jsx'
+import { SubscriptionAccounts } from './subscription-accounts.jsx'
 import { OfficialToolSetup, hasCliSetup } from './official-tool-setup.jsx'
 import css from './ai-providers.css'
 
@@ -18,7 +19,7 @@ let nextScope = 0
 export function AiProvidersPage(props) { const key = useMemo(() => ++nextScope, [props.productApi]); return <AiProviders key={key} {...props}/> }
 
 function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
-  const [section, setSection] = useState('api'), [visitedCli, setVisitedCli] = useState(false)
+  const [section, setSection] = useState('api'), [visitedCli, setVisitedCli] = useState(false), [visitedSubscriptions, setVisitedSubscriptions] = useState(false)
   const [setupTool,setSetupTool]=useState(null)
   const [view, setView] = useState(null), [cli, setCli] = useState(null), [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [checkingCli, setCheckingCli] = useState(false), [cliNotice, setCliNotice] = useState(''), cliEpoch = useRef(0)
@@ -100,8 +101,8 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
   }
   return <section className="bp-ai" aria-label="AI 提供方设置">
     <header className="bp-ai-heading"><div><h2>AI 提供方</h2><p><UiIcon name="computer" size={15}/>适用于这台电脑 · 插件独立配置</p></div>
-      {!draft && <button type="button" disabled={Boolean(busy) || !view} onClick={allCheck}><UiIcon name="refresh" size={15}/>{busy === 'check-all' ? '正在检查…' : '重新检查'}</button>}</header>
-    {!draft && <div className="bp-connection-tabs bp-ai-tabs" role="group" aria-label="AI 连接类型">{[['api','模型 API','spark'],['cli','CLI 聊天','bot'],['tools','官方工具','settings']].map(([id,label,icon]) => <button key={id} type="button" aria-pressed={section === id} onClick={() => { setSection(id); if (id === 'cli') setVisitedCli(true) }}><UiIcon name={icon} size={16}/>{label}</button>)}</div>}
+      {!draft && section !== 'subscriptions' && <button type="button" disabled={Boolean(busy) || !view} onClick={allCheck}><UiIcon name="refresh" size={15}/>{busy === 'check-all' ? '正在检查…' : '重新检查'}</button>}</header>
+    {!draft && <div className="bp-connection-tabs bp-ai-tabs" role="group" aria-label="AI 连接类型">{[['api','模型 API','spark'],['subscriptions','订阅账户','bot'],['cli','CLI 聊天','bot'],['tools','官方工具','settings']].map(([id,label,icon]) => <button key={id} type="button" aria-pressed={section === id} onClick={() => { setSection(id); if (id === 'cli') setVisitedCli(true); if (id === 'subscriptions') setVisitedSubscriptions(true) }}><UiIcon name={icon} size={16}/>{label}</button>)}</div>}
     {error && <div className="bp-ai-alert" role="alert">{error}<button type="button" disabled={editingBusy} onClick={() => void load()}>刷新</button></div>}
     {notice && <p className="bp-ai-notice" role="status">{notice}</p>}
     {!view && !error && <p role="status">正在读取独立 AI 配置…</p>}
@@ -133,7 +134,8 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
         <div className="bp-ai-row-actions"><button type="button" disabled={Boolean(busy) || !provider.enabled || provider.auth === 'key' && !provider.keyConfigured} onClick={() => check(provider)}>{busy === `check-${provider.id}` ? '检查中…' : '检查'}</button><button type="button" disabled={editingBusy} onClick={() => edit(provider)}>管理</button></div>
       </article>)}{!view.providers.length && <div className="bp-ai-empty"><UiIcon name="spark" size={26}/><h4>连接你的第一个 AI</h4><p>选择下面的提供方，填写自己的账号密钥与模型。</p></div>}</div>
       <div className="bp-ai-presets">{view.presets.map(preset => <button type="button" key={preset.id} disabled={editingBusy} onClick={() => edit(preset)}><span className="bp-ai-small-mark" aria-hidden="true">{preset.mark}</span><span>{preset.name}</span><UiIcon name="plus" size={14}/></button>)}</div>
-      </div><div hidden={section !== 'cli'}>{visitedCli && <CliChatProviders productApi={productApi} onOpenTools={onOpenTools} onOpenBindings={onOpenBindings}/>}</div>
+      </div><div hidden={section !== 'subscriptions'}>{visitedSubscriptions && <SubscriptionAccounts productApi={productApi} onOpenBindings={onOpenBindings}/>}</div>
+      <div hidden={section !== 'cli'}>{visitedCli && <CliChatProviders productApi={productApi} onOpenTools={onOpenTools} onOpenBindings={onOpenBindings}/>}</div>
       <div hidden={section !== 'tools'}>
       <div className="bp-ai-section-head"><h3>官方 CLI 与应用</h3>{onOpenTools && <button type="button" onClick={onOpenTools}>安装与登录<UiIcon name="arrow" size={14}/></button>}</div>
       {checkingCli && <p className="bp-ai-hint" role="status">正在检查本机工具…</p>}

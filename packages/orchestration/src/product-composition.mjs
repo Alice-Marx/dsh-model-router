@@ -61,6 +61,7 @@ import { createDataEngine } from './bot-data-engine.mjs'
 import { createProductDataAccess } from './data-product-access.mjs'
 import { inspectProductBinding } from './binding-product.mjs'
 import { openAiProviders } from './ai-providers.mjs'
+import { openSubscriptionProxy } from './subscription-proxy.mjs'
 import { inspectProductBotProfile, saveProductBotProfile } from './bot-profile.mjs'
 import { openUiHostNamespace } from './ui-host-namespace.mjs'
 import { registerDataTools } from './bot-data-tools.mjs'
@@ -464,7 +465,7 @@ export function startBotProduct(ctx, options = {}) {
   const engineCredentialStamps = new Map()
   const engineLeaseId = `native-${randomUUID()}`
   const cliToolSetup=createCliToolSetup()
-  let machines, nativeRemoteActions, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat, securePairing, desktopProxy, desktopHttp, aiProviders, cliProviders, embeddedComputer, embeddedComputerOpening
+  let machines, nativeRemoteActions, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat, securePairing, desktopProxy, desktopHttp, aiProviders, cliProviders, subscriptionProxy, embeddedComputer, embeddedComputerOpening
   const ensureEmbeddedComputer = () => {
     if (embeddedComputer) return Promise.resolve(embeddedComputer)
     if (!isAbsolute(storageFile)) return Promise.reject(Object.assign(new Error('LOCAL_COMPUTER_STORAGE_REQUIRED'), { code: 'LOCAL_COMPUTER_STORAGE_REQUIRED' }))
@@ -559,9 +560,10 @@ export function startBotProduct(ctx, options = {}) {
   let ownerCatalogStamp=''
   let routes = new Set(), hydrated = false, refreshing = false, lastRefresh = 0, timer = null
   const publishRoutes = async discovered => {
-    routes = new Set([...discovered].filter(key => { const provider = key.slice(0, key.indexOf('/')); return !aiProviders?.owns(provider) && !cliProviders?.owns(provider) }))
+    routes = new Set([...discovered].filter(key => { const provider = key.slice(0, key.indexOf('/')); return !aiProviders?.owns(provider) && !cliProviders?.owns(provider) && !subscriptionProxy?.owns(provider) }))
     for (const route of aiProviders?.routes() ?? []) routes.add(`${route.provider}/${route.model}`)
     for (const route of cliProviders?.routes() ?? []) routes.add(`${route.provider}/${route.model}`)
+    for (const route of subscriptionProxy?.routes() ?? []) routes.add(`${route.provider}/${route.model}`)
     hydrated = true
     const ownerRoutes = [...routes].sort().map(key => { const slash = key.indexOf('/'); return { provider: key.slice(0, slash), model: key.slice(slash + 1) } }).filter(route => route.provider && route.model)
     const stamp = JSON.stringify(ownerRoutes)
@@ -580,6 +582,7 @@ export function startBotProduct(ctx, options = {}) {
     refreshing = true
     try {
       aiProviders?.sync()
+      subscriptionProxy?.sync()
       await syncConversationProfiles()
       await publishRoutes((await catalog()).map(route => `${route.provider}/${route.model}`))
     }
@@ -663,6 +666,8 @@ export function startBotProduct(ctx, options = {}) {
     for (const model of models) {
       const independent = aiProviders?.metadata(model.provider)
       if (independent) { model.label = `${independent.name} · ${model.model}`; model.providerName = independent.name; model.source = 'plugin'; model.fundingModes = ['api'] }
+      const subscription = subscriptionProxy?.metadata(model.provider)
+      if (subscription) { model.label = `${subscription.name} · ${model.model}`; model.providerName = subscription.name; model.source = 'plugin'; model.fundingModes = ['subscription'] }
       const native = cliProviders?.metadata(model.provider)
       if (native) { model.label = `${native.name} · 原生聊天 · ${model.model}`; model.providerName = native.name; model.source = 'plugin'; model.fundingModes = [native.driver === 'deepseekAgent' ? 'api' : 'subscription'] }
       const profile = engineProfiles.find(item => item.provider === model.provider && item.model === model.model)
@@ -712,7 +717,7 @@ export function startBotProduct(ctx, options = {}) {
       ],
       taskBackends: taskBackends ? taskBackends.catalog() : [],
       fundingScopes: fundingAccounts ? fundingAccounts.catalog().filter(scope => scope.enabled).map(scope => ({
-        id: scope.id, label: scope.provider, modes: ['api','subscription'],
+        id: scope.id, label: scope.provider, modes: subscriptionProxy?.owns(scope.provider) ? ['subscription'] : ['api','subscription'],
         models: models.filter(model => model.provider === scope.provider).map(({ provider, model }) => ({ provider, model })),
       })) : [] }
   }
@@ -735,6 +740,7 @@ export function startBotProduct(ctx, options = {}) {
       return null
     }
     const account = selected.scopeId && fundingAccounts ? fundingAccounts.get(selected.scopeId) : null
+    if (subscriptionProxy?.owns(route.provider) && selected.mode !== 'subscription') return null
     if (multi && (!account?.enabled || account.provider !== route.provider)) return null
     return { route, funding: selected, account, multi, revision: value.revision }
   }
@@ -954,6 +960,13 @@ export function startBotProduct(ctx, options = {}) {
           || botSettings?.get(bot.id, { publishChange: false }).settings?.mainRoutes?.routes?.some(item => item.provider === route)).map(bot => ({ id: bot.id, name: bot.name })),
         onChanged: async () => { product?.rt.dropCatalog(); await publishRoutes(routes); botSettings?.refresh() } })
       ctx.provide?.('botAiProviders', aiProviders)
+      subscriptionProxy = openSubscriptionProxy({ Database, file: storageFile, root: join(dirname(storageFile), 'subscription-proxy'), llm: ctx.llm, now,
+        ...(options.subscriptionRuntime ? { runtime: options.subscriptionRuntime } : {}),
+        usedBy: route => (product?.lifecycle.committedBots() ?? []).filter(bot => bot.model?.startsWith(route + '/')
+          || botSettings?.get(bot.id, { publishChange: false }).settings?.mainRoutes?.routes?.some(item => item.provider === route)).map(bot => ({ id: bot.id, name: bot.name })),
+        onChanged: async () => { product?.rt.dropCatalog(); await publishRoutes(routes); botSettings?.refresh() } })
+      ctx.provide?.('botSubscriptionProxy', subscriptionProxy)
+      await subscriptionProxy.initialize()
       await publishRoutes(routes)
       routingSettings = openBotRoutingSettings({ Database, file: storageFile, initial: () => config.botRouting, now })
       uiNamespace = openUiHostNamespace({ Database, file: storageFile })
@@ -986,8 +999,8 @@ export function startBotProduct(ctx, options = {}) {
       if (deferredRouterState) {
         fundingAccounts = openFundingAccounts({ Database, file: storageFile,
           providers: () => [...new Set([...routes].map(key => key.slice(0, key.indexOf('/'))))],
-          labelFor: provider => cliProviders?.metadata(provider)?.name ?? aiProviders?.metadata(provider)?.name ?? provider,
-          sourceFor: provider => aiProviders?.metadata(provider) || cliProviders?.metadata(provider) ? 'plugin-provider' : 'harness-provider',
+          labelFor: provider => subscriptionProxy?.metadata(provider)?.name ?? cliProviders?.metadata(provider)?.name ?? aiProviders?.metadata(provider)?.name ?? provider,
+          sourceFor: provider => subscriptionProxy?.metadata(provider) || aiProviders?.metadata(provider) || cliProviders?.metadata(provider) ? 'plugin-provider' : 'harness-provider',
           onCommitted: () => { try { botSettings?.refresh() } catch { /* the interval retries */ } },
           onSuspended: () => { try { botSettings?.refresh() } catch { /* the interval retries */ } }, now })
         botSettings = openBotSettings({ Database, file: storageFile,
@@ -1410,6 +1423,15 @@ export function startBotProduct(ctx, options = {}) {
           ...(botSettings ? {
             'binding.inspect': ownerOnly((payload, context) => inspectProductBinding({ runtime: product.rt, lifecycle: product.lifecycle, botSettings, fundingAccounts, refreshOfficialTools: () => officialCatalog?.refresh({ fresh: true }), signal: context?.signal }, payload)),
             'aiProviders.list': ownerOnly((_payload, context) => aiProviders.list(context)),
+            'subscriptions.list': ownerOnly((_payload, context) => subscriptionProxy.list(context)),
+            'subscriptions.enable': ownerOnly((payload, context) => subscriptionProxy.enable(payload, context)),
+            'subscriptions.stop': ownerOnly((payload, context) => subscriptionProxy.stop(payload, context)),
+            'subscriptions.refresh': ownerOnly((payload, context) => subscriptionProxy.refresh(payload, context)),
+            'subscriptions.login': ownerOnly((payload, context) => subscriptionProxy.login(payload, context)),
+            'subscriptions.loginStatus': ownerOnly((payload, context) => subscriptionProxy.loginStatus(payload, context)),
+            'subscriptions.callback': ownerOnly((payload, context) => subscriptionProxy.callback(payload, context)),
+            'subscriptions.cancelLogin': ownerOnly((payload, context) => subscriptionProxy.cancelLogin(payload, context)),
+            'subscriptions.remove': ownerOnly((payload, context) => subscriptionProxy.remove(payload, context)),
             'cliProviders.list': ownerOnly((_payload, context) => cliProviders.list(context)),
             'cliProviders.save': ownerOnly((payload, context) => cliProviders.save(payload, context)),
             'cliProviders.remove': ownerOnly((payload, context) => cliProviders.remove(payload, context)),
@@ -1622,6 +1644,7 @@ export function startBotProduct(ctx, options = {}) {
       releaseDataTools?.()
       await dataEngine?.closeAll().catch(() => {})
       await embeddedComputerOpening?.catch(() => {}); await embeddedComputer?.close().catch(() => {})
+      await subscriptionProxy?.close().catch(() => {})
       for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close(),()=>aiProviders?.close(),()=>cliProviders?.close()])try{cleanup()}catch{}
       if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
       if(taskService)await taskService.close().catch(()=>{})
@@ -1669,6 +1692,7 @@ export function startBotProduct(ctx, options = {}) {
         releaseDataTools?.()
         await dataEngine?.closeAll().catch(() => {})
         await embeddedComputerOpening?.catch(() => {}); await embeddedComputer?.close().catch(() => {})
+        await subscriptionProxy?.close().catch(() => {})
         for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>securePairing?.close(),()=>nativeRemoteActions?.close(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>uiNamespace?.close(),()=>webPanelStore?.close(),()=>aiProviders?.close(),()=>cliProviders?.close()])try{cleanup()}catch{}
         if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
         if(taskService)await taskService.close().catch(()=>{})

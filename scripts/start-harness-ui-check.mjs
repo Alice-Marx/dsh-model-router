@@ -3,6 +3,7 @@ import { resolve, join } from 'node:path'
 import { spawn, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
+import { installCliProxyArtifact } from '../packages/orchestration/src/cli-proxy-runtime.mjs'
 // Uses a real installed Harness with a new, isolated home. No UI or API mocks.
 const repo=resolve(import.meta.dirname,'..'),passed=process.argv.slice(2)
 const option=name=>{const at=passed.indexOf(name);if(at<0)return null;if(!passed[at+1])throw Error('Missing '+name);return passed[at+1]}
@@ -41,6 +42,8 @@ if (skinDirectory) {
 }
 await writeFile(join(profile,'package.json'),JSON.stringify({private:true,dsh:{profile:{bundles:['@deepseek-ai/dsh-base','@deepseek-ai/dsh-web-app',...visualBundles,'@ljwei-stak/dsh-model-route-bot']}}},null,2))
 const verificationPlugin=option('--verification-plugin')
+const subscriptionArchive=option('--subscription-component-archive')
+if(subscriptionArchive)await installCliProxyArtifact(await readFile(resolve(subscriptionArchive)),join(home,'model-router/subscription-proxy'))
 const verificationCache=option('--verification-cache')
 if(verificationPlugin&&verificationCache){await mkdir(join(home,'model-router'),{recursive:true});for(const file of ['npm-attestations.json','vendor-release-digests.json'])await copyFile(join(resolve(verificationCache),file),join(home,'model-router',file))}
 const patches = []

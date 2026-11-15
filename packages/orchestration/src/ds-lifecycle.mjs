@@ -160,7 +160,15 @@ export function attachDsLifecycle({ runtime, directory, grantFor, readSaved = ()
     const sessionId = agent?.session?.id
     if (!id(sessionId)) fail('INVALID_AGENT')
     if (knownAgents.size >= 16384 && !knownAgents.has(sessionId)) fail('DS_STATE_LIMIT')
-    knownAgents.set(sessionId,agent)
+    if (knownAgents.get(sessionId) !== agent) {
+      knownAgents.set(sessionId,agent)
+      // A later model/account refresh must never try to install effects on a
+      // disposed Agent. Keep observation bounded to its actual Host lifetime.
+      if (typeof agent.ctx?.effect === 'function') {
+        try { agent.ctx.effect(() => () => { if (knownAgents.get(sessionId) === agent) { knownAgents.delete(sessionId); detach(sessionId) } }) }
+        catch (cause) { knownAgents.delete(sessionId); if (cause.code === 'INACTIVE_EFFECT') return; throw cause }
+      }
+    }
     bindKnown()
   }
   const wrapped = {

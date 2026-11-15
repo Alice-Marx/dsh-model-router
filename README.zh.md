@@ -14,7 +14,7 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.74.4 · Windows Remote Agent：0.1.3**
+**当前正式版：0.75.0 · Windows Remote Agent：0.1.3**
 
 以 Bot 联系人和聊天为主要入口，集中使用独立 AI 连接、多模型路线、团队委派、私有资料库、数据分析与自有 Windows 电脑。任务、通知和执行记录保存在工作空间中，Main Bot 可在已保存的多条模型路线之间调度。
 
@@ -58,13 +58,16 @@
 
 ## AI 连接与 Bot 设置
 
-**完整 Bot 版本在“设置 → AI”独立管理模型连接。** 可以为同一提供商保存多个连接，分别设置名称、账号、模型与容量，再在 Bot 的“模型与工具”中选择路线。通过“模型 API”“CLI 聊天”“官方工具”分类管理连接。在 Bot 设置中展开工具行，选择执行身份与方式后保存。聊天模型和官方执行工具分别授权。点击 Bot 联系人上方的“电脑”或“AI 连接”直接进入页面；页面顶部也可打开当前 Bot 的设置。通过“配置与修复”检查托管执行入口并修复安装。Qwen Code、CodeBuddy Code、Gemini CLI、Step Code、MiMo Code 和 dsh-TUI 可通过 Host 沙箱执行只读任务和隔离工作区编辑。完成厂商登录后重新检测，选择 CLI 模型与执行模式，保存 Bot 授权。dsh-TUI 托管任务使用官方 dsh 后端，需要在 Harness 启动环境设置 `DEEPSEEK_API_KEY`，按 API 用量计费。“另作聊天模型（可选）”用于保存独立聊天连接，不授予执行权限。
+**完整 Bot 版本在“设置 → AI”独立管理模型连接。** 可以为同一提供商保存多个连接，分别设置名称、账号、模型与容量，再在 Bot 的“模型与工具”中选择路线。通过“模型 API”“订阅账户”“CLI 聊天”“官方工具”分类管理连接。在 Bot 设置中展开工具行，选择执行身份与方式后保存。聊天模型和官方执行工具分别授权。点击 Bot 联系人上方的“电脑”或“AI 连接”直接进入页面；页面顶部也可打开当前 Bot 的设置。通过“配置与修复”检查托管执行入口并修复安装。Qwen Code、CodeBuddy Code、Gemini CLI、Step Code、MiMo Code 和 dsh-TUI 可通过 Host 沙箱执行只读任务和隔离工作区编辑。完成厂商登录后重新检测，选择 CLI 模型与执行模式，保存 Bot 授权。dsh-TUI 托管任务使用官方 dsh 后端，需要在 Harness 启动环境设置 `DEEPSEEK_API_KEY`，按 API 用量计费。“另作聊天模型（可选）”用于保存独立聊天连接，不授予执行权限。
 
 | 连接类型 | 配置方式 | 用途 |
 | --- | --- | --- |
 | API 模型 | 添加提供商或兼容 API 连接，填写端点、独立凭据及模型容量。 | 支持 OpenAI、Anthropic、Google Gemini 协议及 Ollama；按 API 资金配置计费。 |
+| 订阅账户 | 在 **AI 连接 → 订阅账户** 启用本机登录服务，再授权自己的 ChatGPT/Codex、Claude、Google Antigravity、Kimi Code、Grok Build、Muse Code 或 Devin 账户。 | 同步账户模型目录，使用订阅资金；聊天前为 Bot 设置订阅调用额度。 |
 | 原生 CLI 聊天 | 选择聊天驱动，核验可执行文件、版本和可选入口脚本，保存该连接自己的账号资料与模型 ID。 | 保留 CLI 原生会话，按 Bot 已保存路线与资金配置调用。 |
 | 官方执行工具 | 在 Bot 设置中选择“安装与登录”，完成厂商登录、重新检测并保存工具绑定。 | 为 Bot 授予受支持的文件、命令或其他执行能力，可搭配不同提供商的聊天模型。 |
+
+订阅登录使用这台电脑上的托管 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 组件，授权资料保存在本机私有目录。模型访问与厂商额度以授权账户为准；目录可访问和推理已验证分别显示。缺少容量信息的模型暂不加入选择列表。不支持 OAuth 登录的 Coding Plan，可使用厂商提供的 API 接入信息或可用的原生 CLI 驱动。
 
 CLI 聊天驱动包括 Claude Code、Codex、Pi、Step Code、Muse Code、Antigravity、Grok、Gemini、Kimi Code、Droid、Cursor、OpenCode、Qwen、Hermes、Cline、Copilot、Command Code、DeepSeek ACP 和自定义 ACP。实际可用性取决于本机安装、账号权限和模型访问；连接页面分别显示已配置、需要处理和已验证对话等状态。
 
@@ -77,8 +80,8 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.74.4`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.74.4`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.75.0`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.75.0`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 完整版本进入 Bot 工作区，在 **设置 → AI** 添加独立模型连接，再为 Bot 选择模型。纯路由版本从侧栏打开 **模型路由**，使用 Harness 已配置路线。
 
@@ -86,10 +89,10 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.74.4
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.75.0
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.74.4
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.75.0
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
