@@ -215,7 +215,7 @@
     {
       "path": "src/client/styles.js",
       "kind": "patched",
-      "summary": "Fits four avatar-source tabs and a scrollable, named model avatar grid inside the existing avatar popover.",
+      "summary": "Fits the model portrait grid in the creation form and the existing avatar popover, with accessible source tabs.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "b789349121d050381dc5da82b7473361551a12b20cdd87d382fbb7cd7d7787c5"
@@ -230,6 +230,15 @@
       "path": "src/client/model-avatar-picker.js",
       "kind": "product-file",
       "summary": "Renders named built-in model portraits and recognizes saved selections through the existing avatar.image contract."
+    },
+    {
+      "path": "src/client/create-bot.js",
+      "kind": "patched",
+      "summary": "Shows the 19 built-in model portraits directly in both Create Bot entry points; selection stays in the draft until Create, with ordinary characters, uploads and the avatar library preserved.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "80ebfe7556ade34b7ac5fe5cef2b027c6a78a7866bca62fda033f41d643d656f"
+      }
     }
   ]
 }

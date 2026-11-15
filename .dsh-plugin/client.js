@@ -12043,6 +12043,7 @@ button.bt-q-opt:active{background:var(--bt-active)}
 .bt-create-step{font-size:12px;line-height:16px;color:var(--bt-ink-2);margin-bottom:-10px}
 .bt-create-looks{display:flex;flex-direction:column;gap:10px;padding:10px;border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card)}
 .bt-create-lookbar{justify-content:center}
+.bt-create-avatar-tabs{align-self:flex-start}
 .bt-create-foot{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}
 .bt-create-go{height:36px;padding:0 20px}
 @media (prefers-reduced-motion:reduce){.bt-create-card,.bt-create-pop{animation:none}}
@@ -21655,7 +21656,7 @@ var pick = (list2) => list2[Math.floor(Math.random() * list2.length)], randomLoo
   return { shape: pick(shapes), color: pick(colors) };
 };
 function CreateBot({ roster, actions, start, brief = "", onBack, canGoBack, onCreated, inline = !1 }) {
-  let [look, setLook] = (0, import_react35.useState)(() => randomLook()), [image, setImage] = (0, import_react35.useState)(null), [library, setLibrary] = (0, import_react35.useState)(!1), [name, setName] = (0, import_react35.useState)(start?.name ?? ""), [model, setModel] = (0, import_react35.useState)(() => startModel(roster)), [effort, setEffort] = (0, import_react35.useState)(void 0), [busy, setBusy] = (0, import_react35.useState)(!1), [error, setError] = (0, import_react35.useState)(""), fileRef = (0, import_react35.useRef)(null), frame = (0, import_react35.useRef)(null);
+  let [look, setLook] = (0, import_react35.useState)(() => randomLook()), [image, setImage] = (0, import_react35.useState)(null), [avatarTab, setAvatarTab] = (0, import_react35.useState)("models"), [library, setLibrary] = (0, import_react35.useState)(!1), [name, setName] = (0, import_react35.useState)(start?.name ?? ""), [model, setModel] = (0, import_react35.useState)(() => startModel(roster)), [effort, setEffort] = (0, import_react35.useState)(void 0), [busy, setBusy] = (0, import_react35.useState)(!1), [error, setError] = (0, import_react35.useState)(""), fileRef = (0, import_react35.useRef)(null), frame = (0, import_react35.useRef)(null);
   useEscape(onBack), (0, import_react35.useEffect)(() => {
     inline && frame.current?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, []);
@@ -21689,7 +21690,24 @@ function CreateBot({ roster, actions, start, brief = "", onBack, canGoBack, onCr
     (0, import_react35.createElement)(
       "div",
       { className: "bt-create-looks" },
-      (0, import_react35.createElement)(CharacterGrid, {
+      (0, import_react35.createElement)(
+        "div",
+        { role: "tablist", "aria-label": t("Avatar source"), className: "bt-avedit-tabs bt-create-avatar-tabs" },
+        [["models", "Personas"], ["bot", "Bot"]].map(([id3, label]) => (0, import_react35.createElement)("button", {
+          key: id3,
+          type: "button",
+          role: "tab",
+          className: "bt-avedit-tab",
+          "aria-selected": avatarTab === id3,
+          onClick: () => setAvatarTab(id3)
+        }, t(label)))
+      ),
+      avatarTab === "models" ? (0, import_react35.createElement)(ModelAvatarPicker, {
+        image,
+        onPick: (entry) => {
+          setImage(entry.image), setLibrary(!1);
+        }
+      }) : (0, import_react35.createElement)(CharacterGrid, {
         look,
         hasPhoto: !!image,
         onShape: (shape) => {
@@ -21703,7 +21721,7 @@ function CreateBot({ roster, actions, start, brief = "", onBack, canGoBack, onCr
         "div",
         { className: "bt-actions bt-create-lookbar" },
         (0, import_react35.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: () => {
-          setImage(null), setLook((current) => randomLook(current));
+          setImage(null), setAvatarTab("bot"), setLook((current) => randomLook(current));
         } }, t("Shuffle")),
         (0, import_react35.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: () => fileRef.current?.click() }, image ? t("Replace photo") : t("Upload photo")),
         (0, import_react35.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", "aria-expanded": library, onClick: () => setLibrary((value) => !value) }, t("Library")),
@@ -40264,7 +40282,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.74.3", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.74.4", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);

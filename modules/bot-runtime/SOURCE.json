@@ -219,7 +219,7 @@
     {
       "path": "src/client/styles.js",
       "kind": "patched",
-      "summary": "Fits four avatar-source tabs and a scrollable, named model avatar grid inside the existing avatar popover.",
+      "summary": "Fits the model portrait grid in the creation form and the existing avatar popover, with accessible source tabs.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "b789349121d050381dc5da82b7473361551a12b20cdd87d382fbb7cd7d7787c5"
@@ -234,6 +234,15 @@
       "path": "src/client/model-avatar-picker.js",
       "kind": "product-file",
       "summary": "Renders named built-in model portraits and recognizes saved selections through the existing avatar.image contract."
+    },
+    {
+      "path": "src/client/create-bot.js",
+      "kind": "patched",
+      "summary": "Shows the 19 built-in model portraits directly in both Create Bot entry points; selection stays in the draft until Create, with ordinary characters, uploads and the avatar library preserved.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "80ebfe7556ade34b7ac5fe5cef2b027c6a78a7866bca62fda033f41d643d656f"
+      }
     }
   ],
   "files": [
@@ -289,8 +298,8 @@
     {
       "path": "vendor/ds-bot/client.js",
       "sourcePath": "ds-bot/client.js",
-      "sha256": "36efd19297854e085f8067170f70cacd16eec995983991fb802586a50ffb44ba",
-      "gitBlob": "60378ba339a90ae14e1f6b1a50d33d183f99f61d",
+      "sha256": "3bec7bbc7b99995aa7fa6f5a6f001f3c3182930c6c2dc82aec772e9bc842b5f8",
+      "gitBlob": "ad010739ad0b3572fc75900e193ad50a565c4029",
       "origin": "generated"
     },
     {
@@ -758,9 +767,9 @@
     {
       "path": "vendor/ds-bot/src/client/create-bot.js",
       "sourcePath": "ds-bot/src/client/create-bot.js",
-      "sha256": "80ebfe7556ade34b7ac5fe5cef2b027c6a78a7866bca62fda033f41d643d656f",
-      "gitBlob": "63b8606dbdcd06e8fb73e30e6ec7cb49c71338e6",
-      "origin": "upstream"
+      "sha256": "6074949d4f05612445aaade59d0371a1cd3ad4945c73091b0c904f001ecfd8f0",
+      "gitBlob": "8acf3309d2aa837f7da5bb7890cb21b777051aea",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/desktop-pane.js",
@@ -1136,8 +1145,8 @@
     {
       "path": "vendor/ds-bot/src/client/styles.js",
       "sourcePath": "ds-bot/src/client/styles.js",
-      "sha256": "64f438e2c3dd66dcc6c6457be81defe32cd27d08bf956fc765b4f50d030adf7d",
-      "gitBlob": "76c173e257b6867ae5ac89dffa89ec91247d71eb",
+      "sha256": "a1ecfa5e0566e6e98773bbccb13b162d233e03332ab986f2244fbf2f2473f6da",
+      "gitBlob": "3c626d61e92b9cffe77f2def999f0322af3d7ba8",
       "origin": "overlay"
     },
     {

@@ -2,6 +2,7 @@ import { createElement as h, useEffect, useRef, useState } from 'react'
 import { BotMark } from './mark.js'
 import { CharacterGrid } from './bot-settings.js'
 import { AvatarLibraryPanel, avatarImage } from './avatar-library.js'
+import { ModelAvatarPicker } from './model-avatar-picker.js'
 import { DEFAULT_SHAPES, DEFAULT_COLORS } from './characters.js'
 import { ChevronLeftIcon, CloseIcon } from './icons.js'
 import { useEscape } from './overlay-hooks.js'
@@ -22,6 +23,7 @@ const randomLook = (avoid = {}) => {
 export function CreateBot({ roster, actions, start, brief = '', onBack, canGoBack, onCreated, inline = false }) {
   const [look, setLook] = useState(() => randomLook())
   const [image, setImage] = useState(null)
+  const [avatarTab, setAvatarTab] = useState('models')
   const [library, setLibrary] = useState(false)
   const [name, setName] = useState(start?.name ?? '')
   const [model, setModel] = useState(() => startModel(roster))
@@ -63,13 +65,20 @@ export function CreateBot({ roster, actions, start, brief = '', onBack, canGoBac
       h('span', { className: 'bt-create-name' }, finalName)),
     h('div', { className: 'bt-create-step' }, t('Look')),
     h('div', { className: 'bt-create-looks' },
-      h(CharacterGrid, {
+      h('div', { role: 'tablist', 'aria-label': t('Avatar source'), className: 'bt-avedit-tabs bt-create-avatar-tabs' },
+        [['models', 'Personas'], ['bot', 'Bot']].map(([id, label]) => h('button', {
+          key: id, type: 'button', role: 'tab', className: 'bt-avedit-tab', 'aria-selected': avatarTab === id,
+          onClick: () => setAvatarTab(id),
+        }, t(label)))),
+      avatarTab === 'models' ? h(ModelAvatarPicker, {
+        image, onPick: entry => { setImage(entry.image); setLibrary(false) },
+      }) : h(CharacterGrid, {
         look, hasPhoto: Boolean(image),
         onShape: (shape) => { setImage(null); setLook(current => ({ ...current, shape })) },
         onColor: (color) => { setImage(null); setLook(current => ({ ...current, color })) },
       }),
       h('div', { className: 'bt-actions bt-create-lookbar' },
-        h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => { setImage(null); setLook(current => randomLook(current)) } }, t('Shuffle')),
+        h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => { setImage(null); setAvatarTab('bot'); setLook(current => randomLook(current)) } }, t('Shuffle')),
         h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => fileRef.current?.click() }, image ? t('Replace photo') : t('Upload photo')),
         h('button', { type: 'button', className: 'bt-soft bt-soft-sm', 'aria-expanded': library, onClick: () => setLibrary(value => !value) }, t('Library')),
         image ? h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => setImage(null) }, t('Remove photo')) : null,

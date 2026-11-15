@@ -60,6 +60,42 @@ const choose = async id => {
   }
   throw new Error(`Host did not persist the ${id} avatar`)
 }
+const bots = async () => {
+  const state = JSON.parse(await readFile(join(home, 'bot/state.json'), 'utf8'))
+  return Array.isArray(state.bots) ? state.bots : Object.values(state.bots ?? {})
+}
+const openCreate = async () => {
+  await page.getByRole('button', { name: '新建', exact: true }).first().click()
+  await page.getByRole('option', { name: '新建 Bot', exact: true }).click()
+  await page.locator('.bt-create').waitFor()
+}
+const checkCreate = async form => {
+  assert.equal(await form.locator('.bt-model-avatar').count(), 19, 'creation must show model portraits without visiting the edit picker')
+  assert.equal(await form.getByRole('tab', { name: '模型角色', exact: true }).getAttribute('aria-selected'), 'true')
+  await page.waitForFunction(() => [...document.querySelectorAll('.bt-create-card .bt-model-avatar img')].every(image => image.complete && image.naturalWidth === 256))
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)
+  const box = await form.locator('.bt-create-card').boundingBox()
+  assert.ok(box.x >= 0 && box.x + box.width <= page.viewportSize().width + 1)
+}
+const pickDraft = async (form, id) => {
+  const entry = MODEL_AVATARS.find(item => item.id === id)
+  await form.locator(`[data-model-avatar="${id}"]`).click()
+  await page.waitForFunction(image => document.querySelector('.bt-create-preview img')?.getAttribute('src') === image, entry.image)
+  assert.equal(await form.locator(`[data-model-avatar="${id}"]`).getAttribute('aria-pressed'), 'true')
+  return entry
+}
+const createPortraitBot = async (form, name, id) => {
+  const entry = await pickDraft(form, id)
+  await form.getByRole('textbox', { name: '名字', exact: true }).fill(name)
+  await form.getByRole('button', { name: '创建', exact: true }).click()
+  await form.waitFor({ state: 'hidden' })
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const bot = (await bots()).find(item => item.name === name)
+    if (bot?.avatar?.image === entry.image) return bot
+    await new Promise(done => setTimeout(done, 100))
+  }
+  throw new Error('Created Bot did not persist its chosen model portrait')
+}
 
 try {
   await page.goto(connection.ownerUrl)
@@ -68,6 +104,31 @@ try {
   await beta.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {})
   if (await beta.isVisible()) await page.getByRole('button', { name: '继续', exact: true }).click()
   await dismissWelcome()
+  const beforeDraft = (await bots()).map(({ id, avatar }) => ({ id, avatar }))
+  await openCreate()
+  let form = page.locator('.bt-create')
+  await checkCreate(form)
+  await pickDraft(form, 'deepseek'); await capture('create-avatars-light')
+  await form.getByRole('tab', { name: 'Bot', exact: true }).click()
+  await form.locator('.bt-shape').first().click()
+  assert.equal(await form.locator('.bt-create-preview img').count(), 0)
+  await form.getByRole('tab', { name: '模型角色', exact: true }).click()
+  await pickDraft(form, 'rwkv')
+  await form.getByRole('button', { name: '随机', exact: true }).click()
+  assert.equal(await form.getByRole('tab', { name: 'Bot', exact: true }).getAttribute('aria-selected'), 'true')
+  assert.equal(await form.locator('.bt-create-preview img').count(), 0)
+  await form.getByRole('tab', { name: '模型角色', exact: true }).click()
+  await pickDraft(form, 'rwkv')
+  await form.getByRole('button', { name: '头像库', exact: true }).click()
+  await form.locator('.bt-lib').waitFor()
+  await pickDraft(form, 'deepseek')
+  assert.equal(await form.locator('.bt-lib').count(), 0)
+  assert.deepEqual((await bots()).map(({ id, avatar }) => ({ id, avatar })), beforeDraft, 'avatar browsing stays in the unsaved creation draft')
+  await form.getByRole('button', { name: '关闭', exact: true }).click()
+  assert.deepEqual((await bots()).map(({ id, avatar }) => ({ id, avatar })), beforeDraft, 'cancelling creates no Bot and changes no existing avatar')
+  await openCreate(); form = page.locator('.bt-create')
+  await createPortraitBot(form, 'Portrait Creation Check', 'rwkv')
+  checks.push('the actual New Chat → Create Bot form immediately lists all 19 presets; browsing/cancelling has no Host side effects, and Create persists the selected portrait')
   await openEditor()
   await page.getByRole('tab', { name: '模型角色', exact: true }).click()
   assert.equal(await page.locator('.bt-model-avatar').count(), 19)
@@ -92,23 +153,38 @@ try {
   await openEditor()
   assert.equal(await page.getByRole('tab', { name: '模型角色', exact: true }).getAttribute('aria-selected'), 'true')
   assert.equal(await page.locator('[data-model-avatar="deepseek"]').getAttribute('aria-pressed'), 'true')
-  assert.equal(await page.locator('.bt-tile img').first().getAttribute('src'), MODEL_AVATARS.find(item => item.id === 'deepseek').image)
+  assert.equal(await page.locator('.bt-row, .bt-tile').filter({ hasText: 'Portrait Creation Check' }).first().locator('img').getAttribute('src'), MODEL_AVATARS.find(item => item.id === 'deepseek').image)
   checks.push('a complete browser reload reads the committed portrait in the sidebar, editor and selection ring')
   await page.keyboard.press('Escape')
   const appearance = page.locator('.bp-appearance').first()
   await appearance.locator('summary').click(); await appearance.getByRole('button', { name: '深色', exact: true }).click(); await appearance.locator('summary').click()
   await openEditor(); await noOverflow(); await capture('avatars-dark')
+  await page.keyboard.press('Escape'); await openCreate()
+  form = page.locator('.bt-create'); await checkCreate(form)
+  await pickDraft(form, 'deepseek'); await capture('create-avatars-dark')
+  await form.getByRole('button', { name: '关闭', exact: true }).click()
   // Harness collapses the conversation details column on phones. Use the real
   // full-screen Bot settings entry that remains available from the account menu.
   await page.setViewportSize({ width: 390, height: 844 }); await page.keyboard.press('Escape')
   await page.locator('.bt-account:visible').last().click()
   await page.getByRole('menuitem', { name: 'Bot 设置', exact: true }).click()
   await page.locator('.bt-settings-nav').getByRole('button', { name: 'Bot', exact: true }).click()
-  await page.locator('.bt-settings .bt-set-row:has(.bt-row-title)').first().click()
+  await page.locator('.bt-settings .bt-set-row:has(.bt-row-title)').filter({ hasText: 'Portrait Creation Check' }).first().click()
   await page.locator('.bt-settings .bt-avatar-trigger').click()
   assert.equal(await page.getByRole('tab', { name: '模型角色', exact: true }).getAttribute('aria-selected'), 'true')
   await noOverflow(); await capture('avatars-phone')
   checks.push('the actual desktop details picker fits light/dark; the actual full-screen Bot settings picker fits a 390px phone viewport')
+  await page.keyboard.press('Escape')
+  await page.locator('.bt-settings-nav').getByRole('button', { name: 'Bot', exact: true }).click()
+  await page.locator('.bt-settings').getByRole('button', { name: '新 Bot', exact: true }).click()
+  form = page.locator('.bt-create-inline'); await checkCreate(form)
+  await pickDraft(form, 'deepseek'); await capture('create-avatars-phone')
+  await createPortraitBot(form, 'Phone Portrait Creation Check', 'deepseek')
+  await page.reload(); await page.locator('.bp-workspace-shortcuts').waitFor({ state: 'attached' })
+  const saved = await bots()
+  assert.equal(saved.find(bot => bot.name === 'Portrait Creation Check').avatar.image, MODEL_AVATARS.find(item => item.id === 'deepseek').image)
+  assert.equal(saved.find(bot => bot.name === 'Phone Portrait Creation Check').avatar.image, MODEL_AVATARS.find(item => item.id === 'deepseek').image)
+  checks.push('the actual Settings → Bot → New Bot form lists the same 19 presets at 390px; both created Bots retain their committed portraits after reload')
   assert.ok(served.includes(hash(expectedClient)), 'the real Host must serve the exact generated client bytes')
   assert.deepEqual(errors, [])
   const report = { status: 'passed', buildLabel: 'local model-avatar verification build', packageVersion, actualHarnessRuntime: true, harnessVersion,

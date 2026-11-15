@@ -2894,6 +2894,7 @@ button.bt-q-opt:active{background:var(--bt-active)}
 .bt-create-step{font-size:12px;line-height:16px;color:var(--bt-ink-2);margin-bottom:-10px}
 .bt-create-looks{display:flex;flex-direction:column;gap:10px;padding:10px;border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card)}
 .bt-create-lookbar{justify-content:center}
+.bt-create-avatar-tabs{align-self:flex-start}
 .bt-create-foot{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}
 .bt-create-go{height:36px;padding:0 20px}
 @media (prefers-reduced-motion:reduce){.bt-create-card,.bt-create-pop{animation:none}}
@@ -15100,6 +15101,7 @@ var randomLook = (avoid = {}) => {
 function CreateBot({ roster, actions, start, brief = "", onBack, canGoBack, onCreated, inline = false }) {
   const [look, setLook] = (0, import_react35.useState)(() => randomLook());
   const [image, setImage] = (0, import_react35.useState)(null);
+  const [avatarTab, setAvatarTab] = (0, import_react35.useState)("models");
   const [library, setLibrary] = (0, import_react35.useState)(false);
   const [name, setName] = (0, import_react35.useState)(start?.name ?? "");
   const [model, setModel] = (0, import_react35.useState)(() => startModel(roster));
@@ -15152,7 +15154,25 @@ function CreateBot({ roster, actions, start, brief = "", onBack, canGoBack, onCr
     (0, import_react35.createElement)(
       "div",
       { className: "bt-create-looks" },
-      (0, import_react35.createElement)(CharacterGrid, {
+      (0, import_react35.createElement)(
+        "div",
+        { role: "tablist", "aria-label": t("Avatar source"), className: "bt-avedit-tabs bt-create-avatar-tabs" },
+        [["models", "Personas"], ["bot", "Bot"]].map(([id, label]) => (0, import_react35.createElement)("button", {
+          key: id,
+          type: "button",
+          role: "tab",
+          className: "bt-avedit-tab",
+          "aria-selected": avatarTab === id,
+          onClick: () => setAvatarTab(id)
+        }, t(label)))
+      ),
+      avatarTab === "models" ? (0, import_react35.createElement)(ModelAvatarPicker, {
+        image,
+        onPick: (entry) => {
+          setImage(entry.image);
+          setLibrary(false);
+        }
+      }) : (0, import_react35.createElement)(CharacterGrid, {
         look,
         hasPhoto: Boolean(image),
         onShape: (shape) => {
@@ -15169,6 +15189,7 @@ function CreateBot({ roster, actions, start, brief = "", onBack, canGoBack, onCr
         { className: "bt-actions bt-create-lookbar" },
         (0, import_react35.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: () => {
           setImage(null);
+          setAvatarTab("bot");
           setLook((current) => randomLook(current));
         } }, t("Shuffle")),
         (0, import_react35.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: () => fileRef.current?.click() }, image ? t("Replace photo") : t("Upload photo")),
