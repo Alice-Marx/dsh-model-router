@@ -183,7 +183,7 @@ export function createLatestVersions({
     const cache = await load()
     // The two ZCode channels can publish at different times. Never reuse either
     // channel's in-flight request, cached version, failure or asset URL for the other.
-    const key = tool.id === 'zcode' ? `${tool.id}:${source.kind}` : tool.id
+    const key = tool.id === 'zcode' ? `${tool.id}:${source.kind}:${source.package ?? ''}` : tool.id
     const legacy = tool.id === 'zcode' && source.kind === 'zcode-github-release' ? cache[tool.id] : null
     const candidate = cache[key] ?? legacy
     const entry = tool.id === 'zcode' && candidate?.source !== source.kind ? null : candidate

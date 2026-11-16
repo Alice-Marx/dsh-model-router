@@ -1,4 +1,4 @@
-/** Preserve narrowly identified pre-npm desktop launchers before linking ZCode CLI. */
+/** Preserve identified legacy launchers before linking the vendor's ZCode TUI. */
 import { constants } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rename, writeFile } from 'node:fs/promises'
@@ -9,6 +9,13 @@ const MAX_SHIM_BYTES = 16_384
 const absent = error => error?.code === 'ENOENT'
 const key = path => process.platform === 'win32' ? resolve(path).toLowerCase() : resolve(path)
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
+// Exact npm cmd-shim 8 templates for the old community package's fixed bin.
+// Only line endings may differ. Never classify arbitrary scripts by a substring.
+const COMMUNITY_SHIMS = Object.freeze({
+  zcode: 'c69012aadaa6112a0086c6db7c43625ec8ab1d3ace428cd2e15278b04f8aa3b5',
+  'zcode.cmd': 'b1687dd10e2ef2755eb7c20afba4e48fbecd191bcfcb8f984ce9c871d8ade866',
+  'zcode.ps1': '2f93e28dfe032108fade2410cb4b808a83c21fdd520c24e1568799fa4ee5571f',
+})
 const inside = (root, path) => {
   const part = relative(root, path)
   return part && part !== '..' && !part.startsWith(`..${sep}`) && !isAbsolute(part)
@@ -44,6 +51,24 @@ export function legacyZCodeDesktopShim(name, bytes) {
   return match ? desktopEntry(match[1]) : null
 }
 
+async function communityShimTarget(root, name, bytes) {
+  if (!COMMUNITY_SHIMS[name] || bytes.length > MAX_SHIM_BYTES
+    || digest(Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'))) !== COMMUNITY_SHIMS[name]) return null
+  const packageRoot = join(root, 'node_modules', '@ljwei-stak', 'zcode-cli')
+  try {
+    if (key(await realpath(packageRoot)) !== key(packageRoot)) return null
+    const metadata = join(packageRoot, 'package.json'), entry = join(packageRoot, 'bin', 'zcode.mjs')
+    for (const path of [metadata, entry]) {
+      const info = await lstat(path)
+      if (!info.isFile() || info.isSymbolicLink() || key(await realpath(path)) !== key(path)) return null
+    }
+    const manifest = JSON.parse(await readFile(metadata, 'utf8'))
+    if (manifest.name !== '@ljwei-stak/zcode-cli' || !/^\d+\.\d+\.\d+$/.test(manifest.version)
+      || manifest.bin?.zcode?.replace(/^\.\//, '') !== 'bin/zcode.mjs') return null
+    return key(entry)
+  } catch { return null }
+}
+
 async function canonicalPrefix(prefix) {
   if (typeof prefix !== 'string' || !isAbsolute(prefix) || resolve(prefix) === dirname(resolve(prefix))) {
     throw new Error('ZCode CLI npm 前缀必须是独立的绝对目录。')
@@ -64,8 +89,8 @@ async function canonicalPrefix(prefix) {
 }
 
 /**
- * Only Windows desktop wrappers are moved. Existing npm shims and unrelated files
- * are never overwritten, removed or executed. Backups survive successful installs.
+ * Only identified desktop wrappers and exact old community npm shims are moved.
+ * Files are backed up, never executed. Other npm/user files remain untouched.
  */
 export async function prepareZCodeNpmShims({ prefix, platform = process.platform, signal } = {}) {
   const backups = [], skipped = []
@@ -105,19 +130,20 @@ export async function prepareZCodeNpmShims({ prefix, platform = process.platform
       || key(await realpath(original)) !== key(original)) { blocked.push(name); continue }
     if (info.size > MAX_SHIM_BYTES) { skipped.push(name); continue }
     const bytes = await readFile(original)
-    const target = legacyZCodeDesktopShim(name, bytes)
+    const desktop = legacyZCodeDesktopShim(name, bytes)
+    const target = desktop ?? await communityShimTarget(root, name, bytes)
     if (!target) { skipped.push(name); continue }
-    candidates.push({ name, original, bytes, target, sha256: digest(bytes), mode: info.mode })
+    candidates.push({ name, original, bytes, target, kind: desktop ? 'desktop' : 'community-npm', sha256: digest(bytes), mode: info.mode })
   }
   if (blocked.length) throw new Error(`ZCode CLI npm 命令位置含链接或非普通文件（${blocked.join('、')}）；已保留全部文件，请先核对。`)
   if (!candidates.length) return transaction
   if (skipped.length) throw new Error(`ZCode CLI npm 命令位置还存在无法识别的文件或链接（${skipped.join('、')}）；已保留全部文件，请核对后重试，插件不会使用 --force。`)
-  if (new Set(candidates.map(item => item.target)).size !== 1) throw new Error('ZCode CLI 旧启动器指向不同桌面安装，已保留全部文件，请先核对。')
+  if (new Set(candidates.map(item => item.target)).size !== 1) throw new Error('ZCode TUI 旧启动器指向不同安装，已保留全部文件，请先核对。')
   signal?.throwIfAborted()
   backupDir = await mkdtemp(join(root, '.zcode-legacy-shims-'))
   if (!inside(root, backupDir) || key(await realpath(backupDir)) !== key(backupDir)) throw new Error('ZCode CLI 备份目录离开了 npm 前缀。')
   await writeFile(join(backupDir, 'manifest.json'), `${JSON.stringify({
-    schemaVersion: 1, owner: 'dsh-model-router', kind: 'zcode-desktop-shims', createdAt: new Date().toISOString(),
+    schemaVersion: 1, owner: 'dsh-model-router', kind: candidates[0].kind === 'desktop' ? 'zcode-desktop-shims' : 'zcode-community-npm-shims', createdAt: new Date().toISOString(),
     desktopEntry: candidates[0].target,
     files: candidates.map(({ name, sha256, bytes, mode }) => ({ name, sha256, size: bytes.length, mode })),
   }, null, 2)}\n`, { flag: 'wx', mode: 0o600 })

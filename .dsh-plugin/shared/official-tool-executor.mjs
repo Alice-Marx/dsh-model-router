@@ -24,7 +24,7 @@ import { currentInstallOptions, ensureNpmPrefixOnPath, installPreferences, prefe
 import { resolveInstallPlan } from './tool-install-preferences.mjs'
 import { buildMiniMaxInvocation, createMiniMaxStreamParser } from './vendor-minimax-adapter.mjs'
 import { discoverZCodeBundle } from './zcode-bundle.mjs'
-import { resolveZCodeNpmBundle } from './zcode-npm.mjs'
+import { resolveZCodeTuiBundle, zcodeTuiInvocation } from './zcode-tui.mjs'
 import { CODE_FILE, npmAttestor } from './npm-attestation.mjs'
 import { compareReleaseVersions, isReleaseVersion } from './latest-versions.mjs'
 import { resolveMiMoGrokLaunch, createMiMoGrokParser, installedModuleRoots } from './vendor-mimo-grok-adapter.mjs'
@@ -75,7 +75,7 @@ const CAPABILITIES = Object.freeze({
   'grok-build': Object.freeze(IS_WINDOWS
     ? { supported: true, modes: Object.freeze(['read-only', 'workspace-write']) }
     : { supported: false, reason: 'Grok 原生执行入口目前仅在 Windows 完成适配。' }),
-  zcode: Object.freeze({ supported: true, modes: Object.freeze(['workspace-write']) }),
+  zcode: Object.freeze({ supported: true, modes: Object.freeze(['read-only', 'workspace-write']) }),
   gemini: Object.freeze({
     supported: true, modes: Object.freeze(['read-only','workspace-write']),
   }),
@@ -158,7 +158,7 @@ function checkedTimeout(timeoutMs) {
 
 /** API-key variables removed when a run must use the CLI's own subscription login. */
 const API_KEY_VARIABLES = Object.freeze(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CODEX_API_KEY', 'OPENAI_API_KEY', 'KIMI_API_KEY',
-  'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY', 'ZAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY','DEEPSEEK_API_KEY','STEP_API_KEY','STEPCODE_API_KEY','CODEBUDDY_API_KEY'])
+  'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY', 'ZAI_API_KEY', 'ZCODE_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY','DEEPSEEK_API_KEY','STEP_API_KEY','STEPCODE_API_KEY','CODEBUDDY_API_KEY'])
 
 export function executionEnvironment(toolId, { sessionOnly = false, env: source = process.env, extraKeys = [] } = {}) {
   const vendorKeys = {
@@ -175,7 +175,7 @@ export function executionEnvironment(toolId, { sessionOnly = false, env: source 
     'dsh-tui': ['DEEPSEEK_API_KEY', 'DEEPSEEK_BASE_URL', 'DSH_TUI_HOME','DSH_HOME','DSH_STATE_HOME'],
     gemini:['GEMINI_API_KEY','GOOGLE_API_KEY','GEMINI_CONFIG_DIR','GEMINI_CLI_HOME','GOOGLE_CLOUD_PROJECT'],
     stepcode:['STEP_API_KEY','STEPCODE_API_KEY','STEP_BASE_URL','STEP_CODING_AGENT_DIR','STEPCODE_AUTH_PATH'],
-    zcode: ['ZCODE_DATA_BASE_DIR', 'ZCODE_PERSONAL_PROVIDER_CONFIG_FILE', 'ZCODE_STORAGE_DIR',
+    zcode: ['ZCODE_DATA_BASE_DIR', 'ZCODE_STORAGE_DIR', 'ZCODE_MODEL', 'ZCODE_MODEL_BASE_URL', 'ZCODE_API_KEY',
       'ZCODE_SESSION_DB_PATH', 'ZCODE_LOG_DIR', 'ZCODE_HTTP_PROXY', 'ZCODE_NO_PROXY', 'ZCODE_AGENT_CA_CERT'],
   }
   // Declared prerequisites are additive: a person names one variable for one tool and it joins
@@ -663,16 +663,16 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
           : await resolvePackageJobPlan(tool, selection.plan, selectionOptions.preferences ?? installPreferences())
         const bound = { ...selection, plan, preferred: true, directories: plan.binDir ? [plan.binDir] : selection.directories }
         const moduleRoots = plan.packageModuleRoots ?? [IS_WINDOWS ? join(plan.installDir, 'node_modules') : join(plan.installDir, 'lib', 'node_modules')]
-        const entries = await findGlobalPackageEntries(tool.package, 'zcode', 'bin/zcode.mjs', workspace, { selection: bound, moduleRoots })
+        const entries = await findGlobalPackageEntries(tool.package, 'zcode', 'bin/zcode.cjs', workspace, { selection: bound, moduleRoots })
         const entry = newestFirst(entries)[0]
-        if (!entry) return { unsupported: '未在所选 npm 安装目录中找到 @ljwei-stak/zcode-cli；请安装或修复该方式，不会改用 GitHub 安装副本。' }
-        const bundle = await resolveZCodeNpmBundle(entry)
-        return resolveZCodeLaunch(workspace, mode, task, { modelId, discoverBundle: async () => bundle })
+        if (!entry) return { unsupported: '未在所选安装目录中找到 @mbearo/zcode，请安装或修复 ZCode TUI。' }
+        const bundle = await resolveZCodeTuiBundle(entry, { workspace, boundary: plan.globalDir || plan.installDir })
+        return zcodeTuiInvocation(bundle, mode, modelId)
       } catch (error) {
-        return { unsupported: `ZCode CLI npm 入口核验失败：${redactDiagnostic(error?.message ?? error).slice(0, 240)}` }
+        return { unsupported: `ZCode TUI 入口核验失败：${redactDiagnostic(error?.message ?? error).slice(0, 240)}` }
       }
     }
-    return resolveZCodeLaunch(workspace, mode, task, { installDir: selection.plan.installDir, modelId })
+    return { unsupported: 'ZCode TUI 使用 @mbearo/zcode，请选择 npm 或 pnpm 安装。' }
   }
   return { unsupported: CAPABILITIES[toolId]?.reason ?? '此官方工具尚无已核验的安全执行适配器。' }
 }
@@ -859,15 +859,16 @@ export function parseGeminiProcessOutput(stdout,exitCode){
 }
 
 /** Parse the complete Claude terminal JSON even when its process exits nonzero. */
-export function parseClaudeProcessOutput(stdout, exitCode, { secrets = [] } = {}) {
+export function parseClaudeProcessOutput(stdout, exitCode, { secrets = [], toolLabel = 'Claude', requireCompleted = false } = {}) {
   let result
   try { result = JSON.parse(stdout) } catch {
-    return { status: 'failed', exitCode, error: 'Claude 未返回有效的结果 JSON。' }
+    return { status: 'failed', exitCode, error: `${toolLabel} 未返回有效的结果 JSON。` }
   }
   const validResult = result && typeof result === 'object' && !Array.isArray(result)
     && result.type === 'result'
     && (result.is_error === undefined || typeof result.is_error === 'boolean')
   const succeeded = validResult && result.subtype === 'success' && result.is_error !== true
+    && (!requireCompleted || result.terminal_reason === 'completed')
     && typeof result.result === 'string' && result.result.trim().length > 0
   const failed = validResult && (result.is_error === true
     || (typeof result.subtype === 'string' && /^error(?:_|$)/.test(result.subtype)))
@@ -906,7 +907,7 @@ export function parseClaudeProcessOutput(stdout, exitCode, { secrets = [] } = {}
     if (typeof secret === 'string' && secret) detail = detail.split(secret).join('[redacted]')
   }
   detail = redactDiagnostic(detail, '', 2_000)
-  const error = exitCode !== 0 ? '官方 CLI 退出码非零。' : 'Claude 未返回成功终态。'
+  const error = exitCode !== 0 ? '官方 CLI 退出码非零。' : `${toolLabel} 未返回成功终态。`
   return { status: 'failed', exitCode, ...(failed ? { terminalEvent: 'failed' } : {}),
     error: detail ? `${error}${detail}` : error, ...(detail ? { detail } : {}), ...evidence }
 }
@@ -1174,6 +1175,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
       let evidence = accounting.snapshot()
       if (spec.format === 'claude-json') {
         evidence = parseClaudeProcessOutput(stdout, result.exitCode, {
+          ...(toolId === 'zcode' ? { toolLabel: 'ZCode TUI', requireCompleted: true } : {}),
           secrets: [...API_KEY_VARIABLES, 'CLAUDE_CODE_OAUTH_TOKEN'].map(key => childEnvironment[key]),
         })
       } else if (miniMaxParser) {
@@ -1243,6 +1245,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
       if(spec.format==='gemini-json'){settle(parseGeminiProcessOutput(stdout,code));return}
       if (spec.format === 'claude-json') {
         settle({ ...parseClaudeProcessOutput(stdout, code, {
+          ...(toolId === 'zcode' ? { toolLabel: 'ZCode TUI', requireCompleted: true } : {}),
           secrets: [...API_KEY_VARIABLES, 'CLAUDE_CODE_OAUTH_TOKEN'].map(key => childEnvironment[key]),
         }), exitSignal })
         return

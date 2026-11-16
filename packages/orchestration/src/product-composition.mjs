@@ -542,7 +542,7 @@ export function startBotProduct(ctx, options = {}) {
         const conversationId = context?.conversationId ?? policy.activeIdentity()?.conversationId ?? ctx.get('botRuntimeAdapter')?.contextOf?.(botId)?.contextId
         const team = createNativeTeamTools({ service: teamCoordination, callerBotId: botId, conversationId,
           validate: () => { validate(); teamCoordination.assertCanAct(botId, { conversationId }) }, redact: product.rt.redactSecrets })
-        entries.push(...team.handlers.map(handler => ({ handler, validate, readonly: handler.definition.name !== 'coordinate_bots' })))
+        entries.push(...team.handlers.map(handler => ({ handler, validate, readonly: !['coordinate_bots', 'team_inbox'].includes(handler.definition.name) })))
       }
       return entries
     } }))
@@ -710,7 +710,7 @@ export function startBotProduct(ctx, options = {}) {
         { id: 'model-inference', label: '模型推理', tools: ['model/infer'] },
         { id: 'mr-routing', label: '模型路由', tools: PRODUCT_TOOLS.filter(name=>name!=='model/infer') },
         { id: 'data-analysis', label: '数据分析与图表', tools: ['tool/data'] },
-        { id: 'team-work', label: '团队协作与委派', tools: ['tool/team', 'tool/coordinate_bots', 'tool/assignment_status', 'tool/list_bots', 'tool/list_threads'] },
+        { id: 'team-work', label: '团队协作与委派', tools: ['tool/team', 'tool/coordinate_bots', 'tool/assignment_status', 'tool/list_bots', 'tool/list_threads', 'tool/team_inbox'] },
         { ...TASK_CAPABILITY },
         ...[...new Set((machines?.readModel().items ?? []).filter(machine => machine.status !== 'revoked').flatMap(machine => machine.tools))]
           .map(tool => ({ id: tool, label: tool, tools: [`remote/${tool}`] })),
@@ -1602,7 +1602,7 @@ export function startBotProduct(ctx, options = {}) {
       })
       releaseTeamTools = registerTeamTools(ctx, { service: teamCoordination,
         botIdFor: exec => describeBot(directory.forAgent(exec?.agent)),
-        names: ['coordinate_bots', 'assignment_status', 'list_threads'], redact: product.rt.redactSecrets })
+        names: ['coordinate_bots', 'assignment_status', 'list_threads', 'team_inbox'], redact: product.rt.redactSecrets })
       releaseTeamStop = ctx.on('session/event', (session, event) => {
         if (event.type !== 'turn/end' || event.data?.reason?.kind !== 'aborted'
           || !['user', 'parent'].includes(event.data.reason.reason?.kind)) return

@@ -1,5 +1,5 @@
 /**
- * The native MCP door for the four teammate-coordination tools.
+ * The native MCP door for teammate coordination and its inbox.
  *
  * This is the independent-runtime half of the team family: it wraps the coordination
  * service (createTeamCoordination in team-bridge.mjs) in the same handler shape the
@@ -57,6 +57,7 @@ export function createNativeTeamTools({ service, callerBotId, conversationId = n
         }
         else if (entry.method === 'assignmentStatus') value = await service.assignmentStatus({ ...request, args })
         else if (entry.method === 'listBots') value = await service.listBots(request)
+        else if (entry.method === 'teamInbox') value = await service.teamInbox({ ...request, args })
         else value = await service.listThreads(request)
         await check()
         service.validateResult?.(request, value)

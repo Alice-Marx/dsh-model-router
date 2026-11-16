@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.75.0 · Windows Remote Agent: 0.1.3**
+**Current stable version: 0.76.0 · Windows Remote Agent: 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -80,8 +80,8 @@ Edit the Bot's name, role and standing instructions under **Identity & personali
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.75.0`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.75.0`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.76.0`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.76.0`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -89,10 +89,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.75.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.76.0
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.75.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.0
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -143,7 +143,9 @@ Model routing executes read-only analysis. To modify files, choose **Team → Na
 
 ### Use native tools with their own accounts
 
-The tool registry includes **Qwen Code, CodeBuddy Code, Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, Gemini, OpenCode, StepCode, Pi, Hermes, ZCode, and DSH TUI**. In **Native tools**, detect the tool, choose an available install method, complete the vendor's login, then check readiness for the execution mode you want.
+The tool registry includes **Qwen Code, CodeBuddy Code, Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, Gemini, OpenCode, StepCode, Pi, Hermes, ZCode TUI, and DSH TUI**. In **Native tools**, detect the tool, choose an available install method, complete the vendor's login, then check readiness for the execution mode you want.
+
+**ZCode TUI** uses the vendor-supplied beta package `@mbearo/zcode`, installed with `npm i -g @mbearo/zcode` or the pnpm method. The command remains `zcode`; use `zcode login` to choose Z.ai or BigModel. It requires Node.js 22.16.0 or newer and matching optional native dependencies (Windows x64/ARM64, macOS ARM64, or Linux glibc x64/ARM64). Managed tasks use print JSON, a private runtime and the Host sandbox for read-only or workspace-edit execution. A saved CLI model is passed with `--model`; otherwise the configured default is used. Existing `zcode` bindings retain their identity. The older community `zcode-cli` distribution does not satisfy TUI detection.
 
 An interactive terminal exposes the installed tool's own workflow and capabilities. Managed single-tool and team execution use supported adapters; installation or login alone does not establish readiness for every mode or model. Managed execution requires the Host process sandbox. Qwen, CodeBuddy, Gemini, Step, MiMo and dsh use private per-task runtime state; source login files remain in the local CLI account. MiMo managed tasks leave Git integration to the Host. CodeBuddy Code is available as an execution tool; Qwen Code can also be configured separately for native chat. The explicitly selected native environment has the current system user's permissions.
 
@@ -159,7 +161,15 @@ A Host Claude conversation profile can enable `hostTools: true` to offer paired-
 
 The workspace shows native tool activity in both chat modes, scoped to the selected Bot and conversation. Open the activity indicator to inspect earlier entries. “Returned” records a CLI response; the task or remote-operation receipt determines whether the operation succeeded. Cancellation and confirmed process shutdown are separate facts. Unconfirmed turns remain marked for review, and recording failures are shown explicitly.
 
-The plugin adds team coordination. Main can delegate using `coordinate_bots`; workers require the committed team-work permission. Assignments retain their original conversation, work thread and request identity, and targets use their own model, permissions and funding. Consult assignments cannot execute tools. Status checks and thread lists stay within the caller's scope; uncertain execution or reply delivery requires reconciliation. Restored work retains its original delegation ancestry for cycle and depth checks. Local validation uses real SDK/SQLite, an offline model provider and controlled native CLI fixtures; live user Host and provider-account acceptance remain outstanding.
+Main delegates through `coordinate_bots`; workers require the committed team-work permission. Assignments retain their original conversation, work thread and request identity, and targets use their own model, permissions and funding. Consult assignments cannot execute tools. Restored work keeps its delegation ancestry for cycle and depth checks; uncertain execution or delivery is never automatically repeated.
+
+Results stay in the original conversation's durable `team_inbox`. Results from a parallel batch share one compact notification; result bodies enter context only when a Bot reads selected items. If a new interactive instruction arrives while teammates work, the old notification is held for review and the results remain available. `team_inbox` lists metadata, reads bounded text pages, acknowledges used results, or dismisses irrelevant ones. Reading alone does not acknowledge delivery, so a lost tool response does not hide unread results. Every read rechecks current access; unknown outcomes require reconciliation, and handling an inbox item neither cancels work nor confirms that an uncertain process stopped.
+
+| `coordinate_bots` reply mode | Behavior |
+| --- | --- |
+| `resume` (default) | Notify once after the batch finishes, if the original input is still current. Read and verify relevant results before one final answer. |
+| `inbox` | Collect results for later reading without waking the sender. |
+| `none` | Send a one-way notice with no result return. |
 
 | To do this | Use this workflow |
 | --- | --- |

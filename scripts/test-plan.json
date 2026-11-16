@@ -214,6 +214,7 @@
       "tests/cli-providers.test.mjs",
       "tests/cli-tool-setup.test.mjs",
       "tests/official-execution-adapters.test.mjs",
+      "tests/zcode-tui.test.mjs",
       "tests/qwen-official-tools.test.mjs",
       "tests/official-tool-setup.integration.test.mjs",
       "tests/cli-chat-providers.integration.test.mjs",

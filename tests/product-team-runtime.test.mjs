@@ -63,7 +63,7 @@ test('actual installed AgentLoop target correlates its real session events and f
     let nextId = 0
     ctx.sessionController.create = async () => {
       const sessionId = `real-team-${++nextId}`
-      const handle = await actual.context.agents.create({ sessionId, agentOptions: { provider: 'alpha', model: 'one' }, setup: ctx => { ctx.tools.restrict({ deny: ctx.tools.schemas().map(tool => tool.name) }) } })
+      const handle = await actual.context.agents.create({ sessionId, agentOptions: { provider: 'beta', model: 'vendor/two' }, setup: ctx => { ctx.tools.restrict({ deny: ctx.tools.schemas().map(tool => tool.name) }) } })
       handles.push(handle)
       return { sessionId }
     }

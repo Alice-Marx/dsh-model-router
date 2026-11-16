@@ -28300,28 +28300,17 @@ var OFFICIAL_TOOLS = Object.freeze([
   }),
   Object.freeze({
     id: "zcode",
-    label: "ZCode CLI",
-    vendor: "Z.ai · Alice-Marx 社区抽取版",
-    purpose: "ZCode 独立命令行发行版，包含 TUI、Web 和 Agent，无需 Electron；由 Alice-Marx/zcode-cli 社区维护。",
-    package: "@ljwei-stak/zcode-cli",
-    manager: "github-release",
-    installArgs: [],
-    uninstallArgs: [],
+    label: "ZCode TUI",
+    vendor: "Z.ai · 智谱",
+    purpose: "ZCode 官方内测 TUI，使用 @mbearo/zcode 发布的 Rust 终端程序；启动命令为 zcode。",
+    package: "@mbearo/zcode",
+    manager: "npm",
+    installArgs: ["install", "-g", "@mbearo/zcode@latest"],
+    uninstallArgs: ["uninstall", "-g", "@mbearo/zcode"],
     probeExecutables: ["zcode"],
-    probeNote: "支持 GitHub Release（SHA256）或 npm 安装；需要 Node.js 24.14.0 或更新的 Node 24。",
+    probeNote: "需要 Node.js 22.16.0 及以上并保留 optional dependencies；支持 Windows x64/ARM64、macOS 13+ ARM64、Linux glibc 2.35+ x64/ARM64。",
     providerHints: ["zai", "z.ai", "zcode", "glm", "zhipu", "bigmodel"],
-    installMethods: Object.freeze([Object.freeze({
-      id: "github-release",
-      label: "GitHub Release · SHA256",
-      kind: "archive",
-      manager: "github-release",
-      repository: "Alice-Marx/zcode-cli",
-      platforms: Object.freeze(["win32", "linux", "darwin"]),
-      supportsInstallDir: !0,
-      supportsRegistry: !1,
-      installArgs: Object.freeze([]),
-      uninstallArgs: Object.freeze([])
-    }), packageManagerMethod("npm", "npm", "npm", "@ljwei-stak/zcode-cli@latest")])
+    installMethods: Object.freeze([packageManagerMethod("npm", "npm", "npm", "@mbearo/zcode@latest"), packageManagerMethod("pnpm", "pnpm", "pnpm", "@mbearo/zcode@latest")])
   }),
   Object.freeze({
     id: "dsh-tui",
@@ -28428,7 +28417,6 @@ function normalizeProfile(entry, index) {
   if (entry.cliModel !== void 0) {
     let cliModel = id(entry.cliModel);
     if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$/.test(cliModel)) throw new Error(`${label} 的 cliModel 无效`);
-    if (toolForProvider(provider)?.id === "zcode") throw new Error(`${label} 对应的 ZCode CLI 暂不支持逐次切换模型`);
     profile.cliModel = cliModel;
   }
   if (entry.execution !== void 0) {
@@ -28685,7 +28673,7 @@ function parseInstallPreferences(config = {}, { tools = [], home = "", env = {} 
   for (let [id3, methodId] of Object.entries(methodRaw)) methods[id3] = methodId.trim();
   for (let [id3, url] of Object.entries(scriptRaw)) scriptUrls[id3] = normalizeSourceUrl(url, `${id3} 安装脚本源`);
   for (let [id3, methodId] of Object.entries(methods)) {
-    let selected = installMethodFor({ id: id3, installMethods: tools.find((tool) => tool.id === id3)?.installMethods }, methodId);
+    let migrated = id3 === "zcode" && methodId === "github-release" ? "npm" : methodId, selected = installMethodFor({ id: id3, installMethods: tools.find((tool) => tool.id === id3)?.installMethods }, migrated);
     if (!selected)
       throw new Error(`${id3} 不支持安装方式 ${methodId}。`);
     methods[id3] = selected.id;
@@ -29888,7 +29876,7 @@ function channelForProvider(provider, installedToolIds = [], runnableToolIds = [
     preference,
     tool: tool.id,
     label: tool.label,
-    detail: tui ? `${tool.label} 已安装：工作台通过受管终端（PTY）把提示词输入它并取回终端文本，不是无头协议输出。` : tool.id === "zcode" ? "独立 ZCode CLI 已安装，插件可调用其编程代理；其 CLI 使用自身配置的默认模型，不能保证与 Harness 建议模型一致。" : headless && !runnable ? `${tool.label} 已安装。分配到该模型的任务会先走官方无界面命令；命令缺失或失败时回退模型目录 API。` : `${tool.label} 已安装，插件可托管调用其官方 CLI；Harness 模型目录与厂商 CLI 名称可能不同，团队无法确认映射时使用 CLI 默认模型，实际模型仍须核对运行记录。`
+    detail: tui ? `${tool.label} 已安装：工作台通过受管终端（PTY）把提示词输入它并取回终端文本，不是无头协议输出。` : tool.id === "zcode" ? "ZCode TUI 已安装；托管任务使用其原生程序，可绑定 CLI 模型。未显式绑定时使用 TUI 中配置的默认模型。" : headless && !runnable ? `${tool.label} 已安装。分配到该模型的任务会先走官方无界面命令；命令缺失或失败时回退模型目录 API。` : `${tool.label} 已安装，插件可托管调用其官方 CLI；Harness 模型目录与厂商 CLI 名称可能不同，团队无法确认映射时使用 CLI 默认模型，实际模型仍须核对运行记录。`
   } : {
     kind: "harness-llm",
     preference,
@@ -40282,7 +40270,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.75.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.76.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -40712,7 +40700,7 @@ function CliTerminalCard({ api, health, settingsSignature = "" }) {
     } catch {
     }
   }, active2 = sessions.find((item) => item.sessionId === activeId), history = info.value?.history ?? [];
-  return /* @__PURE__ */ import_react60.default.createElement("section", { className: "mr-card", "aria-label": "官方工具终端" }, /* @__PURE__ */ import_react60.default.createElement("style", null, xterm_default), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react60.default.createElement("div", null, /* @__PURE__ */ import_react60.default.createElement("h2", { className: "mr-card-title" }, "官方工具终端"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "mr-card-copy" }, "在工作台里交互式运行 PowerShell、已安装的 CLI（包括独立 ZCode CLI TUI）（多轮对话、实时输出，可用于 ", /* @__PURE__ */ import_react60.default.createElement("code", null, "codex login"), " 等登录）。启动入口与官方工具的安装方式和目录同步。终端不经过 Harness 沙箱，使用你自己的登录和环境变量。")), /* @__PURE__ */ import_react60.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
+  return /* @__PURE__ */ import_react60.default.createElement("section", { className: "mr-card", "aria-label": "官方工具终端" }, /* @__PURE__ */ import_react60.default.createElement("style", null, xterm_default), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react60.default.createElement("div", null, /* @__PURE__ */ import_react60.default.createElement("h2", { className: "mr-card-title" }, "官方工具终端"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "mr-card-copy" }, "在工作台里交互式运行 PowerShell、已安装的 CLI（包括 ZCode TUI）（多轮对话、实时输出，可用于 ", /* @__PURE__ */ import_react60.default.createElement("code", null, "codex login"), " 等登录）。启动入口与官方工具的安装方式和目录同步。终端不经过 Harness 沙箱，使用你自己的登录和环境变量。")), /* @__PURE__ */ import_react60.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
     loadInfo();
   } }, "刷新")), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-card-body" }, info.status === "error" && /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-error", role: "alert" }, info.error), info.value && /* @__PURE__ */ import_react60.default.createElement("p", { className: "mr-caption" }, info.value.backend === "pty" ? "终端组件：伪终端（PTY），支持全屏界面、颜色和窗口大小同步。" : `终端组件：管道模式。${info.value.limitation ?? ""}${info.value.ptyError ? `（PTY 加载失败：${info.value.ptyError}）` : ""}`), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react60.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-term-target" }, "启动"), /* @__PURE__ */ import_react60.default.createElement("select", { className: "mr-input", id: "mr-term-target", value: selected?.id ?? "shell", onChange: (event) => {
     setTarget(event.target.value), setConfirming(!1);
@@ -41484,7 +41472,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
       }
     }
   }, byId = Object.fromEntries(probeState.probes.map((probe) => [probe.id, probe])), capabilitiesById = Object.fromEntries(probeState.capabilities.map((item) => [item.id, item])), readinessById = Object.fromEntries(probeState.readiness.map((item) => [item.id, item])), installById = Object.fromEntries((probeState.install?.tools ?? []).map((item) => [item.id, item])), savedMethods = savedToolInstallMethods(settingsSnapshot.value);
-  return /* @__PURE__ */ import_react61.default.createElement("section", { className: "mr-card", "aria-label": "官方工具" }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react61.default.createElement("div", null, /* @__PURE__ */ import_react61.default.createElement("h2", { className: "mr-card-title" }, "官方工具 · 体检"), /* @__PURE__ */ import_react61.default.createElement("p", { className: "mr-card-copy" }, "检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装或更新到各厂商最新版（新版本未经插件测试）。可按工具选择 npm、pnpm、厂商安装脚本或经过校验的发行包，并统一设置安装目录与下载源；卸载只删除程序，配置与登录保留。未登录的工具点“去登录”查看登录命令。ZCode CLI 可选择 npm 社区包或 GitHub Release 发行包，按所选方式使用安装目录设置。")), /* @__PURE__ */ import_react61.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
+  return /* @__PURE__ */ import_react61.default.createElement("section", { className: "mr-card", "aria-label": "官方工具" }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react61.default.createElement("div", null, /* @__PURE__ */ import_react61.default.createElement("h2", { className: "mr-card-title" }, "官方工具 · 体检"), /* @__PURE__ */ import_react61.default.createElement("p", { className: "mr-card-copy" }, "检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装或更新到各厂商最新版（新版本未经插件测试）。可按工具选择 npm、pnpm、厂商安装脚本或经过校验的发行包，并统一设置安装目录与下载源；卸载只删除程序，配置与登录保留。未登录的工具点“去登录”查看登录命令。ZCode TUI 使用厂商提供的 @mbearo/zcode 内测包，通过 npm 或 pnpm 安装。")), /* @__PURE__ */ import_react61.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
     refresh();
   } }, "重新体检")), /* @__PURE__ */ import_react61.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react61.default.createElement(InstallSettings, { settingsScope, install: probeState.install, onPendingChange: handleSettingsPending, onMutationStart: beginSettingsMutation }), previewPending && /* @__PURE__ */ import_react61.default.createElement("p", { className: "mr-caption", role: "status" }, "安装设置已变更，正在刷新实际安装命令；仍可切换方式，刷新完成后可安装与更新。", !previewError && /* @__PURE__ */ import_react61.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
     refreshInstallSettings();
@@ -41523,7 +41511,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
     } }, maintenance.uninstall.label), running && /* @__PURE__ */ import_react61.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: job.cancelRequested, onClick: () => {
       cancel(tool.id);
     } }, job.cancelRequested ? "正在取消…" : `取消${operation}`)));
-  })), /* @__PURE__ */ import_react61.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "安装目录与下载源使用已保存设置，命令上方显示实际执行方式。可点“取消”终止下载任务，随后重新检测版本。卸载保留配置、登录信息和历史记录；脚本方式只移除登记的命令入口，可能保留厂商版本目录。不支持安全卸载的方式会说明原因。ZCode CLI 可从已保存的 npm 源安装完整运行包，或下载固定 GitHub Release 并校验 SHA-256。会话与 Agent 也可使用 ", /* @__PURE__ */ import_react61.default.createElement("code", null, "/tools"), "、", /* @__PURE__ */ import_react61.default.createElement("code", null, "model_router_tool_install"), "、", /* @__PURE__ */ import_react61.default.createElement("code", null, "model_router_tool_repair"), " 和 ", /* @__PURE__ */ import_react61.default.createElement("code", null, "model_router_tool_uninstall"), "。")));
+  })), /* @__PURE__ */ import_react61.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "安装目录与下载源使用已保存设置，命令上方显示实际执行方式。可点“取消”终止下载任务，随后重新检测版本。卸载保留配置、登录信息和历史记录；脚本方式只移除登记的命令入口，可能保留厂商版本目录。不支持安全卸载的方式会说明原因。ZCode TUI 从已保存的 npm 源安装 @mbearo/zcode 及匹配的原生平台包。会话与 Agent 也可使用 ", /* @__PURE__ */ import_react61.default.createElement("code", null, "/tools"), "、", /* @__PURE__ */ import_react61.default.createElement("code", null, "model_router_tool_install"), "、", /* @__PURE__ */ import_react61.default.createElement("code", null, "model_router_tool_repair"), " 和 ", /* @__PURE__ */ import_react61.default.createElement("code", null, "model_router_tool_uninstall"), "。")));
 }
 var HEADLESS_TOOLS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini"]);
 function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }) {
@@ -42486,7 +42474,7 @@ function RouterSettingsCard(props) {
     {
       id: "model-router-tool-install-methods",
       label: "默认安装方式（JSON，可选）",
-      hint: "按工具 ID 固定一种安装方式，例如固定 Step Code 在 Windows 上用 irm | iex。留空自动选择适合本机的方式。可选值以工具下拉框为准：npm、pnpm、script-bash（curl | bash）、script-sh（curl | sh）、script-powershell（irm | iex）、github-release（ZCode CLI，SHA256）。",
+      hint: "按工具 ID 固定一种安装方式，例如固定 Step Code 在 Windows 上用 irm | iex。留空自动选择适合本机的方式。可选值以工具下拉框为准：npm、pnpm、script-bash（curl | bash）、script-sh（curl | sh）、script-powershell（irm | iex）。ZCode TUI 使用 @mbearo/zcode。",
       disabled,
       ...state.toolInstallMethodsJson,
       overriddenLabel: FIELD_COPY.overridden,

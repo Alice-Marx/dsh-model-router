@@ -25,8 +25,19 @@ test('API independent model tool calls delegate through the production family an
           yield {type:'usage',usage}
           yield {type:'finish',reason:{kind:'tool-calls'}}
           return
+        }else if(senderCalls===3){
+          const note=options.messages.filter(message=>message.role==='user').at(-1).content.map(part=>part.text??'').join('\n')
+          assert.doesNotMatch(JSON.stringify(options.messages),/目标已用自己的模型核对/)
+          const id=note.match(/assign_[a-f0-9-]+/)[0]
+          yield {type:'tool-call-delta',index:0,id:'pull-team-inbox',name:'team_inbox',argumentsDelta:JSON.stringify({action:'read',ids:[id]})}
+          yield {type:'usage',usage};yield {type:'finish',reason:{kind:'tool-calls'}};return
+        }else if(senderCalls===4){
+          assert.match(JSON.stringify(options.messages),/目标已用自己的模型核对/)
+          const id=ctx.get('botTeamCoordination').store.all()[0].assignmentId
+          yield {type:'tool-call-delta',index:0,id:'ack-team-inbox',name:'team_inbox',argumentsDelta:JSON.stringify({action:'acknowledge',ids:[id]})}
+          yield {type:'usage',usage};yield {type:'finish',reason:{kind:'tool-calls'}};return
         }else{
-          yield {type:'text-delta',index:0,text:senderCalls===2?'已安排，等待结果':'已收到原任务的核对结果'}
+          yield {type:'text-delta',index:0,text:senderCalls===2?'已安排，等待结果':'已核对收件箱中的结果'}
         }
         yield {type:'usage',usage}; yield finish
       }
@@ -43,13 +54,14 @@ test('API independent model tool calls delegate through the production family an
     assert.equal(row.outcome,'succeeded')
     assert.equal(row.resumeState,'delivered')
     assert.equal(runtime.contextOf('a').contextId,origin)
-    assert.equal(senderCalls,3); assert.equal(targetCalls,1)
-    for(const name of ['coordinate_bots','assignment_status','list_bots','list_threads']) assert.ok(ctx.upstream[0].tools.some(tool=>tool.name===name),name)
+    assert.equal(senderCalls,5); assert.equal(targetCalls,1)
+    assert.equal(row.inboxState,'read')
+    for(const name of ['coordinate_bots','assignment_status','list_bots','list_threads','team_inbox']) assert.ok(ctx.upstream[0].tools.some(tool=>tool.name===name),name)
     assert.ok(ctx.upstream.filter(request=>request.provider==='alpha').at(-1).messages.some(message=>message.role==='user'&&message.content.some(part=>part.text?.includes('Team result from b'))))
     assert.equal(runtime.history('b').length,0,'work-thread does not replace the target default conversation')
     const receipts=readRows('router_model_calls')
-    assert.equal(receipts.length,4)
-    assert.equal(receipts.filter(receipt=>receipt.botId==='a'&&receipt.provider==='alpha'&&receipt.model==='one').length,3)
+    assert.equal(receipts.length,6)
+    assert.equal(receipts.filter(receipt=>receipt.botId==='a'&&receipt.provider==='alpha'&&receipt.model==='one').length,5)
     assert.equal(receipts.filter(receipt=>receipt.botId==='b'&&receipt.provider==='beta'&&receipt.model==='vendor/two').length,1)
     assert.ok(receipts.every(receipt=>receipt.state==='settled'&&receipt.outcome==='succeeded'))
     const before=receipts.length

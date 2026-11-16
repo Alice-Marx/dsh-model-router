@@ -875,7 +875,7 @@ async function selectedPackageEntries(tool, { plan, preferences: selectedPrefere
     plan = plan.installDir || Array.isArray(plan.packageModuleRoots) ? plan
       : await resolvePackageJobPlan(tool, plan, selectedPreferences)
     const moduleRoots = plan.packageModuleRoots ?? [IS_WINDOWS ? join(plan.installDir, 'node_modules') : join(plan.installDir, 'lib', 'node_modules')]
-    return findGlobalPackageEntries(tool.package, 'zcode', 'bin/zcode.mjs', process.cwd(), { moduleRoots, manager: 'npm' })
+    return findGlobalPackageEntries(tool.package, 'zcode', 'bin/zcode.cjs', process.cwd(), { moduleRoots, manager: plan.manager })
   }
   const selection = officialToolEntrySelection(tool.id, { preferences: selectedPreferences, plan })
   const entries = []
@@ -1571,7 +1571,7 @@ async function runInstallJob(installPlan, job) {
     job.phase = 'installing'
     if (job.tool.id === 'zcode' && manager === 'npm' && installPlan.kind === 'package-manager') {
       legacyShims = await prepareZCodeNpmShims({ prefix: installPlan.installDir, platform: process.platform, signal: job.controller.signal })
-      if (legacyShims.backups.length) pushLine(job, `— 已备份旧 ZCode 桌面启动器：${legacyShims.backupDir}；本次 npm 安装不会使用 --force —`)
+      if (legacyShims.backups.length) pushLine(job, `— 已备份旧 ZCode 启动器：${legacyShims.backupDir} —`)
     }
     const outcome = await runCapture(manager, args, {
       timeoutMs: INSTALL_TIMEOUT_MS,

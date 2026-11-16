@@ -30,7 +30,8 @@ export function createTeamAssignmentStore({ Database, file, now = Date.now, maxR
     db.exec(`CREATE TABLE IF NOT EXISTS bot_team_owner_v2 (slot INTEGER PRIMARY KEY CHECK(slot=1), token TEXT, pid INTEGER, active INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS bot_team_rows_v2 (id TEXT PRIMARY KEY, parent TEXT NOT NULL, origin TEXT NOT NULL, state TEXT NOT NULL, created INTEGER NOT NULL, data TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS bot_team_rows_parent_v2 ON bot_team_rows_v2(parent,origin,created);
-      CREATE TABLE IF NOT EXISTS bot_team_batches_v2 (parent TEXT NOT NULL, origin TEXT NOT NULL, request TEXT NOT NULL, hash TEXT NOT NULL, ids TEXT NOT NULL, PRIMARY KEY(parent,origin,request));`)
+      CREATE TABLE IF NOT EXISTS bot_team_batches_v2 (parent TEXT NOT NULL, origin TEXT NOT NULL, request TEXT NOT NULL, hash TEXT NOT NULL, ids TEXT NOT NULL, PRIMARY KEY(parent,origin,request));
+      CREATE TABLE IF NOT EXISTS bot_team_inputs_v1 (parent TEXT NOT NULL, origin TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY(parent,origin));`)
     if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='bot_team_assignments'").get() && db.prepare('SELECT count(*) n FROM bot_team_assignments').get().n) fail('TEAM_LEGACY_JOURNAL_RECONCILIATION_REQUIRED')
     db.transaction(() => {
       const owner = db.prepare('SELECT * FROM bot_team_owner_v2 WHERE slot=1').get()
@@ -49,6 +50,24 @@ export function createTeamAssignmentStore({ Database, file, now = Date.now, maxR
     assertOpen()
     return db.transaction(() => { assertOpen(); const row = read(id); if (!row || !predicate(row)) return null; change(row); row.updatedAt = now(); save(row); return row }).immediate()
   }
+  const mutateMany = (ids, predicate, change) => {
+    assertOpen()
+    if (!Array.isArray(ids) || !ids.length || ids.length > 4 || new Set(ids).size !== ids.length) fail(TEAM_CODES.INVALID_ARGS)
+    return db.transaction(() => {
+      assertOpen(); const rows = ids.map(read)
+      if (rows.some(row => !row || !predicate(row)) || rows.some(row => row.parentBot !== rows[0].parentBot || row.originKey !== rows[0].originKey)) return null
+      for (const row of rows) { change(row); row.updatedAt = now(); save(row) }
+      return rows
+    }).immediate()
+  }
+  const beginResume = ids => Boolean(mutateMany(ids, row => row.state === 'waiting' && row.resumeState === 'waiting' && row.cancelRequestedAt === null && (row.inboxState ?? 'unread') === 'unread',
+    row => { row.resumeState = 'sending'; row.resumeActive = true }))
+  const completeResumes = (ids, state, { executionFinished = true } = {}) => mutateMany(ids, row => row.state === 'waiting' && row.resumeActive === true, row => {
+    row.state = 'settled'; row.resumeState = row.cancelRequestedAt !== null ? 'withheld' : state; row.resumeActive = !executionFinished
+    if (!executionFinished) row.cancelRequestedAt ??= now()
+  })
+  const rewarmResumes = ids => Boolean(mutateMany(ids, row => row.state === 'waiting' && row.resumeState === 'sending' && row.cancelRequestedAt === null,
+    row => { row.resumeState = (row.inboxState ?? 'unread') === 'unread' ? 'waiting' : 'consumed'; if (row.resumeState === 'consumed') row.state = 'settled'; row.resumeActive = false }))
   const createBatch = (specs, { parentBot = specs[0]?.parentBot, originKey = specs[0]?.originKey ?? '', requestKey, payloadHash } = {}) => {
     assertOpen()
     if (!Array.isArray(specs) || !specs.length || specs.length > 4 || !requestKey) fail(TEAM_CODES.INVALID_ARGS)
@@ -65,7 +84,7 @@ export function createTeamAssignmentStore({ Database, file, now = Date.now, maxR
         if (match && !spec.rework) return { row: match, duplicate: true }
         const timestamp = now()
         const assignmentId = `assign_${randomUUID()}`
-        return { row: { ...spec, requestKey, originKey, assignmentId, rootAssignmentId: spec.rootAssignmentId ?? assignmentId, reworkOf: match?.assignmentId ?? null, state: 'queued', outcome: null, resultText: null, resultCode: null, targetRef: null, targetRequestId: null, resumeState: spec.reply === 'none' ? 'none' : 'waiting', cancelRequestedAt: null, createdAt: timestamp, updatedAt: timestamp } }
+        return { row: { ...spec, requestKey, originKey, notificationGroup: requestKey, assignmentId, rootAssignmentId: spec.rootAssignmentId ?? assignmentId, reworkOf: match?.assignmentId ?? null, state: 'queued', outcome: null, resultText: null, resultCode: null, targetRef: null, targetRequestId: null, resumeState: spec.reply === 'none' || spec.reply === 'inbox' ? 'none' : 'waiting', inboxState: 'unread', cancelRequestedAt: null, createdAt: timestamp, updatedAt: timestamp } }
       })
       // All decisions, including rework validity, are complete before the first insert.
       for (const { row, duplicate } of decisions) if (!duplicate) save(row)
@@ -97,18 +116,33 @@ export function createTeamAssignmentStore({ Database, file, now = Date.now, maxR
     },
     dispatchable: () => all().filter(row => row.state === 'queued'),
     rowsForReconcile: () => all().filter(row => row.state === 'running'),
-    resumeDue: () => all().filter(row => row.state === 'waiting' && row.resumeState === 'waiting' && row.cancelRequestedAt === null),
+    resumeDue() {
+      const groups = new Map()
+      for (const row of all()) { const key = JSON.stringify([row.parentBot, row.originKey, row.notificationGroup ?? row.assignmentId]); const group = groups.get(key) ?? []; group.push(row); groups.set(key, group) }
+      return [...groups.values()].flatMap(group => {
+        if (group.some(row => ['queued', 'admitting', 'running'].includes(row.state))) return []
+        const ready = group.filter(row => row.state === 'waiting' && row.resumeState === 'waiting' && row.cancelRequestedAt === null && (row.inboxState ?? 'unread') === 'unread')
+        return ready.length ? [{ ...ready[0], resumeIds: ready.map(row => row.assignmentId) }] : []
+      })
+    },
+    observeInput(parent, origin, seq) { assertOpen(); if (!Number.isSafeInteger(seq) || seq < 0) fail('TEAM_INPUT_SEQUENCE_INVALID'); db.prepare('INSERT INTO bot_team_inputs_v1(parent,origin,seq) VALUES(?,?,?) ON CONFLICT(parent,origin) DO UPDATE SET seq=MAX(seq,excluded.seq)').run(parent, origin, seq) },
+    inputSnapshot(parent, origin) { assertOpen(); return 'sdk:' + (db.prepare('SELECT seq FROM bot_team_inputs_v1 WHERE parent=? AND origin=?').get(parent, origin)?.seq ?? 0) },
     all,
     admit: id => mutate(id, row => row.state === 'queued', row => { row.state = 'admitting' }),
     beginDispatch: (id, ref, requestId) => mutate(id, row => row.state === 'admitting' && !row.cancelRequestedAt, row => { row.state = 'running'; row.targetRef = ref; row.targetRequestId = requestId; row.targetActive = true }),
-    settle: (id, { outcome, resultText = null, resultCode = null }) => mutate(id, row => row.state === 'running', row => { row.state = row.reply === 'none' || row.cancelRequestedAt !== null ? 'settled' : 'waiting'; row.outcome = outcome; row.resultText = resultText; row.resultCode = resultCode; row.targetActive = false; if (row.cancelRequestedAt !== null) row.resumeState = 'withheld' }),
-    markResumeSending: id => Boolean(mutate(id, row => row.state === 'waiting' && row.resumeState === 'waiting' && row.cancelRequestedAt === null, row => { row.resumeState = 'sending'; row.resumeActive = true })),
-    completeResume: (id, state, { executionFinished = true } = {}) => mutate(id, row => row.state === 'waiting' && row.resumeActive === true, row => {
-      row.state = 'settled'; row.resumeState = row.cancelRequestedAt !== null ? 'withheld' : state
-      row.resumeActive = !executionFinished
-      if (!executionFinished) row.cancelRequestedAt ??= now()
-    }),
-    rewarmResume: id => Boolean(mutate(id, row => row.state === 'waiting' && row.resumeState === 'sending' && row.cancelRequestedAt === null, row => { row.resumeState = 'waiting'; row.resumeActive = false })),
+    settle: (id, { outcome, resultText = null, resultCode = null }) => mutate(id, row => row.state === 'running', row => { row.state = row.reply === 'none' || row.reply === 'inbox' || row.cancelRequestedAt !== null ? 'settled' : 'waiting'; row.outcome = outcome; row.resultText = resultText; row.resultCode = resultCode; row.targetActive = false; if (row.cancelRequestedAt !== null) row.resumeState = 'withheld' }),
+    beginResume, completeResumes, rewarmResumes,
+    markResumeSending: id => beginResume([id]),
+    completeResume: (id, state, options) => completeResumes([id], state, options)?.[0] ?? null,
+    rewarmResume: id => rewarmResumes([id]),
+    holdResumes: (ids, code) => mutateMany(ids, row => row.state === 'waiting' && ['waiting', 'sending', 'withheld'].includes(row.resumeState), row => { row.state = 'settled'; row.resumeState = row.cancelRequestedAt !== null ? 'withheld' : 'held'; row.resumeCode = code; row.resumeActive = false }),
+    handleInbox: (ids, state) => {
+      if (!['read', 'dismissed'].includes(state)) fail(TEAM_CODES.INVALID_ARGS)
+      return mutateMany(ids, row => row.outcome !== null && row.outcome !== undefined, row => {
+        row.inboxState = state; row.inboxHandledAt = now()
+        if (row.state === 'waiting' && row.resumeState === 'waiting' && !row.resumeActive) { row.state = 'settled'; row.resumeState = 'consumed' }
+      })
+    },
     rewarm: id => mutate(id, row => row.state === 'running' && row.cancelRequestedAt === null, row => { row.state = 'queued'; row.targetRequestId = null; row.targetRef = null; row.targetActive = false }),
     cancel: (id, { resultCode = null } = {}) => mutate(id, row => ['queued', 'admitting'].includes(row.state), row => { row.state = 'cancelled'; row.outcome = 'cancelled'; row.resultCode = resultCode; row.resumeState = 'withheld' }),
     requestCancel: id => mutate(id, row => !terminal(row), row => { row.cancelRequestedAt ??= now(); if (['queued', 'admitting'].includes(row.state)) { row.state = 'cancelled'; row.outcome = 'cancelled' }; row.resumeState = 'withheld' }),

@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-route-bot",
-  "version": "0.75.0",
+  "version": "0.76.0",
   "type": "module",
   "description": "DSH Bot workspace with integrated model routing, official tools and remote computers",
   "repository": {
@@ -80,6 +80,7 @@
     ".dsh-plugin/shared/zcode-bundle.mjs",
     ".dsh-plugin/shared/zcode-installer.mjs",
     ".dsh-plugin/shared/zcode-npm.mjs",
+    ".dsh-plugin/shared/zcode-tui.mjs",
     ".dsh-plugin/shared/official-team-runtime.mjs",
     ".dsh-plugin/shared/tool-health.mjs",
     ".dsh-plugin/shared/router-state.mjs",

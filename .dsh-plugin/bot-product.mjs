@@ -177,6 +177,7 @@ export function connect(ctx, config, { stateDir, valueOf }) {
         workThreadRead: (...args) => runtime.workThreadRead(...args),
         captureTeamOrigin: request => runtime.captureTeamOrigin(request),
         teamOriginCurrent: (...args) => runtime.teamOriginCurrent(...args),
+        teamOriginSnapshot: (...args) => runtime.teamOriginSnapshot(...args),
         resumeTeamTurn: request => runtime.resumeTeamTurn(request),
         modeOf: botId => runtime.describe(botId)?.runtime ?? null,
         busyBots: () => runtime.busyBots(),

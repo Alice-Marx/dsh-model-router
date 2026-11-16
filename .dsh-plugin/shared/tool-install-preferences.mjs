@@ -126,7 +126,10 @@ export function parseInstallPreferences(config = {}, { tools = [], home = '', en
   for (const [id, methodId] of Object.entries(methodRaw)) methods[id] = methodId.trim()
   for (const [id, url] of Object.entries(scriptRaw)) scriptUrls[id] = normalizeSourceUrl(url, `${id} 安装脚本源`)
   for (const [id, methodId] of Object.entries(methods)) {
-    const selected = installMethodFor({ id, installMethods: tools.find(tool => tool.id === id)?.installMethods }, methodId)
+    // Saved community-release preferences move to the vendor's npm TUI entry.
+    // The old package/runtime is retained and never selected as the new program.
+    const migrated = id === 'zcode' && methodId === 'github-release' ? 'npm' : methodId
+    const selected = installMethodFor({ id, installMethods: tools.find(tool => tool.id === id)?.installMethods }, migrated)
     if (!selected) {
       throw new Error(`${id} 不支持安装方式 ${methodId}。`)
     }

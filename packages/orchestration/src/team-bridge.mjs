@@ -3,12 +3,13 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { TEAM_CODES, parseTeamToolArgs, projectCoordinateArgs } from './team-tool-contract.mjs'
 import { createTeamAssignmentStore, computeBriefHash, standingThreadKey, workThreadConversationKey, assertNoCycle, assertDepth } from './team-assignment-store.mjs'
 import { createTeamScheduler } from './team-scheduler.mjs'
+import { composeTeamNotice, integratedInputSnapshot, isTeamInput, teamOriginKey } from './team-attention.mjs'
 
 const fail = (code, extra = {}) => { throw Object.assign(new Error(code), { code, ...extra }) }
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const textOf = content => Array.isArray(content) ? content.filter(block => block.type === 'text').map(block => block.text ?? '').join('\n') : ''
 const composeBrief = row => `[Team assignment from ${row.parentBot}; mode ${row.mode}]\n${row.doneWhen ? `Done when: ${row.doneWhen}\n` : ''}${row.brief}`
-const composeResult = row => `[Team result from ${row.targetBot}; assignment ${row.assignmentId}; ${row.outcome}${row.resultCode ? ` (${row.resultCode})` : ''}]\n${row.resultText || '(no result text)'}`
+const composeResult = row => composeTeamNotice(row.results ?? [row])
 const unknown = code => ({ outcome: 'unknown', code })
 
 /** Fold installed SDK events, requiring the exact identified user message in one
@@ -88,6 +89,8 @@ export function createIntegratedTeamBridge({ rt, directory, authority, lifecycle
       const existing = prior.some(event => event.type === 'user/message' && event.data?.source?.kind === 'bot' && event.data.source.exchangeId === requestId && event.data.source.role === role)
       if (existing) return role === 'assign-task' ? { started: true, ...teamReceiptFromEvents(prior, requestId, role), executionFinished: true } : { resumed: true, replayed: true, executionFinished: true }
       row.validate?.(); row.signal?.throwIfAborted()
+      if (role === 'assign-result') await row.validateFresh?.()
+      row.validate?.(); row.signal?.throwIfAborted()
       const message = createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'bot', form: 'relay', role, exchangeId: requestId, senderName: 'Team coordinator' } })
       const aborted = new Promise(resolve => {
         const stop = () => { try { agent.cancel({ kind: 'hook', reason: 'team-assignment-cancelled' }) } catch {}; resolve('aborted') }
@@ -143,6 +146,7 @@ export function createIntegratedTeamBridge({ rt, directory, authority, lifecycle
     readTarget,
     captureOrigin({ callerBotId, sessionId }) { if (!owns(callerBotId, sessionId)) fail('TEAM_ORIGIN_UNCONFIRMED'); return { mode: 'integration', sessionId } },
     originCurrent: (botId, origin) => origin.mode === 'integration' && owns(botId, origin.sessionId),
+    originSnapshot: async (_botId, origin) => integratedInputSnapshot(await eventsFor(origin.sessionId)),
     resumeSender(row) { if (!owns(row.parentBot, row.origin?.sessionId)) return { started: false, retired: true }; return submit(row, row.origin.sessionId, 'assign-result', `team-result-${row.assignmentId}`, composeResult(row)) },
     async cancelTarget(row) { if (row.targetRef?.sessionId) { const agent = await resolve(row.targetBot, row.targetRef.sessionId); agent.cancel({ kind: 'hook', reason: 'team-assignment-cancelled' }) } },
     isBusy: botId => rt.live?.get(rt.chatOf(botId))?.turn !== undefined,
@@ -166,8 +170,9 @@ export function createIndependentTeamBridge({ runtime } = {}) {
     readTarget,
     captureOrigin: row => api().captureTeamOrigin({ botId: row.callerBotId, conversationId: row.conversationId, workThreadId: row.workThreadId }),
     originCurrent: (botId, origin) => api().teamOriginCurrent(botId, origin),
+    originSnapshot: (botId, origin) => api().teamOriginSnapshot(botId, origin),
     async resumeSender(row) {
-      try { return { ...await api().resumeTeamTurn({ botId: row.parentBot, origin: row.origin, requestId: `team-result-${row.assignmentId}`, input: composeResult(row), signal: row.signal, validate: row.validate }), executionFinished: true } }
+      try { await row.validateFresh?.(); return { ...await api().resumeTeamTurn({ botId: row.parentBot, origin: row.origin, requestId: `team-result-${row.assignmentId}`, input: composeResult(row), signal: row.signal, validate: row.validate, expectedInput: row.originSnapshot }), executionFinished: true } }
       catch (error) { error.executionFinished = true; throw error }
     },
     cancelTarget() {},
@@ -187,6 +192,7 @@ export function createTeamBridge({ integrated, independent, serving }) {
     cancelTarget: row => forRef(row.targetRef)?.cancelTarget(row),
     captureOrigin: row => forBot(row.callerBotId).captureOrigin(row),
     originCurrent: (botId, origin) => serving.readMode(botId) === origin?.mode && forRef(origin)?.originCurrent(botId, origin) === true,
+    originSnapshot: (botId, origin) => forRef(origin)?.originSnapshot?.(botId, origin),
     isBusy: botId => typeof serving.busy === 'function' ? serving.busy(botId) : forBot(botId).isBusy(botId),
   })
 }
@@ -220,14 +226,22 @@ export function createTeamCoordination({ Database, file, rt = null, directory, a
     const resumed = active?.resumeAssignmentId ? store.get(active.resumeAssignmentId) : null
     if (active && (active.cancelRequestedAt !== null || active.assignmentId && !accessAllowed(active) || resumed && !accessAllowed(resumed))) fail('TEAM_ACCESS_CHANGED')
   }
-  const scheduler = createTeamScheduler({ store, bridge, checks: { committedBot: id => lifecycle.committedBot(id), accessAllowed, originAllowed: row => bridge.originCurrent(row.parentBot, row.origin) }, policy })
+  const scheduler = createTeamScheduler({ store, bridge, checks: { committedBot: id => lifecycle.committedBot(id), accessAllowed,
+    originAllowed: row => bridge.originCurrent(row.parentBot, row.origin),
+    originFreshNow: row => (row.origin.mode === 'integration' ? store.inputSnapshot(row.parentBot, row.originKey) : bridge.originSnapshot(row.parentBot, row.origin)) === row.originSnapshot,
+    originFresh: async row => { if (typeof row.originSnapshot !== 'string') fail('TEAM_ORIGIN_SNAPSHOT_UNAVAILABLE'); return await bridge.originSnapshot(row.parentBot, row.origin) === row.originSnapshot } }, policy })
+  const releaseInputs = sessionEvents?.subscribe?.((session, event) => {
+    if (!isTeamInput(event) || !Number.isSafeInteger(event.seq) || event.seq < 0) return
+    const bot = lifecycle.committedBots().find(bot => (bot.sessionId ?? bot.id) === session.id || bot.threads?.some(thread => thread.sessionId === session.id && !thread.archivedAt))
+    if (bot) store.observeInput(bot.id, teamOriginKey({ mode: 'integration', sessionId: session.id }), event.seq)
+  })
   const scope = input => {
     requireCaller(input.callerBotId)
     const active = store.activeFor(input.callerBotId, { sessionId: input.sessionId, conversationId: input.conversationId })
     const origin = bridge.captureOrigin({ ...input, workThreadId: active?.targetRef?.workThreadKey })
     return { origin, originKey: digest(origin), active }
   }
-  const shape = row => ({ assignmentId: row.assignmentId, requestKey: row.requestKey, targetBot: row.targetBot, workThreadKey: row.workThreadKey, threadId: row.workThreadKey, mode: row.mode, reply: row.reply, state: row.state, outcome: row.outcome, resultCode: row.resultCode, result: row.outcome === 'succeeded' ? row.resultText : null, resumeState: row.resumeState, reworkOf: row.reworkOf, depth: row.depth, cancelRequested: row.cancelRequestedAt !== null, ...(row.duplicate ? { duplicate: true } : {}) })
+  const shape = (row, includeResult = false) => ({ assignmentId: row.assignmentId, requestKey: row.requestKey, targetBot: row.targetBot, workThreadKey: row.workThreadKey, threadId: row.workThreadKey, mode: row.mode, reply: row.reply, state: row.state, outcome: row.outcome, resultCode: row.resultCode, result: includeResult && row.outcome === 'succeeded' ? row.resultText?.slice(0, 4000) ?? null : null, resultAvailable: typeof row.resultText === 'string', resultTruncated: includeResult && (row.resultText?.length ?? 0) > 4000, resumeState: row.resumeState, reworkOf: row.reworkOf, depth: row.depth, cancelRequested: row.cancelRequestedAt !== null, ...(row.duplicate ? { duplicate: true } : {}) })
   const coordinateBots = input => {
     const { callerBotId, turnId, callId } = input
     const { origin, originKey, active } = scope(input)
@@ -248,7 +262,8 @@ export function createTeamCoordination({ Database, file, rt = null, directory, a
       const requestedThread = args.thread ?? 'standing'
       const workThreadKey = requestedThread === 'standing' ? standingThreadKey(callerBotId, targetBot, originKey) : requestedThread === 'new' ? `wt-${randomUUID()}` : requestedThread
       if (!['new', 'standing'].includes(requestedThread) && !store.listByParent(callerBotId, { includeTerminal: true, originKey }).some(row => row.targetBot === targetBot && row.workThreadKey === workThreadKey)) fail(TEAM_CODES.THREAD_NOT_OWNED)
-      const spec = { parentBot: callerBotId, targetBot, requestedThread, workThreadKey, origin, originKey, mode, reply: args.reply ?? 'resume', brief: args.message, doneWhen: args.doneWhen ?? null, briefHash: computeBriefHash(mode, args.message, args.doneWhen, args.consult), rework: args.rework === true, lineage: [...lineage, targetBot], depth: lineage.length, rootBot: active?.rootBot ?? callerBotId, rootAssignmentId: active?.rootAssignmentId ?? active?.assignmentId ?? null, parentAssignmentId: active?.assignmentId ?? null, parentRequestId: active?.targetRequestId ?? null, createdByTurn: turnId, createdByCall: callId }
+      const originSnapshot = origin.mode === 'integration' ? store.inputSnapshot(callerBotId, originKey) : bridge.originSnapshot(callerBotId, origin)
+      const spec = { parentBot: callerBotId, targetBot, requestedThread, workThreadKey, origin, originKey, originSnapshot, mode, reply: args.reply ?? 'resume', brief: args.message, doneWhen: args.doneWhen ?? null, briefHash: computeBriefHash(mode, args.message, args.doneWhen, args.consult), rework: args.rework === true, lineage: [...lineage, targetBot], depth: lineage.length, rootBot: active?.rootBot ?? callerBotId, rootAssignmentId: active?.rootAssignmentId ?? active?.assignmentId ?? null, parentAssignmentId: active?.assignmentId ?? null, parentRequestId: active?.targetRequestId ?? null, createdByTurn: turnId, createdByCall: callId }
       if (!accessAllowed(spec)) fail(TEAM_CODES.ACCESS_CHANGED)
       return spec
     })
@@ -262,21 +277,47 @@ export function createTeamCoordination({ Database, file, rt = null, directory, a
     validateResult(input, value) {
       requireCaller(input.callerBotId)
       if (input.sessionId || input.conversationId) scope(input)
-      const targets = [...(value.assignments ?? []), ...(value.assignment ? [value.assignment] : []), ...(value.threads ?? [])].map(row => row.targetBot)
+      const targets = [...(value.assignments ?? []), ...(value.assignment ? [value.assignment] : []), ...(value.threads ?? []), ...(value.items ?? [])].map(row => row.targetBot)
       targets.push(...(value.bots ?? []).map(row => row.id))
       if (targets.some(id => !reachable(input.callerBotId, id))) fail(TEAM_CODES.ACCESS_CHANGED)
     },
     assignmentStatus(input) {
       const rows = rowsFor(input), args = input.args ?? {}
       if (rows.some(row => row.createdByTurn === input.turnId)) fail('TEAM_STATUS_SAME_TURN')
-      if (args.id) { const row = rows.find(row => row.assignmentId === args.id); if (!row) fail(TEAM_CODES.ASSIGNMENT_NOT_FOUND); return { assignment: shape(row) } }
-      return { assignments: rows.filter(row => !['settled', 'unknown', 'cancelled'].includes(row.state)).map(shape) }
+      if (args.id) { const row = rows.find(row => row.assignmentId === args.id); if (!row) fail(TEAM_CODES.ASSIGNMENT_NOT_FOUND); return { assignment: shape(row, true) } }
+      return { assignments: rows.filter(row => !['settled', 'unknown', 'cancelled'].includes(row.state)).map(row => shape(row)) }
+    },
+    teamInbox(input) {
+      const args = parseTeamToolArgs('team_inbox', input.args ?? {}), action = args.action ?? 'list'
+      assertCanAct(input.callerBotId, input)
+      let rows = rowsFor(input).filter(row => row.reply !== 'none' && row.outcome !== null)
+      const metadata = row => ({ assignmentId: row.assignmentId, targetBot: row.targetBot, threadId: row.workThreadKey,
+        objective: row.brief.slice(0, 120), outcome: row.outcome, resultCode: row.resultCode, delivery: row.resumeState,
+        ...(row.resumeCode ? { heldReason: row.resumeCode } : {}), inboxState: row.inboxState ?? 'unread',
+        executionUnconfirmed: row.targetActive === true, resultChars: row.resultText?.length ?? 0, updatedAt: row.updatedAt })
+      if (action === 'list') {
+        rows = rows.reverse()
+        if (args.before) { const at = rows.findIndex(row => row.assignmentId === args.before); if (at < 0) fail(TEAM_CODES.ASSIGNMENT_NOT_FOUND); rows = rows.slice(at + 1) }
+        if (!args.include_handled) rows = rows.filter(row => (row.inboxState ?? 'unread') === 'unread')
+        const limit = args.limit ?? 10, selected = rows.slice(0, limit)
+        return { items: selected.map(metadata), hasMore: rows.length > limit, nextBefore: rows.length > limit ? selected.at(-1).assignmentId : null }
+      }
+      const selected = args.ids.map(id => rows.find(row => row.assignmentId === id))
+      if (selected.some(row => !row)) fail(TEAM_CODES.ASSIGNMENT_NOT_FOUND)
+      const handled = action === 'read' ? selected : store.handleInbox(args.ids, action === 'acknowledge' ? 'read' : 'dismissed')
+      if (!handled) fail('TEAM_INBOX_CHANGED')
+      return { items: handled.map(row => {
+        const meta = metadata(row)
+        if (action !== 'read') return meta
+        const offset = args.offset ?? 0, size = args.max_chars ?? 2000, body = row.resultText ?? ''
+        return { ...meta, result: body.slice(offset, offset + size), offset, nextOffset: offset + size < body.length ? offset + size : null }
+      }) }
     },
     listBots({ callerBotId }) { requireCaller(callerBotId); return { bots: lifecycle.committedBots().filter(bot => reachable(callerBotId, bot.id)).map(bot => ({ id: bot.id, name: bot.name ?? bot.id, main: isMain(bot.id), model: bot.model ?? null, mode: serving.readMode(bot.id) })).sort((a, b) => a.id.localeCompare(b.id)) } },
     listThreads(input) { const rows = rowsFor(input), seen = new Set(); return { threads: rows.reverse().filter(row => { if (seen.has(row.workThreadKey)) return false; seen.add(row.workThreadKey); return true }).map(row => ({ threadId: row.workThreadKey, targetBot: row.targetBot, title: row.brief.slice(0, 80), state: row.state, assignmentId: row.assignmentId, updatedAt: row.updatedAt })) } },
     stop: botId => scheduler.stop(botId), store, scheduler,
     start(options) { scheduler.start(options); return this }, tick: () => scheduler.tick(), whenIdle: () => scheduler.whenIdle(),
     async drain(rounds = 24) { for (let index = 0; index < rounds; index++) { scheduler.tick(); await scheduler.whenIdle(); if (!store.dispatchable().length && !store.rowsForReconcile().length && !store.resumeDue().length) break }; return this },
-    close() { scheduler.close(); store.close() },
+    close() { releaseInputs?.(); scheduler.close(); store.close() },
   })
 }

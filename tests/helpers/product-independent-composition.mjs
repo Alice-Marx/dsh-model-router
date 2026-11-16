@@ -102,6 +102,7 @@ export async function withProductIndependent(run, { beforeBoot, beforeProduct, n
         workThreadRead: (...args) => runtime.workThreadRead(...args),
         captureTeamOrigin: request => runtime.captureTeamOrigin(request),
         teamOriginCurrent: (...args) => runtime.teamOriginCurrent(...args),
+        teamOriginSnapshot: (...args) => runtime.teamOriginSnapshot(...args),
         resumeTeamTurn: request => runtime.resumeTeamTurn(request),
         contextOf: botId => runtime.contextOf?.(botId) ?? null,
         newConversation: (botId, options) => runtime.newConversation(botId, options),

@@ -25,7 +25,8 @@ for (const mode of ['integrated','independent']) test(`native ${mode} team calls
     await bind('b','beta','vendor/two')
     await runtime.move('b','independent')
     if(mode==='independent') await runtime.move('a','independent')
-    const handle=mode==='integrated' ? await actual.context.agents.create({sessionId:'a',agentOptions:{provider:'native-team',model:'fixture-model-a'}}) : null
+    // Native tools run through the bound MCP broker, not the SDK tool executor.
+    const handle=mode==='integrated' ? await actual.context.agents.create({sessionId:'a',agentOptions:{provider:'native-team',model:'fixture-model-a'},setup:context=>{context.tools.restrict({deny:context.tools.schemas().map(tool=>tool.name)})}}) : null
     const evidence=async()=>JSON.parse(await readFile(join(home,'model-router/conversation-engines/native-team/workspace/fixture-evidence.json'),'utf8'))
     let turns=0
     const send=async calls=>{

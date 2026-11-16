@@ -66,7 +66,6 @@ function normalizeProfile(entry, index) {
   if (entry.cliModel !== undefined) {
     const cliModel = id(entry.cliModel)
     if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$/.test(cliModel)) throw new Error(`${label} 的 cliModel 无效`)
-    if (toolForProvider(provider)?.id === 'zcode') throw new Error(`${label} 对应的 ZCode CLI 暂不支持逐次切换模型`)
     profile.cliModel = cliModel
   }
   if (entry.execution !== undefined) {

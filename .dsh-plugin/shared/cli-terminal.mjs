@@ -20,8 +20,7 @@ import { basename, extname, isAbsolute, join, relative, sep } from 'node:path'
 import { createWindowsManagedTerminal } from '../../packages/cli-runtime/src/native-terminal.mjs'
 import { getOfficialTool, installMethodFor } from './official-tool-registry.mjs'
 import { resolveInstallPlan } from './tool-install-preferences.mjs'
-import { discoverZCodeBundle } from './zcode-bundle.mjs'
-import { resolveZCodeNpmBundle } from './zcode-npm.mjs'
+import { resolveZCodeTuiBundle, ZCODE_TUI_NODE_MINIMUM } from './zcode-tui.mjs'
 import {
   TERMINAL_LIMITS,
   TERMINAL_LOGIN_ARGS,
@@ -167,7 +166,7 @@ export async function resolveTerminalLaunch(target, mode = 'interactive', {
   platform = process.platform, env = process.env, locate = defaultLocate,
   preferences = {}, home = homedir(), cwd = process.cwd(),
   packageEntry = findTerminalPackageEntry, fileExists = async path => (await stat(path).catch(() => null))?.isFile() === true,
-  discoverBundle = discoverZCodeBundle, npmBundle = resolveZCodeNpmBundle, findNode = terminalNode,
+  zcodeTuiBundle = resolveZCodeTuiBundle, findNode = terminalNode,
 } = {}) {
   if (target === TERMINAL_SHELL_ID) {
     if (platform === 'win32') {
@@ -182,18 +181,12 @@ export async function resolveTerminalLaunch(target, mode = 'interactive', {
   const tool = getOfficialTool(target)
   if (target === 'zcode') {
     const plan = resolveInstallPlan(tool, undefined, preferences, { platform, env, home })
-    let bundle
-    if (plan.kind === 'package-manager') {
-      const boundPlan = plan.installDir ? plan : await (await import('./official-tools-runtime.mjs')).resolvePackageJobPlan(tool, plan, preferences, { options: { platform, env, home } })
-      const entry = await packageEntry(tool, boundPlan, { platform })
-      if (!entry) throw new Error('未在所选 npm 安装目录中找到 ZCode CLI；请安装或修复该方式，不会改用 GitHub 安装副本。')
-      bundle = await npmBundle(entry, { env, home, platform })
-    } else {
-      bundle = await discoverBundle({ installDir: plan.installDir, env, home, platform })
-      if (!bundle) throw new Error('未找到通过 GitHub Release SHA256 核验的 ZCode CLI；请先安装或修复。')
-    }
-    const node = await findNode(cwd, [24, 14, 0], version => Number(String(version).split('.')[0]) === 24)
-    if (!node) throw new Error('ZCode CLI 需要 Node.js 24.14.0 或更新的 Node 24；请安装后重新体检。')
+    const boundPlan = plan.installDir ? plan : await (await import('./official-tools-runtime.mjs')).resolvePackageJobPlan(tool, plan, preferences, { options: { platform, env, home } })
+    const entry = await packageEntry(tool, boundPlan, { platform })
+    if (!entry) throw new Error('未在所选安装目录中找到 @mbearo/zcode，请安装或修复 ZCode TUI。')
+    const bundle = await zcodeTuiBundle(entry, { platform, workspace: cwd, boundary: boundPlan.globalDir || boundPlan.installDir })
+    const node = await findNode(cwd, ZCODE_TUI_NODE_MINIMUM)
+    if (!node) throw new Error('ZCode TUI 需要 Node.js 22.16.0 及以上，请安装后重新体检。')
     const args = mode === 'login' ? [...TERMINAL_LOGIN_ARGS.zcode] : []
     return { file: node, args: [bundle.cliEntry, ...args], verbatim: false, utf8Console: true,
       display: ['zcode', ...args].join(' ') }

@@ -7,8 +7,8 @@ import {
 
 const coded = fn => { try { fn() } catch (error) { return error } return null }
 
-test('the contract names exactly the four team tools with both schema shapes', () => {
-  assert.deepEqual([...TEAM_TOOL_NAMES], ['coordinate_bots', 'assignment_status', 'list_bots', 'list_threads'])
+test('the shared contract includes the scoped collaboration inbox on both doors', () => {
+  assert.deepEqual([...TEAM_TOOL_NAMES], ['coordinate_bots', 'assignment_status', 'list_bots', 'list_threads', 'team_inbox'])
   for (const name of TEAM_TOOL_NAMES) {
     const entry = teamToolEntry(name)
     assert.equal(entry.inputSchema.type, 'object')

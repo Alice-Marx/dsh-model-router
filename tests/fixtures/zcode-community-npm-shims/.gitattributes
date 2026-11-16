@@ -1,0 +1,2 @@
+# Exact npm-generated launcher fixtures include an intentional "else " line.
+*.txt whitespace=-blank-at-eol

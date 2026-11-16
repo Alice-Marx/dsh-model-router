@@ -1,5 +1,5 @@
 /**
- * The SDK (integrated Harness) door for the four teammate-coordination tools.
+ * The SDK (integrated Harness) door for teammate coordination and its inbox.
  *
  * Registered through `ctx.tools.register` exactly as the data tools are
  * (bot-data-tools.mjs), reading names, descriptions and the SDK parameter map from the
@@ -36,7 +36,7 @@ const sdkParameters = parameters => Object.fromEntries(Object.entries(parameters
  * @param {{ service: object, botIdFor: (exec: object) => string | null, names?: string[] }} source
  * @returns {() => void} release
  */
-export function registerTeamTools(ctx, { service, botIdFor, names = ['coordinate_bots', 'assignment_status', 'list_threads'], redact = text => text } = {}) {
+export function registerTeamTools(ctx, { service, botIdFor, names = ['coordinate_bots', 'assignment_status', 'list_threads', 'team_inbox'], redact = text => text } = {}) {
   if (!service || typeof service.coordinateBots !== 'function') throw new TypeError('TEAM_TOOLS_REQUIRE_SERVICE')
   if (typeof botIdFor !== 'function') throw new TypeError('TEAM_TOOLS_REQUIRE_BOT_ID_FOR')
   if (!ctx || typeof ctx.tools?.register !== 'function') throw new TypeError('TEAM_TOOLS_REQUIRE_CTX')
@@ -73,6 +73,7 @@ export function registerTeamTools(ctx, { service, botIdFor, names = ['coordinate
       if (entry.method === 'coordinateBots') { const value = await service.coordinateBots({ ...request, args: projectCoordinateArgs(parsed) }); exec.concludeTurn?.(); return value }
       if (entry.method === 'assignmentStatus') return service.assignmentStatus({ ...request, args: parsed })
       if (entry.method === 'listBots') return service.listBots(request)
+      if (entry.method === 'teamInbox') return service.teamInbox({ ...request, args: parsed })
       return service.listThreads(request)
     }),
   }))

@@ -8,7 +8,7 @@ import { startFixtureAgent } from './fixtures/independent-tool-host.mjs'
 
 const Database = createRequire(import.meta.url)('better-sqlite3')
 const mainLocalTools = ['data_load', 'data_describe', 'data_sql', 'data_show', 'data_export',
-  'coordinate_bots', 'assignment_status', 'list_bots', 'list_threads']
+  'coordinate_bots', 'assignment_status', 'list_bots', 'list_threads', 'team_inbox']
 // Tool discovery for the independent runtime, through the installed SDK and the real composition.
 //
 // What is real here: the installed Cordis/LlmRuntime with only its provider transport offline, the

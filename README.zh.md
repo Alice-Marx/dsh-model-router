@@ -14,7 +14,7 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.75.0 · Windows Remote Agent：0.1.3**
+**当前正式版：0.76.0 · Windows Remote Agent：0.1.3**
 
 以 Bot 联系人和聊天为主要入口，集中使用独立 AI 连接、多模型路线、团队委派、私有资料库、数据分析与自有 Windows 电脑。任务、通知和执行记录保存在工作空间中，Main Bot 可在已保存的多条模型路线之间调度。
 
@@ -80,8 +80,8 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.75.0`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.75.0`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.76.0`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.76.0`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 完整版本进入 Bot 工作区，在 **设置 → AI** 添加独立模型连接，再为 Bot 选择模型。纯路由版本从侧栏打开 **模型路由**，使用 Harness 已配置路线。
 
@@ -89,10 +89,10 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.75.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.76.0
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.75.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.0
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -143,7 +143,9 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.75.0
 
 ### 使用各工具自己的账户与能力
 
-工具注册表包含 **Qwen Code、CodeBuddy Code、Kimi Code、Claude Code、Codex、MiniMax Code、MiMo Code、Grok Build、Gemini、OpenCode、StepCode、Pi、Hermes、ZCode 和 DSH TUI**。在 **官方工具** 中检测工具，选择可用安装方式，完成厂商登录，再检查所需执行模式的就绪状态。
+工具注册表包含 **Qwen Code、CodeBuddy Code、Kimi Code、Claude Code、Codex、MiniMax Code、MiMo Code、Grok Build、Gemini、OpenCode、StepCode、Pi、Hermes、ZCode TUI 和 DSH TUI**。在 **官方工具** 中检测工具，选择可用安装方式，完成厂商登录，再检查所需执行模式的就绪状态。
+
+**ZCode TUI** 使用厂商提供的内测包 `@mbearo/zcode`，安装命令为 `npm i -g @mbearo/zcode`，也可选择 pnpm。启动命令仍为 `zcode`；通过 `zcode login` 选择 Z.ai 或 BigModel 登录。需要 Node.js 22.16.0 及以上，并保留匹配的可选原生依赖（Windows x64/ARM64、macOS ARM64，或 Linux glibc x64/ARM64）。托管任务使用 print JSON、私有运行状态和 Host 沙箱，支持只读与工作区编辑。已保存的 CLI 模型通过 `--model` 传入，否则使用已配置的默认模型。已有 `zcode` 绑定保留原有身份，旧社区版 `zcode-cli` 不满足新 TUI 的检测要求。
 
 交互终端提供已安装工具自身的工作方式与能力；托管单工具和团队执行使用受支持的适配器。安装或登录成功，仍需核对具体模式与模型是否可用。托管执行必须经过 Host 进程沙箱。Qwen、CodeBuddy、Gemini、Step、MiMo 和 dsh 使用每任务私有运行状态，原始登录文件保留在本机 CLI 账号中；MiMo 托管任务由 Host 管理 Git 工作树。CodeBuddy Code 用于官方工具执行；Qwen Code 还可单独配置原生聊天连接。明确选择的厂商正常执行环境使用当前系统用户权限。
 
@@ -159,7 +161,15 @@ Host 的 Claude 对话引擎配置可启用 `hostTools: true`，通过私有 MCP
 
 两种聊天均展示原生工具活动，按当前 Bot 和会话隔离，可从活动入口查看更早记录。“已返回”表示 CLI 返回了结果，操作是否成功以对应 Task 或远程操作收据为准。取消请求与已确认的进程停止分别显示；未确认回合保持待核对，记录失败也会明确显示。
 
-Main 可通过 `coordinate_bots` 委派任务；普通 Bot 需要已提交的团队协作权限。委派保留原会话、工作线程和请求身份，目标使用自己的模型、权限与资金。咨询任务不能执行工具，状态和线程列表遵循调用者的访问范围；执行或回传不确定时须核对原记录。恢复后的工作沿用原委派祖先链检查循环和深度。
+Main 通过 `coordinate_bots` 委派任务，普通 Bot 需要已提交的团队协作权限。委派保留原会话、工作线程和请求身份，目标使用自己的模型、权限与资金。咨询任务不能执行工具。恢复后的工作沿用原委派祖先链检查循环和深度；执行或回传不确定时，不会自动重复。
+
+结果保存在原会话的持久化 `team_inbox` 协作收件箱中。一批并行任务的结果合并成一次简短提醒，结果正文由 Bot 按需读取；等待期间出现新的交互指令时，旧提醒先暂存，结果仍可查阅。`team_inbox` 可列出摘要、分段读取正文、确认已使用的结果，或忽略不相关的结果。单纯读取不会确认送达，工具响应丢失时，未确认结果仍保留在未读列表中。每次读取均重新核对当前权限；结果未知时须核对原记录，处理收件箱条目不会取消任务，也不代表已确认停止结果未知的进程。
+
+| `coordinate_bots` 的 reply 模式 | 行为 |
+| --- | --- |
+| `resume`（默认） | 一批任务完成后合并提醒，前提是原始输入仍有效；按需读取并核验结果，再给出一次最终答复。 |
+| `inbox` | 静默收集结果，稍后按需读取，不唤醒发起者。 |
+| `none` | 单向通知，不回传结果。 |
 
 | 要做的事 | 操作方式 |
 | --- | --- |

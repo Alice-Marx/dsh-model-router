@@ -229,7 +229,13 @@ export function createIndependentRuntime({
     try { workThreadGuard(botId); const current = origin.workThreadId ? workThreadStoreFor(origin.workThreadId, botId).get(origin.workThreadId) : store.get(botId); return !current.contextReset && current.contextId === origin.contextId }
     catch { return false }
   }
-  const runTeamTurn = async ({ botId, workThreadId = null, input, requestId, signal, conversationId, consult = false, validate = () => {}, origin = null }) => {
+  const teamOriginSnapshot = (botId, origin) => {
+    workThreadGuard(botId)
+    if (!teamOriginCurrent(botId, origin)) fail('TEAM_ORIGIN_RETIRED')
+    const session = origin.workThreadId ? workThreadStoreFor(origin.workThreadId, botId).get(origin.workThreadId) : store.get(botId)
+    return 'message:' + (session.messages.findLast(message => message.role === 'user' && message.name !== 'team-result')?.messageId ?? 'empty')
+  }
+  const runTeamTurn = async ({ botId, workThreadId = null, input, requestId, signal, conversationId, consult = false, validate = () => {}, origin = null, teamNotice = false, expectedInput = null }) => {
     assertOpen()
     // Validate all identifiers and open the transcript before acquiring admission.
     const transcript = workThreadId ? workThreadStoreFor(workThreadId, botId) : store
@@ -239,12 +245,13 @@ export function createIndependentRuntime({
     checkpoint()
     const lease = guard.acquire(botId), scope = controlled(signal)
     try {
+      if (expectedInput !== null && teamOriginSnapshot(botId, origin) !== expectedInput) throw Object.assign(new Error('TEAM_CONTEXT_CHANGED'), { code: 'TEAM_CONTEXT_CHANGED', started: false, held: true })
       const provider = providerFor(botId)
       if (typeof provider !== 'function') fail('RUNTIME_PROVIDER_UNAVAILABLE')
       const guarded = request => { checkpoint(); return provider({ ...request, botId, conversationId }) }
       const loop = createBotLoop({ store: workThreadId ? workThreadStoreView(transcript, workThreadId) : transcript, provider: guarded,
         tools: consult ? null : toolServiceFor(botId), guard: checkpoint, now, ...(maxSteps ? { maxSteps } : {}) })
-      return await loop.run({ botId, input, requestId, conversationId, signal: scope.controller.signal })
+      return await loop.run({ botId, input, requestId, conversationId, signal: scope.controller.signal, teamNotice })
     } finally { scope.release(); lease.release() }
   }
 
@@ -286,9 +293,10 @@ export function createIndependentRuntime({
     busyBots: () => (guard && typeof guard.busyBots === 'function' ? guard.busyBots() : []),
     captureTeamOrigin,
     teamOriginCurrent,
-    async resumeTeamTurn({ botId, origin, requestId, input, signal, validate } = {}) {
+    teamOriginSnapshot,
+    async resumeTeamTurn({ botId, origin, requestId, input, signal, validate, expectedInput = null } = {}) {
       if (!origin || !teamOriginCurrent(botId, origin)) return { started: false, retired: true }
-      const result = await runTeamTurn({ botId, origin, workThreadId: origin.workThreadId, conversationId: origin.conversationId, requestId, input, signal, validate })
+      const result = await runTeamTurn({ botId, origin, workThreadId: origin.workThreadId, conversationId: origin.conversationId, requestId, input, signal, validate, teamNotice: true, expectedInput })
       return { ...result, resumed: true }
     },
 

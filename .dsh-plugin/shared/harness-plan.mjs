@@ -43,7 +43,7 @@ export function channelForProvider(provider, installedToolIds = [], runnableTool
       detail: tui
         ? `${tool.label} 已安装：工作台通过受管终端（PTY）把提示词输入它并取回终端文本，不是无头协议输出。`
         : tool.id === 'zcode'
-        ? '独立 ZCode CLI 已安装，插件可调用其编程代理；其 CLI 使用自身配置的默认模型，不能保证与 Harness 建议模型一致。'
+        ? 'ZCode TUI 已安装；托管任务使用其原生程序，可绑定 CLI 模型。未显式绑定时使用 TUI 中配置的默认模型。'
         : headless && !runnable
           ? `${tool.label} 已安装。分配到该模型的任务会先走官方无界面命令；命令缺失或失败时回退模型目录 API。`
           : `${tool.label} 已安装，插件可托管调用其官方 CLI；Harness 模型目录与厂商 CLI 名称可能不同，团队无法确认映射时使用 CLI 默认模型，实际模型仍须核对运行记录。`,

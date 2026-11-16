@@ -13,15 +13,16 @@ function harness(over = {}) {
     assignmentStatus: async request => { calls.push(['assignmentStatus', request]); return { assignments: [] } },
     listBots: async request => { calls.push(['listBots', request]); return { bots: [{ id: 'worker', main: false }] } },
     listThreads: async request => { calls.push(['listThreads', request]); return { threads: [] } },
+    teamInbox: async request => { calls.push(['teamInbox', request]); return { items: [] } },
   }
   const factory = createNativeTeamTools({ service, callerBotId: 'main', conversationId: 'teamwt-xyz', validate: async () => { validations += 1 }, ...over.factory })
   return { factory, calls, validations: () => validations, handler: name => factory.handlers.find(entry => entry.definition.name === name) }
 }
 const context = () => ({ context: { turnId: 'turn-1', callId: 'call-1' }, signal: new AbortController().signal })
 
-test('the native door offers exactly the four team tools', () => {
+test('the native door offers the shared team and inbox tools', () => {
   const { factory } = harness()
-  assert.deepEqual(factory.tools, ['coordinate_bots', 'assignment_status', 'list_bots', 'list_threads'])
+  assert.deepEqual(factory.tools, ['coordinate_bots', 'assignment_status', 'list_bots', 'list_threads', 'team_inbox'])
   for (const entry of factory.handlers) {
     assert.equal(entry.definition.inputSchema.additionalProperties, false)
     assert.equal(entry.capability, 'tool/team')

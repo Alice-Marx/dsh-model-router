@@ -125,7 +125,7 @@ export function createBotLoop({ store, provider, tools = null, guard = null, now
      * Run one turn: user input in, answer or tool call out. The whole turn is bounded.
      * @param {{ botId: string, input: string, signal?: AbortSignal }} request
      */
-    async run({ botId, input, signal, onProgress, requestId, conversationId } = {}) {
+    async run({ botId, input, signal, onProgress, requestId, conversationId, teamNotice = false } = {}) {
       if (typeof input !== 'string' || input.trim() === '') fail('BOT_LOOP_INPUT_REQUIRED')
       if (onProgress !== undefined && typeof onProgress !== 'function') fail('BOT_LOOP_PROGRESS_INVALID')
       // Committed state is re-read before anything is written, so a Bot that no longer stands
@@ -144,7 +144,7 @@ export function createBotLoop({ store, provider, tools = null, guard = null, now
           fail('BOT_REQUEST_OUTCOME_UNKNOWN')
         }
       }
-      store.append(botId, [{ role: 'user', content: input, ...(ids ? { messageId: ids.user } : {}) }])
+      store.append(botId, [{ role: 'user', content: input, ...(ids ? { messageId: ids.user } : {}), ...(teamNotice ? { name: 'team-result' } : {}) }])
       const executed = []
       // One Host turn identity for the whole run, made here and kept for every step: a durable Task
       // the Host opens for a call is correlated to this turn, and a repeated call re-reads the same

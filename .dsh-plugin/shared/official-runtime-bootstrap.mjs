@@ -6,7 +6,7 @@ import {spawn} from 'node:child_process'
 import {codeBuddyAccountFile} from './vendor-codebuddy-adapter.mjs'
 
 const {toolId,spec}=JSON.parse(await readFile(process.argv[2],'utf8'))
-if(!['gemini','stepcode','dsh-tui','mimo-code','qwen-code','codebuddy-code'].includes(toolId))throw Error('Unsupported managed runtime')
+if(!['gemini','stepcode','dsh-tui','mimo-code','qwen-code','codebuddy-code','zcode'].includes(toolId))throw Error('Unsupported managed runtime')
 const source=homedir(),home=await mkdtemp(join(tmpdir(),'official-cli-'))
 const env={...process.env,...spec.env,HOME:home,USERPROFILE:home,APPDATA:join(home,'appdata'),LOCALAPPDATA:join(home,'local'),
  XDG_CONFIG_HOME:join(home,'.config'),XDG_DATA_HOME:join(home,'.local/share'),XDG_CACHE_HOME:join(home,'.cache')}
@@ -18,6 +18,15 @@ if(toolId==='codebuddy-code'){
  await copy(codeBuddyAccountFile(source),codeBuddyAccountFile(home))
  env.CODEBUDDY_CONFIG_DIR=target;env.CODEBUDDY_HOME=target
  env.DISABLE_AUTOUPDATER='1';env.CODEBUDDY_CODE_DISABLE_BACKGROUND_TASKS='1'
+}else if(toolId==='zcode'){
+ // Carry only account/provider selection into the task's private state. Do not
+ // import the user's sessions, plugins, project trust records or hooks.
+ const original=join(process.env.ZCODE_DATA_BASE_DIR||source,'.zcode/v2'),target=join(home,'.zcode/v2')
+ for(const file of ['provider_config.json','credentials.json','telemetry-state.json'])await copy(join(original,file),join(target,file))
+ await copy(join(source,'.zcode/v2/setting.json'),join(target,'setting.json'))
+ await copy(join(process.env.ZCODE_STORAGE_DIR||join(source,'.zcode'),'rust-cli/default-model.json'),join(home,'.zcode/rust-cli/default-model.json'))
+ env.ZCODE_DATA_BASE_DIR=home;env.ZCODE_STORAGE_DIR=join(home,'.zcode')
+ env.ZCODE_SESSION_DB_PATH=join(home,'.zcode/cli/db/db.sqlite');env.ZCODE_LOG_DIR=join(home,'.zcode/rust-cli/log')
 }else if(toolId==='qwen-code'){
  const original=process.env.QWEN_HOME||join(source,'.qwen'),target=join(home,'.qwen');await mkdir(target,{recursive:true})
  for(const file of ['oauth_creds.json','settings.json'])await copy(join(original,file),join(target,file))

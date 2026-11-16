@@ -11,7 +11,7 @@
  */
 import { getOfficialTool, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
 
-/** Follow the tool registry, including the standalone ZCode CLI. */
+/** Follow the tool registry, including ZCode TUI. */
 export const TERMINAL_TOOL_IDS = Object.freeze(OFFICIAL_TOOLS
   .filter(tool => !tool.unsupported && tool.probeExecutables?.length)
   .map(tool => tool.id))

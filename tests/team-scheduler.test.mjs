@@ -137,3 +137,19 @@ test('a parent stop fences the whole subtree\'s dispatches and resumes', async t
   assert.ok(stopped.stopped.includes(row.assignmentId))
   assert.equal(store.get(row.assignmentId).cancelRequestedAt !== null, true)
 })
+
+test('stopping a non-leading member aborts the single shared notification without claiming execution stopped', async t => {
+  const { scheduler, state, store } = fixture(t)
+  const rows = store.createBatch(['worker', 'b'].map(targetBot => ({ parentBot: 'main', targetBot, workThreadKey: 'group-' + targetBot, mode: 'work', reply: 'resume', brief: 'check', briefHash: computeBriefHash('work', 'check'), lineage: ['main', targetBot], depth: 1, rootBot: 'main' })), { requestKey: 'group-stop' }).assignments
+  let resumed
+  state.resume = request => { resumed = request; return new Promise(done => request.signal.addEventListener('abort', () => done({ resumed: true, executionFinished: false }), { once: true })) }
+  scheduler.tick(); await scheduler.whenIdle(); scheduler.tick()
+  for (let i = 0; i < 100 && !resumed; i++) await new Promise(done => setTimeout(done, 5))
+  assert.ok(resumed)
+  const other = rows.find(row => row.assignmentId !== resumed.assignmentId)
+  scheduler.stop(other.targetBot); await scheduler.whenIdle()
+  assert.equal(resumed.signal.aborted, true)
+  assert.equal(state.resumes.length, 1)
+  assert.ok(rows.every(row => store.get(row.assignmentId).resumeActive === true))
+  assert.equal(store.resumeDue().length, 0)
+})

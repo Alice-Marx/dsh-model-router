@@ -244,7 +244,6 @@ function cliModelFor(route, adapter) {
   if ((adapter?.id === 'minimax-code' || adapter?.id === 'mimo-code') && !explicit.includes('/')) {
     throw new TypeError(`${adapter.id} cliModel requires provider/model`)
   }
-  if (adapter?.id === 'zcode') throw new TypeError('ZCode CLI does not support a per-call cliModel')
   return explicit
 }
 

@@ -32,7 +32,7 @@ export const LOGIN_GUIDES = Object.freeze({
   'mimo-code': Object.freeze({ command: 'mimo auth login', steps: '在终端运行 mimo auth login，选择 Xiaomi MiMo Platform 登录小米账号或填入 API Key；mimo auth list 可查看已保存的凭据。未登录时 MiMo Auto 免费匿名通道可能仍可用。' }),
   'grok-build': Object.freeze({ command: 'grok login', steps: '在终端运行 grok login，按浏览器提示登录 xAI 账号；无浏览器环境用 grok login --device-auth，或设置 XAI_API_KEY 使用 API 计费。' }),
   'dsh-tui': Object.freeze({ command: 'dsh-tui', steps: '在终端运行 dsh-tui（或 dst）启动 DeepSeek TUI，首次启动按提示使用 DEEPSEEK_API_KEY 或登录 DeepSeek 账号。插件不代为执行登录，只显示这条命令。' }),
-  zcode: Object.freeze({ command: 'zcode login', steps: '在终端运行 zcode login 登录 Z.ai，或运行 zcode login bigmodel 登录 BigModel 并绑定 GLM Coding Plan；无浏览器环境可加 --no-browser。运行 zcode 进入 TUI 配置供应商与模型。API Key 的 Coding 专用端点为 https://open.bigmodel.cn/api/coding/paas/v4。ZCode CLI 没有登录状态命令，登录结果以 CLI 实际反馈为准。' }),
+  zcode: Object.freeze({ command: 'zcode login', steps: '安装 @mbearo/zcode 后，运行 zcode login zai 或 zcode login bigmodel 登录 Coding Plan；无浏览器环境可加 --no-browser。运行 zcode 进入 ZCode TUI，核对账户、供应商和默认模型。当前内测版没有独立的登录状态查询命令，以 TUI 和登录命令的实际反馈为准。' }),
   opencode: Object.freeze({ command: 'opencode auth login', steps: '在终端运行 opencode auth login，按提示完成登录；OpenCode 支持多家供应商，用 /connect 在会话内选择并保存凭据。也可在 opencode.json 中配置 provider 的 API Key。' }),
   stepcode: Object.freeze({ command: 'step login', steps: '在终端运行 step login（step login status --json 可查看状态），按提示完成阶跃账号登录；登录信息保存在 ~/.stepcode/auth.json。卸载本工具不会删除该文件。' }),
   hermes: Object.freeze({ command: 'hermes auth', steps: '在终端运行 hermes auth，选择模型供应商并完成 OAuth 或 API Key 配置。插件暂未核验自动登录检测，不读取 Hermes 凭据，以 CLI 实际结果为准。' }),
@@ -246,7 +246,7 @@ export async function checkLogin(toolId, {
   }
   if (toolId === 'hermes') return { state: 'unknown', detail: '插件暂未核验 Hermes 自动登录检测；请在终端运行 hermes auth，并以 CLI 实际结果为准。' }
   if (toolId === 'pi') return { state: 'unknown', detail: 'Pi 认证按供应商区分；启动 pi 后输入 /login 查看或配置，插件不读取凭据。' }
-  if (toolId === 'zcode') return { state: 'unknown', detail: 'ZCode CLI 没有登录状态命令；请用 zcode login 或 zcode login bigmodel 登录，并在 TUI 中核对供应商与模型。' }
+  if (toolId === 'zcode') return { state: 'unknown', detail: 'ZCode TUI 当前没有独立的登录状态查询命令；请用 zcode login zai 或 zcode login bigmodel 登录，并在 TUI 中核对供应商与模型。' }
   return viaKey ?? { state: 'unknown', detail: '该 CLI 没有可安全调用的登录状态命令；首次运行时以实际结果为准。' }
 }
 

@@ -14,6 +14,7 @@ function harness({ names = null, throwOn = null } = {}) {
     assignmentStatus: async request => { calls.push(['assignmentStatus', request]); return { assignments: [] } },
     listBots: async request => { calls.push(['listBots', request]); return { bots: [] } },
     listThreads: async request => { calls.push(['listThreads', request]); return { threads: [] } },
+    teamInbox: async request => { calls.push(['teamInbox', request]); return { items: [] } },
   }
   const release = registerTeamTools(ctx, { service, botIdFor: e => e?.agent?.botId ?? null, ...(names ? { names } : {}) })
   return { tools, release, calls, service }
@@ -21,7 +22,7 @@ function harness({ names = null, throwOn = null } = {}) {
 
 test('the SDK door registers the team tools and derives the caller from the live session', async () => {
   const { tools, calls } = harness()
-  assert.deepEqual([...tools.keys()].sort(), ['assignment_status', 'coordinate_bots', 'list_threads'])
+  assert.deepEqual([...tools.keys()].sort(), ['assignment_status', 'coordinate_bots', 'list_threads', 'team_inbox'])
   const answer = await tools.get('coordinate_bots').execute({ bot_ids: ['worker'], message: 'do it' }, exec('main'))
   assert.deepEqual(answer, { assignments: [{ targetBot: 'worker', state: 'queued' }] })
   const [method, request] = calls[0]
@@ -47,7 +48,7 @@ test('an unidentifiable caller and a service refusal are returned as values, nev
 
 test('release unregisters every tool', () => {
   const { tools, release } = harness()
-  assert.equal(tools.size, 3)
+  assert.equal(tools.size, 4)
   release()
   assert.equal(tools.size, 0)
 })

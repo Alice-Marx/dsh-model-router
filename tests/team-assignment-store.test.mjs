@@ -86,6 +86,31 @@ test('depth means four delegation edges; notices cannot waive ancestry cycles', 
   assert.notEqual(standingThreadKey('a', 'b', 'one'), standingThreadKey('a', 'b', 'two'))
 })
 
+test('a coalesced notification commits intent atomically and restart preserves all bodies without resending', t => {
+  const first = fixture(t), store = first.store
+  const rows = store.createBatch([spec(), spec({ targetBot: 'second', workThreadKey: 'standing-two' })], { requestKey: 'one-notification' }).assignments
+  for (const row of rows) { running(store, row); store.settle(row.assignmentId, { outcome: 'succeeded', resultText: 'result-' + row.targetBot }) }
+  assert.equal(store.resumeDue().length, 1)
+  const ids = store.resumeDue()[0].resumeIds
+  assert.equal(ids.length, 2); assert.equal(store.beginResume(ids), true)
+  assert.ok(ids.every(id => store.get(id).resumeActive))
+  store.close()
+  const restored = fixture(t, { file: first.file }).store
+  assert.equal(restored.recover().fenced, 2)
+  assert.equal(restored.resumeDue().length, 0)
+  for (const row of rows) { const saved = restored.get(row.assignmentId); assert.equal(saved.resumeState, 'uncertain'); assert.equal(saved.resultText, 'result-' + row.targetBot); assert.equal(saved.inboxState, 'unread') }
+})
+
+test('an acknowledgement during a provably unstarted notification is retained when its group is rearmed', t => {
+  const { store } = fixture(t)
+  const rows = store.createBatch([spec(), spec({ targetBot: 'second', workThreadKey: 'standing-two' })], { requestKey: 'ack-race' }).assignments
+  for (const row of rows) { running(store, row); store.settle(row.assignmentId, { outcome: 'succeeded' }) }
+  const ids = rows.map(row => row.assignmentId)
+  store.beginResume(ids); store.handleInbox([ids[0]], 'read'); store.rewarmResumes(ids)
+  assert.equal(store.get(ids[0]).resumeState, 'consumed')
+  assert.deepEqual(store.resumeDue()[0].resumeIds, [ids[1]])
+})
+
 test('a resume frame persists across awaits and an uncertain live execution stays fenced until Host recovery', t => {
   const first = fixture(t), { store } = first
   const parent = store.create(spec({ reply: 'none' })).assignment; running(store, parent)
