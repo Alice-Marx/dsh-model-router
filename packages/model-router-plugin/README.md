@@ -8,16 +8,16 @@ English · [简体中文](README.zh.md)
 
 Describe the result you want, choose suitable configured models or native CLI tools, review the plan, then follow execution and accounting from one workbench. This edition adds a **Model Router** sidebar entry and keeps the existing Harness workspace.
 
-**Stable version: 0.74.3.** For Bot conversations, multi-Bot delegation, remote computers, private libraries, and routines, use the [full Bot edition](https://github.com/Alice-Marx/dsh-model-router/blob/main/README.md): **`@ljwei-stak/dsh-model-route-bot`**. Select one edition per profile.
+**Stable version: 0.76.0.** For Bot conversations, multi-Bot delegation, remote computers, private libraries, and routines, use the [full Bot edition](https://github.com/Alice-Marx/dsh-model-router/blob/main/README.md): **`@ljwei-stak/dsh-model-route-bot`**. Select one edition per profile.
 
 ## Install
 
-1. In Harness **Plugins → Add plugin**, enter `@ljwei-stak/dsh-model-router@0.74.3`.
+1. In Harness **Plugins → Add plugin**, enter `@ljwei-stak/dsh-model-router@0.76.0`.
 2. Enable it, quit Harness including its tray process, and restart.
 3. Configure provider credentials/models in Harness **Models**, then open **Model Router** from the sidebar.
 
 ```powershell
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.74.3
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.0
 ```
 
 ## Run your first task
@@ -42,6 +42,8 @@ The current application uses Chinese interface labels; these English description
 | Native tools / 官方工具 | Detection, supported install methods, login/readiness inspection, and interactive CLI terminals. |
 | Budget & safety / 预算与安全 | Per-task estimates, API daily/monthly limits and reservations, separate subscription calls/tokens, review policy, and explicit feedback. |
 | Execution history / 执行记录 | Results, receipts, attempt status, cancellation, supported retries, and reconciliation of interrupted/unknown effects. |
+
+**ZCode TUI** uses the vendor-supplied beta package `@mbearo/zcode`. Choose npm or pnpm in Native tools; the shell command remains `zcode`, and `zcode login` opens account login. Keep optional dependencies for the matching native platform package. Node.js 22.16.0 or newer is required. Managed execution supports read-only tasks and workspace edits through the Host sandbox; an explicit CLI model is passed with `--model`.
 
 Route comparison and execution preview run locally without model calls. Confirmation starts the selected provider or supported tool. **Model routing is read-only**; editing requires **Team → Native-tool collaboration → Edit files**. Tool installation/login and readiness for a specific managed execution mode are separate checks. Vendor-native processes run as the current system user; a worktree organizes changes rather than restricting system access.
 

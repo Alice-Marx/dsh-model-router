@@ -8,16 +8,16 @@
 
 写清期望结果，选择合适的已配置模型或原生 CLI 工具，审查计划后启动，并在同一工作台跟踪执行和费用。此版本保留现有 Harness 工作区，在侧栏增加 **模型路由** 入口。
 
-**当前正式版：0.65.0。** 如需 Bot 对话、多 Bot 分工、远程电脑、私有资料库和例行任务，请使用 [完整 Bot 版本](https://github.com/Alice-Marx/dsh-model-router/blob/main/README.zh.md)：**`@ljwei-stak/dsh-model-route-bot`**。同一 profile 选择一种版本。
+**当前正式版：0.76.0。** 如需 Bot 对话、多 Bot 分工、远程电脑、私有资料库和例行任务，请使用 [完整 Bot 版本](https://github.com/Alice-Marx/dsh-model-router/blob/main/README.zh.md)：**`@ljwei-stak/dsh-model-route-bot`**。同一 profile 选择一种版本。
 
 ## 安装
 
-1. 在 Harness **插件 → 添加插件** 输入 `@ljwei-stak/dsh-model-router@0.65.0`。
+1. 在 Harness **插件 → 添加插件** 输入 `@ljwei-stak/dsh-model-router@0.76.0`。
 2. 启用后，连同托盘进程完全退出 Harness，再重新启动。
 3. 在 Harness **模型** 中配置 Provider 凭据和模型，从侧栏打开 **模型路由**。
 
 ```powershell
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.65.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.0
 ```
 
 ## 完成第一个任务
@@ -42,6 +42,8 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.65.0
 | 官方工具 | 工具检测、受支持的安装方式、登录/就绪检查与 CLI 交互终端。 |
 | 预算与安全 | 单次估算、API 日/月限额及预占、独立订阅调用/token、复核策略和显式反馈。 |
 | 执行记录 | 结果、收据、执行尝试、取消、受支持的重试及中断/未知影响核对。 |
+
+**ZCode TUI** 使用厂商提供的内测包 `@mbearo/zcode`，在官方工具中选择 npm 或 pnpm 安装。启动命令仍为 `zcode`，通过 `zcode login` 登录账户。请保留匹配平台的可选原生依赖，并使用 Node.js 22.16.0 及以上。托管执行通过 Host 沙箱支持只读与工作区编辑，显式 CLI 模型通过 `--model` 传入。
 
 路线比较和执行预览在本地进行，不调用模型；确认才会启动所选供应商或受支持的工具。**模型路由为只读执行**；修改文件需选择 **团队分工 → 官方工具协作 → 编辑文件**。工具安装/登录与具体托管执行模式就绪分别检查。厂商原生进程使用当前系统用户权限；工作树用于整理改动，不限制系统访问。
 
