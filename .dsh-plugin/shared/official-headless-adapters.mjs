@@ -3,6 +3,7 @@ import {readFile,realpath,stat} from 'node:fs/promises'
 import {createRequire} from 'node:module'
 import {dirname,isAbsolute,join,relative,sep} from 'node:path'
 import {attestVendorRelease} from './vendor-release-attestation.mjs'
+import {DSH_TUI_BACKEND_VERSION} from './official-tool-registry.mjs'
 
 const inside=(root,file)=>{const part=relative(root,file);return part!==''&&part!=='..'&&!part.startsWith('..'+sep)&&!isAbsolute(part)}
 const versionOf=file=>new Promise((resolve,reject)=>{
@@ -31,26 +32,26 @@ export async function resolveStepTask(workspace,mode,modelId,selection,{attest=a
  return {unsupported:'未在所选 Step 安装目录中找到已核验的 step.exe，请展开诊断并修复该安装。'}
 }
 
-/** Use the same official DSH backend as dsh-TUI, with the actual rc.2 JSON protocol. */
+/** Use the same pinned official DSH backend as the TUI installation plan. */
 export async function resolveDshTask(workspace,mode,modelId,selection,{findEntries,findNode}={}){
  if(modelId)return {unsupported:'DeepSeek 托管工具当前使用 CLI 已保存的默认模型，请选择“厂商默认模型”。'}
  const entries=await findEntries('@deepseek-ai/dsh','dsh','lib/bin.js',workspace,{moduleRoots:selection.plan?.packageModuleRoots,directories:selection.preferred?selection.directories:undefined})
- let entry=entries.find(row=>row.version==='0.2.2-rc.2'),electron=false
- if(!entry){
+ let entry=entries.find(row=>row.version===DSH_TUI_BACKEND_VERSION),electron=false
+ if(!entry&&!selection.preferred){
   // The installed official Host may already carry dsh. Resolve its package
   // from trusted process entry points, never from a model-supplied location.
   for(const origin of [process.argv[1],import.meta.url]){
    try{
     if(!origin)continue
     const require=createRequire(origin),manifest=require.resolve('@deepseek-ai/dsh/package.json'),pkg=JSON.parse(await readFile(manifest,'utf8'))
-    if(pkg.name!=='@deepseek-ai/dsh'||pkg.version!=='0.2.2-rc.2')continue
+    if(pkg.name!=='@deepseek-ai/dsh'||pkg.version!==DSH_TUI_BACKEND_VERSION)continue
     const root=dirname(manifest),script=await realpath(join(root,'lib/bin.js'))
     if(!inside(root,script)||inside(workspace,script))continue
     entry={entry:script,version:pkg.version,source:'official-host-dsh-runtime'};electron=Boolean(process.versions.electron&&script.includes('app.asar'));break
    }catch{}
   }
  }
- if(!entry)return {unsupported:'缺少官方 dsh 0.2.2-rc.2 Node 运行时；请在 dsh-TUI 的“安装/修复 CLI”补齐依赖。'}
+ if(!entry)return {unsupported:`所选安装目录缺少官方 dsh ${DSH_TUI_BACKEND_VERSION} Node 运行时；请在 dsh-TUI 的“安装/修复 CLI”补齐依赖。`}
  const node=electron?process.execPath:await findNode(workspace)
  if(!node)return {unsupported:'缺少可直接启动的 Node 运行时。'}
  return {file:node,args:[...(electron?['--expose-internals']:[]),entry.entry,'--profile','headless','--json','--permission-mode',mode,'--approval-policy','never','-'],

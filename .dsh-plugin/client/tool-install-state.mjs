@@ -178,3 +178,16 @@ export function shouldApplyInstallStatus(localJob, remoteJob) {
   if (!localStarted || !remoteStarted) return true
   return remoteStarted >= localStarted
 }
+
+/** Describe observed phases and elapsed time without inventing download percent. */
+export function installJobProgress(job, now = Date.now()) {
+  if (job?.status !== 'running') return null
+  const labels = { queued: '等待其他工具任务', preflight: '检查安装环境', installing: '解析依赖、下载与安装',
+    'downloading-and-verifying': '下载与校验安装文件', verifying: job.operation === 'uninstall' ? '卸载命令已完成，核验移除结果' : '安装命令已完成，核验版本与执行入口',
+    uninstalling: '正在卸载', removing: '正在移除程序' }
+  const seconds = value => { const at = Date.parse(value ?? ''); return Number.isFinite(at) ? Math.max(0, Math.floor((now - at) / 1000)) : null }
+  const elapsed = seconds(job.startedAt), idle = seconds(job.lastOutputAt)
+  return { label: job.cancelRequested ? '正在请求取消' : labels[job.phase] ?? '正在处理工具任务', elapsedSeconds: elapsed, idleSeconds: idle,
+    detail: [elapsed === null ? '' : `已用时 ${elapsed} 秒`, idle === null ? '' : `最近输出 ${idle} 秒前`].filter(Boolean).join(' · '),
+    waitingForOutput: job.phase === 'installing' && (idle ?? elapsed ?? 0) >= 20 }
+}

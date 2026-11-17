@@ -2272,8 +2272,8 @@ export function createRouterTerminals(options = {}) {
     prepare: () => ensureNpmPrefixOnPath(),
     preferences: () => installPreferences(),
     launchOptions: () => currentInstallOptions(),
-    onSessionEnd: record => { void routerStateStore().upsertTerminalSession(record).catch(() => {}) },
-    onSessionUpdate: record => { void routerStateStore().upsertTerminalSession(record).catch(() => {}) },
+    onSessionEnd: record => { void routerStateStore().appendTerminalSession(record).catch(() => {}) },
+    onSessionUpdate: record => { void routerStateStore().appendTerminalSession(record).catch(() => {}) },
     ...options,
   })
 }

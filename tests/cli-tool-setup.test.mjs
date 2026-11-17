@@ -40,5 +40,5 @@ test('repair only starts on the explicit owner operation and status/cancel recon
 })
 test('TUI install and repair include the pinned official dsh prerequisite for npm and pnpm',()=>{
  const tool=getOfficialTool('dsh-tui')
- for(const method of tool.installMethods){assert.ok(method.installArgs.includes('@deepseek-ai/dsh@0.2.2-rc.2'));assert.equal(method.uninstallArgs.includes('@deepseek-ai/dsh'),false)}
+ for(const method of tool.installMethods){assert.ok(method.installArgs.includes('@deepseek-ai/dsh@0.2.2-rc.3'));assert.ok(!method.installArgs.includes('@deepseek-ai/dsh@0.2.2-rc.2'));assert.equal(method.uninstallArgs.includes('@deepseek-ai/dsh'),false)}
 })

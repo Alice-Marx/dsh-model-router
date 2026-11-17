@@ -22,6 +22,7 @@
 
 /** npm registry every fixed npm method installs from unless the user overrides it. */
 export const DEFAULT_NPM_REGISTRY = 'https://registry.npmjs.org/'
+export const DSH_TUI_BACKEND_VERSION = '0.2.2-rc.3'
 
 /** Shared shape of a "package manager" method: argv only, no script staging. */
 function packageManagerMethod(id, label, manager, spec, { registryFlag = '--registry=', command = 'install', extraArgs = [] } = {}) {
@@ -498,7 +499,7 @@ export const OFFICIAL_TOOLS = Object.freeze([
     purpose: 'DeepSeek Harness 的终端 TUI：像素鲸鱼、实时状态、时间回退、会话管理，直接复用 DSH 的模型、工具与会话。',
     package: '@deepseek-harness-tui/dsh-tui',
     manager: 'npm',
-    installArgs: ['install', '-g', '@deepseek-harness-tui/dsh-tui@latest', '@deepseek-ai/dsh@0.2.2-rc.2', '--registry=https://registry.npmjs.org/'],
+    installArgs: ['install', '-g', '@deepseek-harness-tui/dsh-tui@latest', `@deepseek-ai/dsh@${DSH_TUI_BACKEND_VERSION}`, '--no-audit', '--no-fund', '--registry=https://registry.npmjs.org/'],
     uninstallArgs: ['uninstall', '-g', '@deepseek-harness-tui/dsh-tui'],
     probeExecutables: ['dsh-tui', 'dst'],
     probeNote: '包同时提供 dsh-tui 与 dst 两个命令，二者指向同一入口；需要 Node 22.19 或 24 以上。',
@@ -507,8 +508,8 @@ export const OFFICIAL_TOOLS = Object.freeze([
     tuiPrompt: true,
     providerHints: ['deepseek'],
     installMethods: Object.freeze([
-      packageManagerMethod('npm', 'npm', 'npm', '@deepseek-harness-tui/dsh-tui@latest', { extraArgs: ['@deepseek-ai/dsh@0.2.2-rc.2'] }),
-      packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@deepseek-harness-tui/dsh-tui@latest', { extraArgs: ['@deepseek-ai/dsh@0.2.2-rc.2'] }),
+      packageManagerMethod('npm', 'npm', 'npm', '@deepseek-harness-tui/dsh-tui@latest', { extraArgs: [`@deepseek-ai/dsh@${DSH_TUI_BACKEND_VERSION}`, '--no-audit', '--no-fund'] }),
+      packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@deepseek-harness-tui/dsh-tui@latest', { extraArgs: [`@deepseek-ai/dsh@${DSH_TUI_BACKEND_VERSION}`] }),
     ]),
   }),
 ])

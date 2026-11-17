@@ -12,6 +12,7 @@ const MAX_FRAME = 262_144
 const MAX_BUFFERED_OUTPUT = 1_048_576
 const TREE_PROOF = 'windows-job-active-process-zero'
 const EVENT_FIELDS = Object.freeze({
+  bootstrapping: ['control'],
   listening: ['control'],
   dataConnected: ['control'],
   launcherCreated: ['control', 'pid', 'start', 'containment', 'conpty'],
@@ -54,8 +55,11 @@ export function createNativeTerminalProtocol() {
       const allowed = new Set(EVENT_FIELDS[frame.control])
       if (Object.keys(frame).some(key => !allowed.has(key))) throw protocolError('NATIVE_TERMINAL_PROTOCOL_FIELDS')
       const name = frame.control
-      if (name === 'listening') {
+      if (name === 'bootstrapping') {
         if (stage !== 'new') throw protocolError('NATIVE_TERMINAL_PROTOCOL_SEQUENCE')
+        stage = 'bootstrapping'
+      } else if (name === 'listening') {
+        if (!['new', 'bootstrapping'].includes(stage)) throw protocolError('NATIVE_TERMINAL_PROTOCOL_SEQUENCE')
         stage = 'listening'
       } else if (name === 'dataConnected') {
         if (stage !== 'listening') throw protocolError('NATIVE_TERMINAL_PROTOCOL_SEQUENCE')
@@ -155,7 +159,10 @@ async function allocatePrivateOutput(parentPath) {
   } catch { throw terminalError('NATIVE_TERMINAL_PRIVATE_OUTPUT_INVALID') }
 }
 
-export async function createWindowsManagedTerminal({ launch, cwd, cols, rows, env, ttlMs = 21_600_000, privateOutput, signal } = {}) {
+export async function createWindowsManagedTerminal({ launch, cwd, cols, rows, env, ttlMs = 21_600_000, privateOutput, signal } = {}, {
+  spawnHelper = spawn, bootstrapTimeoutMs = 60_000, createTimeoutMs = 20_000,
+} = {}) {
+  if (![bootstrapTimeoutMs, createTimeoutMs].every(ms => Number.isSafeInteger(ms) && ms >= 1 && ms <= 120_000)) throw terminalError('NATIVE_TERMINAL_TIMEOUT_INVALID')
   if (process.platform !== 'win32') throw terminalError('NATIVE_TERMINAL_UNSUPPORTED')
   const prepared = prepareLaunch(launch, env ?? {})
   const args = validateLaunch(prepared, cwd, env, cols, rows, ttlMs, privateOutput)
@@ -169,7 +176,7 @@ export async function createWindowsManagedTerminal({ launch, cwd, cols, rows, en
   const dataEndpoint = `\\\\.\\pipe\\dsh-terminal-${randomBytes(24).toString('hex')}`
   let helper
   try {
-    helper = spawn(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', helperPath], {
+    helper = spawnHelper(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', helperPath], {
       cwd: privateOutput, env: privateEnvironment(privateOutput), windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'],
     })
   } catch {
@@ -205,6 +212,7 @@ export async function createWindowsManagedTerminal({ launch, cwd, cols, rows, en
   let outputClosed = false
   let bytesDropped = 0
   let startupTimer = null
+  let startTimer = null
   let stopTimer = null
   let resizeTimer = null
   let cleaned = false
@@ -223,7 +231,7 @@ export async function createWindowsManagedTerminal({ launch, cwd, cols, rows, en
     helper.stdin.write(wire, error => error ? reject(terminalError('NATIVE_TERMINAL_CONTROL_LOST')) : resolve())
   })
   const clearWaits = () => {
-    clearTimeout(startupTimer); clearTimeout(stopTimer); clearTimeout(resizeTimer)
+    clearTimeout(startupTimer); clearTimeout(startTimer); clearTimeout(stopTimer); clearTimeout(resizeTimer)
     startupTimer = stopTimer = resizeTimer = null
   }
   const removePrivateOutput = async () => {
@@ -292,9 +300,9 @@ export async function createWindowsManagedTerminal({ launch, cwd, cols, rows, en
   }
   const accept = frame => {
     try { protocol.accept(frame) } catch (error) { protocolFailure(error); return }
-    if (frame.control === 'listening') attachSocket()
+    if (frame.control === 'listening') { armStartupTimer(createTimeoutMs); attachSocket() }
     else if (frame.control === 'launcherCreated') { launcherCreated = true; created.resolve() }
-    else if (frame.control === 'started') startedCall?.wait.resolve(Object.freeze({ pid: frame.pid, startIdentity: frame.start, started: true }))
+    else if (frame.control === 'started') { clearTimeout(startTimer); startedCall?.wait.resolve(Object.freeze({ pid: frame.pid, startIdentity: frame.start, started: true })) }
     else if (frame.control === 'hostExit') { hostExited = true; emit('exit', Object.freeze({ exitCode: frame.exitCode, signal: null })) }
     else if (frame.control === 'treeClosed') {
       treeClosed = true
@@ -383,11 +391,21 @@ export async function createWindowsManagedTerminal({ launch, cwd, cols, rows, en
     else if (!stopCall) void requestStop('abort').catch(() => {})
   }
   signal?.addEventListener('abort', aborted, { once: true })
-  startupTimer = setTimeout(() => {
-    created.reject(terminalError('NATIVE_TERMINAL_CREATE_TIMEOUT'))
-    loseControl('NATIVE_TERMINAL_CREATE_TIMEOUT')
-    abortHelper()
-  }, 20_000)
+  // Add-Type/CLR startup happens before any process exists. Give that cold path
+  // its own budget; once the data pipe listens, process creation is bounded
+  // independently. There is only one live deadline and no automatic replay.
+  function armStartupTimer(timeout) {
+    clearTimeout(startupTimer)
+    startupTimer = setTimeout(() => {
+      const stage = protocol.stage
+      const code = ['new', 'bootstrapping'].includes(stage) ? 'NATIVE_TERMINAL_BOOTSTRAP_TIMEOUT' : 'NATIVE_TERMINAL_CREATE_TIMEOUT'
+      const error = terminalError(code); error.startupStage = stage
+      created.reject(error)
+      loseControl(code, { startupStage: stage })
+      abortHelper()
+    }, timeout)
+  }
+  armStartupTimer(bootstrapTimeoutMs)
   const requestStop = reason => {
     if (treeClosed) return Promise.resolve(false)
     if (stopCall) return stopCall.promise
@@ -476,18 +494,16 @@ export async function createWindowsManagedTerminal({ launch, cwd, cols, rows, en
       const identity = protocol.identity
       const promise = send({ control: 'resume', ...identity }).then(() => wait.promise)
       startedCall = { promise, wait }
+      startTimer = setTimeout(() => {
+        loseControl('NATIVE_TERMINAL_START_TIMEOUT', { startupStage: protocol.stage })
+        abortHelper()
+      }, createTimeoutMs)
       promise.catch(() => {})
       return promise
     },
   }
   try {
-    await Promise.race([
-      created.promise,
-      new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(terminalError('NATIVE_TERMINAL_CREATE_TIMEOUT')), 20_000)
-        created.promise.then(() => clearTimeout(timer), () => clearTimeout(timer))
-      }),
-    ])
+    await created.promise
     clearTimeout(startupTimer)
     return Object.freeze(proc)
   } catch (error) {

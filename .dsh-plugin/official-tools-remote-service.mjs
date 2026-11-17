@@ -178,6 +178,7 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
 
   /** Re-probe the local fixed registry; the caller cannot supply a command. */
   async list() {
+    const settings = await this.installSettings()
     const tools = await probeAllTools({ fresh: true })
     const executionReadiness = await Promise.all(tools.map(async tool => {
       if (!tool.installed) return { id: tool.id, ready: false, reason: 'CLI 尚未安装或版本检测失败。' }
@@ -192,7 +193,7 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
       executionCapabilities: officialToolExecutionCapabilities(),
       executionReadiness,
       hostVersion: HOST_PLUGIN_VERSION,
-      install: this.installSettings().install,
+      install: settings.install,
     }
   }
 
@@ -210,7 +211,7 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
   /** Start one serialized fixed-registry install; return immediately for UI polling. */
   async installTool(request) {
     return settled(async () => {
-      this.installSettings()
+      await this.installSettings()
       await ensureNpmPrefixOnPath()
       return { accepted: true, job: startInstall(request.tool, { method: request.method }) }
     })
@@ -222,7 +223,7 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
    */
   async uninstallTool(request) {
     return settled(async () => {
-      this.installSettings()
+      await this.installSettings()
       await ensureNpmPrefixOnPath()
       return { accepted: true, job: startUninstall(request.tool, { method: request.method }) }
     })
@@ -231,7 +232,7 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
   /** Reinstall the tool even when it already reports the latest version. */
   async repairTool(request) {
     return settled(async () => {
-      this.installSettings()
+      await this.installSettings()
       await ensureNpmPrefixOnPath()
       return { accepted: true, job: startRepair(request.tool, { method: request.method }) }
     })

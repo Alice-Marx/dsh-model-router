@@ -38,6 +38,7 @@ import { versionStillOlder } from './version-order.mjs'
 
 const PROBE_TIMEOUT_MS = 8_000
 const INSTALL_TIMEOUT_MS = 900_000
+export const INSTALL_READINESS_TIMEOUT_MS = 60_000
 const UNINSTALL_TIMEOUT_MS = 300_000
 const OUTPUT_LINE_CAP = 120
 const IS_WINDOWS = process.platform === 'win32'
@@ -1154,6 +1155,7 @@ function jobView(job) {
     command: job.command,
     status: job.status,
     phase: job.phase,
+    lastOutputAt: job.lastOutputAt ?? null,
     cancelRequested: job.cancelRequested,
     startedAt: job.startedAt,
     finishedAt: job.finishedAt,
@@ -1168,6 +1170,7 @@ function jobView(job) {
 }
 
 function pushLine(job, line) {
+  job.lastOutputAt = new Date().toISOString()
   if (job.outputTail.length >= OUTPUT_LINE_CAP) {
     job.outputTail.shift()
     job.outputTruncated = true
@@ -1423,6 +1426,28 @@ export function installEnvironment(plan, base = process.env) {
 }
 
 /** Installation and version must pass; verify execution only where an adapter supports it. */
+export async function awaitInstallReadiness(toolId, selection, {
+  readinessFor = trustedExecutionReadiness, timeoutMs = INSTALL_READINESS_TIMEOUT_MS, signal,
+} = {}) {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120_000) throw new TypeError('INSTALL_READINESS_TIMEOUT_INVALID')
+  let timer, cancelled
+  const unavailable = (code, reason) => ({ ready: false, supported: true, readyModes: [], code, reason })
+  try {
+    return await Promise.race([
+      Promise.resolve().then(() => {
+        if (signal?.aborted) return unavailable('INSTALL_VERIFICATION_CANCELLED', '执行入口核验已取消。')
+        return readinessFor(toolId, selection)
+      }),
+      new Promise(resolve => { timer = setTimeout(() => resolve(unavailable('INSTALL_READINESS_TIMEOUT', `安装包的执行入口核验在 ${Math.ceil(timeoutMs / 1000)} 秒内未完成；请重新检测安装状态。`)), timeoutMs) }),
+      new Promise(resolve => {
+        cancelled = () => resolve(unavailable('INSTALL_VERIFICATION_CANCELLED', '执行入口核验已取消。'))
+        signal?.addEventListener('abort', cancelled, { once: true })
+        if (signal?.aborted) cancelled()
+      }),
+    ])
+  } finally { clearTimeout(timer); signal?.removeEventListener('abort', cancelled) }
+}
+
 export async function finishVerifiedInstall(job, probe, {
   lookupLatest = (tool, selection) => latestVersions.lookup(tool, selection), readinessFor = trustedExecutionReadiness,
 } = {}) {
@@ -1439,7 +1464,7 @@ export async function finishVerifiedInstall(job, probe, {
     failBecauseStillOlder(job, probe, latest.version)
     return true
   }
-  const readiness = await readinessFor(job.tool.id, { preferences: job.preferences, plan: job.plan })
+  const readiness = await awaitInstallReadiness(job.tool.id, { preferences: job.preferences, plan: job.plan }, { readinessFor, signal: job.controller?.signal })
   job.executionReadiness = readiness
   if (job.cancelRequested) { markCancelled(job); return true }
   if (!readiness.ready && readiness.supported !== false) {
@@ -1529,8 +1554,13 @@ async function runInstallJob(installPlan, job) {
         return
       }
       if (order === 0) {
-        const readiness = await trustedExecutionReadiness(job.tool.id, { preferences: job.preferences, plan: job.plan })
+        const readiness = await awaitInstallReadiness(job.tool.id, { preferences: job.preferences, plan: job.plan }, { signal: job.controller.signal })
         if (job.cancelRequested) { markCancelled(job); return }
+        if (readiness.code === 'INSTALL_READINESS_TIMEOUT') {
+          job.status = 'failed'; job.finishedAt = new Date().toISOString(); job.postInstallProbe = before; job.executionReadiness = readiness
+          job.error = `已安装最新版 ${before.version}，但${readiness.reason} 本次未重复安装。`
+          return
+        }
         // A repair re-runs the same command even when nothing looks stale: a
         // broken install reports the right version, so "already current" is
         // exactly the case the user pressed 修复 for.

@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
 [Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false, $true)
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::Out.WriteLine('{"control":"bootstrapping"}')
+[Console]::Out.Flush()
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections;

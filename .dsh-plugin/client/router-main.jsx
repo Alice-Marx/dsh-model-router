@@ -1,7 +1,7 @@
 import React from 'react'
 import { createWorkspacePlan, routesFromModelCatalog } from './catalog.mjs'
 import { ModelProfileEditor } from './model-profile-editor.jsx'
-import { acceptedInstallJob, installClickRefusal, installSummaryMatchesSettings, mutateToolInstallSettings, retainToolInstallDrafts, savedToolInstallMethods, shouldApplyInstallStatus, toolInstallAction, toolInstallSettingsSignature, toolMaintenanceActions, validateToolInstallSetting } from './tool-install-state.mjs'
+import { acceptedInstallJob, installClickRefusal, installJobProgress, installSummaryMatchesSettings, mutateToolInstallSettings, retainToolInstallDrafts, savedToolInstallMethods, shouldApplyInstallStatus, toolInstallAction, toolInstallSettingsSignature, toolMaintenanceActions, validateToolInstallSetting } from './tool-install-state.mjs'
 import { OFFICIAL_TOOLS, installCommandLine, installMethodsFor, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { attentionSummary, deriveAttention } from '../shared/attention.mjs'
@@ -433,6 +433,14 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
 
   const refreshInstallSettingsRef = React.useRef(refreshInstallSettings)
   refreshInstallSettingsRef.current = refreshInstallSettings
+  const [progressNow, setProgressNow] = React.useState(Date.now)
+  const hasActiveInstall = Object.values(jobs).some(job => job?.status === 'running')
+  React.useEffect(() => {
+    if (!hasActiveInstall) return undefined
+    setProgressNow(Date.now())
+    const timer = setInterval(() => setProgressNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [hasActiveInstall])
   const beginSettingsMutation = React.useCallback(operations => {
     const generation = ++mutationGeneration.current
     mutationPendingRef.current = { generation, operations }
@@ -481,8 +489,7 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
         const job = response.value?.job
         const local = jobsRef.current[id]
         if (!job) {
-          if (local?.status === 'running') return
-          throw new Error('安装任务状态暂不可用。')
+          throw new Error('宿主未返回此安装任务的状态，结果尚未确认。请重新打开面板并检测安装结果，再决定是否重试。')
         }
         if (!shouldApplyInstallStatus(local, job)) return
         rememberJobs(previous => shouldApplyInstallStatus(previous[id], job) ? { ...previous, [id]: job } : previous)
@@ -659,7 +666,8 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
               ? job.postInstallProbe?.installed === false
               : job.postInstallProbe?.installed === true)
             const operation = job?.operation === 'uninstall' ? '卸载' : job?.operation === 'repair' ? '修复' : '安装'
-            const status = running ? job.cancelRequested ? `正在取消${operation}…` : `${operation}中…`
+            const progress = installJobProgress(job, progressNow)
+            const status = running ? `${progress.label}…`
               : job?.status === 'cancelled' ? `${operation}已取消，请重新检测`
                   : verified ? `${operation}成功并验证` : probe ? probeLabel(probe) : '所选安装目标尚未体检'
             return (
@@ -668,6 +676,7 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
                   <div className="mr-route-name" title={tool.purpose}>{tool.label}</div>
                   <div className="mr-route-provider">{tool.vendor} · {tool.id}</div>
                   <div className="mr-tool-status" role="status"><span className={`mr-tool-dot ${running ? 'running' : probe?.installed ? 'installed' : 'missing'}`} />{status}{probe?.installed && probe.version ? ` · ${probe.version}` : ''}{healthById[tool.id]?.latestVersion ? ` · 最新 ${healthById[tool.id].latestVersion}` : ''}</div>
+                  {progress && <p className="mr-caption mr-tool-progress" role="status">{progress.detail}{progress.waitingForOutput ? ' · 暂未收到新输出，依赖处理可能较慢；可展开安装日志查看或请求取消。' : ''}</p>}
                   <ToolLoginLine entry={healthById[tool.id]} />
                   {probe?.installed && <p className="mr-caption mr-tool-detail">{tool.taskBackend === true ? '可登记为子任务：Bot 派发的 CLI 步骤会进入统一任务系统（依赖、取消、重试、收据），收据分别记录请求模型与实际模型。' : tool.headlessAdapter
                     ? '只读路由任务可尝试官方无界面 CLI；API 回退按计费与失败处理设置执行。此工具未支持官方隔离工作区团队入口。'

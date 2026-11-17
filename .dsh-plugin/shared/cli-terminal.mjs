@@ -188,7 +188,9 @@ export async function resolveTerminalLaunch(target, mode = 'interactive', {
     const node = await findNode(cwd, ZCODE_TUI_NODE_MINIMUM)
     if (!node) throw new Error('ZCode TUI 需要 Node.js 22.16.0 及以上，请安装后重新体检。')
     const args = mode === 'login' ? [...TERMINAL_LOGIN_ARGS.zcode] : []
-    return { file: node, args: [bundle.cliEntry, ...args], verbatim: false, utf8Console: true,
+    // The Rust TUI owns Unicode console I/O. Avoid an extra encoded PowerShell
+    // process; the verified vendor wrapper still manages native updates.
+    return { file: node, args: [bundle.cliEntry, ...args], verbatim: false,
       display: ['zcode', ...args].join(' ') }
   }
   const executable = tool.probeExecutables[0]
@@ -560,6 +562,8 @@ export function createTerminalManager({
             : backend.backend === 'pty' ? spawnPtyProcess(loadPty().pty, launch, options) : spawnPipe(launch, options)
         } catch (error) {
           await releaseOutputParent(ownedOutput)
+          if (error?.code === 'NATIVE_TERMINAL_BOOTSTRAP_TIMEOUT') throw new Error('Windows 终端组件初始化超时（尚未收到进程创建确认）。请稍后重试；若仍失败，请保留此诊断代码：NATIVE_TERMINAL_BOOTSTRAP_TIMEOUT。')
+          if (error?.code === 'NATIVE_TERMINAL_CREATE_TIMEOUT') throw new Error(`Windows 终端未在限定时间内完成进程创建（阶段 ${error.startupStage ?? 'unknown'}）。诊断代码：NATIVE_TERMINAL_CREATE_TIMEOUT。`)
           throw new Error(`无法启动 ${launch.display}：${error instanceof Error ? error.message : String(error)}`)
         }
         const at = now()

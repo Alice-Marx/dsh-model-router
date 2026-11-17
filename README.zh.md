@@ -14,7 +14,7 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.76.0 · Windows Remote Agent：0.1.3**
+**当前正式版：0.76.1 · Windows Remote Agent：0.1.3**
 
 以 Bot 联系人和聊天为主要入口，集中使用独立 AI 连接、多模型路线、团队委派、私有资料库、数据分析与自有 Windows 电脑。任务、通知和执行记录保存在工作空间中，Main Bot 可在已保存的多条模型路线之间调度。
 
@@ -80,8 +80,8 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.76.0`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.76.0`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.76.1`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.76.1`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 完整版本进入 Bot 工作区，在 **设置 → AI** 添加独立模型连接，再为 Bot 选择模型。纯路由版本从侧栏打开 **模型路由**，使用 Harness 已配置路线。
 
@@ -89,10 +89,10 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.76.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.76.1
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.1
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -144,6 +144,8 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.0
 ### 使用各工具自己的账户与能力
 
 工具注册表包含 **Qwen Code、CodeBuddy Code、Kimi Code、Claude Code、Codex、MiniMax Code、MiMo Code、Grok Build、Gemini、OpenCode、StepCode、Pi、Hermes、ZCode TUI 和 DSH TUI**。在 **官方工具** 中检测工具，选择可用安装方式，完成厂商登录，再检查所需执行模式的就绪状态。
+
+工具任务会区分排队、依赖处理与安装后核验，并显示已用时和最近输出时间。安装包已完成而执行入口核验超时时，会保留已安装版本并提示重新检测。Windows 交互终端使用 ConPTY 和 Job 管理进程树；首次组件初始化与进程创建分别计时。dsh-TUI 的安装与托管执行使用同一官方 dsh 0.2.2-rc.3 运行时。
 
 **ZCode TUI** 使用厂商提供的内测包 `@mbearo/zcode`，安装命令为 `npm i -g @mbearo/zcode`，也可选择 pnpm。启动命令仍为 `zcode`；通过 `zcode login` 选择 Z.ai 或 BigModel 登录。需要 Node.js 22.16.0 及以上，并保留匹配的可选原生依赖（Windows x64/ARM64、macOS ARM64，或 Linux glibc x64/ARM64）。托管任务使用 print JSON、私有运行状态和 Host 沙箱，支持只读与工作区编辑。已保存的 CLI 模型通过 `--model` 传入，否则使用已配置的默认模型。已有 `zcode` 绑定保留原有身份，旧社区版 `zcode-cli` 不满足新 TUI 的检测要求。
 

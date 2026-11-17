@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.76.0 · Windows Remote Agent: 0.1.3**
+**Current stable version: 0.76.1 · Windows Remote Agent: 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -80,8 +80,8 @@ Edit the Bot's name, role and standing instructions under **Identity & personali
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.76.0`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.76.0`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.76.1`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.76.1`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -89,10 +89,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.76.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.76.1
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.1
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -144,6 +144,8 @@ Model routing executes read-only analysis. To modify files, choose **Team → Na
 ### Use native tools with their own accounts
 
 The tool registry includes **Qwen Code, CodeBuddy Code, Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, Gemini, OpenCode, StepCode, Pi, Hermes, ZCode TUI, and DSH TUI**. In **Native tools**, detect the tool, choose an available install method, complete the vendor's login, then check readiness for the execution mode you want.
+
+Tool jobs distinguish queueing, dependency installation and post-install verification, and show elapsed time and the last output time. If execution verification times out after installation, the installed version remains visible and can be checked again. Windows interactive terminals use ConPTY with Job process-tree tracking; cold bootstrap and process creation have separate deadlines. dsh-TUI installation and managed execution use the same official dsh 0.2.2-rc.3 runtime.
 
 **ZCode TUI** uses the vendor-supplied beta package `@mbearo/zcode`, installed with `npm i -g @mbearo/zcode` or the pnpm method. The command remains `zcode`; use `zcode login` to choose Z.ai or BigModel. It requires Node.js 22.16.0 or newer and matching optional native dependencies (Windows x64/ARM64, macOS ARM64, or Linux glibc x64/ARM64). Managed tasks use print JSON, a private runtime and the Host sandbox for read-only or workspace-edit execution. A saved CLI model is passed with `--model`; otherwise the configured default is used. Existing `zcode` bindings retain their identity. The older community `zcode-cli` distribution does not satisfy TUI detection.
 

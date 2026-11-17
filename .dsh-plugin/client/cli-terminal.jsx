@@ -203,7 +203,9 @@ export function CliTerminalCard({ api, health, settingsSignature = '' }) {
       </div><button className="mr-button mr-button-secondary" type="button" onClick={() => { void loadInfo() }}>刷新</button></div>
       <div className="mr-card-body">
         {info.status === 'error' && <div className="mr-error" role="alert">{info.error}</div>}
-        {info.value && <p className="mr-caption">{info.value.backend === 'pty'
+        {info.value && <p className="mr-caption">{info.value.backend === 'managed'
+          ? '终端组件：Windows ConPTY，支持全屏界面、颜色和窗口大小同步；由 Windows Job 管理进程树。'
+          : info.value.backend === 'pty'
           ? '终端组件：伪终端（PTY），支持全屏界面、颜色和窗口大小同步。'
           : `终端组件：管道模式。${info.value.limitation ?? ''}${info.value.ptyError ? `（PTY 加载失败：${info.value.ptyError}）` : ''}`}</p>}
         <div className="mr-controls">
@@ -229,7 +231,7 @@ export function CliTerminalCard({ api, health, settingsSignature = '' }) {
           <p className="mr-caption">命令：<code>{details.command}</code><br />工作目录：<code>{details.cwd}</code></p>
           <ul>{details.points.map(point => <li key={point}>{point}</li>)}</ul>
           <div className="mr-actions">
-            <button className="mr-button" type="button" disabled={starting} onClick={() => { void start() }}>{starting ? '正在启动…' : '确认启动'}</button>
+            <button className="mr-button" type="button" disabled={starting} onClick={() => { void start() }}>{starting ? '正在准备终端…' : '确认启动'}</button>
             <button className="mr-button mr-button-secondary" type="button" disabled={starting} onClick={() => setConfirming(false)}>取消</button>
           </div>
         </div>}
