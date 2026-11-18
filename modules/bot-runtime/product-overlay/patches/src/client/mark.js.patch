@@ -1,0 +1,41 @@
+--- a/src/client/mark.js
++++ b/src/client/mark.js
+@@ -1,6 +1,8 @@
+ import { createElement as h, useEffect, useRef, useState } from 'react'
+ import { fnv1a, lookOf, shapeId, shapeOf, MASK_ID, nextMarkSerial, characterMarkup } from './characters.js'
+ import { t } from './i18n.js'
++import { modelAvatarOf } from './model-avatar-picker.js'
++import { ModelPortrait } from './model-portrait.js'
+ 
+ export { colorOf, lookOf } from './characters.js'
+ 
+@@ -57,12 +59,14 @@
+   // A photo that does not load shows the character instead; a new photo is tried again.
+   const [broken, setBroken] = useState('')
+   const image = look.image && look.image !== broken ? look.image : undefined
+-  useGaze(ref, gaze)
++  const portrait = live && image ? modelAvatarOf(image) : undefined
++  const markState = STATES.includes(state) ? state : 'idle'
++  useGaze(ref, gaze && !portrait)
+   const common = {
+     ref,
+     className: poked ? 'bt-mark bt-mark-poke' : 'bt-mark',
+     'data-shape': image ? 'image' : shapeId(look.shape),
+-    'data-state': STATES.includes(state) ? state : 'idle',
++    'data-state': markState,
+     'data-live': live ? '' : undefined,
+     'data-fidget': live ? FIDGETS[fnv1a(`${bot?.id ?? ''}:fidget`) % FIDGETS.length] : undefined,
+     'data-gaze': gaze ? '' : undefined,
+@@ -71,9 +75,11 @@
+     role: label ? 'img' : undefined,
+     'aria-label': label,
+     'aria-hidden': label ? undefined : true,
+-    onClick: pokeable ? () => setPoked(true) : undefined,
++    onClick: pokeable && !portrait ? () => setPoked(true) : undefined,
+     onAnimationEnd: poked ? (event) => { if (/^bt-poke/.test(event.animationName)) setPoked(false) } : undefined,
+   }
++  if (portrait) return h('span', common, h(ModelPortrait, { key: portrait.id, entry: portrait, botId: bot?.id ?? portrait.id,
++    state: markState, size, gaze, pokeable, onError: () => setBroken(image) }))
+   if (image) return h('span', common, h('img', { className: 'bt-mark-img', src: image, alt: '', draggable: false, onError: () => setBroken(image) }))
+   const box = shapeOf(look.shape).size
+   return h('span', common, h('svg', { viewBox: `0 0 ${box} ${box}`, dangerouslySetInnerHTML: { __html: characterMarkup(look.shape, look.color).replaceAll(MASK_ID, maskId.current) } }))

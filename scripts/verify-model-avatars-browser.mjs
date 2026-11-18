@@ -6,8 +6,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { chromium } from 'playwright'
 import { MODEL_AVATARS } from '../modules/bot-runtime/vendor/ds-bot/src/client/model-avatar-catalog.js'
+import { PORTRAIT_RIGS } from '../modules/bot-runtime/vendor/ds-bot/src/client/model-portrait-eyes.js'
 
-const root = resolve(import.meta.dirname, '..'), base = join(root, 'tmp/integration/actual-harness-ui')
+const root = resolve(import.meta.dirname, '..'), base = process.argv[2] ? resolve(process.argv[2]) : join(root, 'tmp/integration/actual-harness-ui')
 const { run, home, source, harnessVersion, packageVersion } = JSON.parse(await readFile(join(base, 'current.json'), 'utf8'))
 const connection = JSON.parse(await readFile(join(run, 'connection.private.json'), 'utf8'))
 assert.equal(new URL(connection.origin).hostname, '127.0.0.1')
@@ -16,7 +17,7 @@ const expectedClient = await readFile(join(source, '.dsh-plugin/client.js'))
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const browser = await chromium.launch({ headless: true })
 const page = await browser.newPage({ viewport: { width: 1360, height: 1000 } })
-const errors = [], images = [], served = [], checks = []
+const errors = [], images = [], served = [], checks = [], motions = []
 page.on('pageerror', cause => errors.push(cause.message.replace(/([?&]token=)[^\s&]+/g, '$1[REDACTED]')))
 page.on('response', async response => {
   if (response.status() !== 200 || !/javascript/.test(response.headers()['content-type'] ?? '')) return
@@ -84,6 +85,74 @@ const pickDraft = async (form, id) => {
   assert.equal(await form.locator(`[data-model-avatar="${id}"]`).getAttribute('aria-pressed'), 'true')
   return entry
 }
+const motionSelector = id => '.bt-create-preview .bt-model-portrait[data-portrait="' + id + '"]'
+const checkMotion = async (form, id) => {
+  const selector = motionSelector(id)
+  const avatar = form.locator(selector)
+  await avatar.waitFor()
+  await page.waitForFunction(selector => document.querySelector(selector)?.hasAttribute('data-portrait-motion'), selector)
+  await page.waitForFunction(selector => document.querySelector(selector + ' img')?.naturalWidth === 256, selector)
+  if (id === 'deepseek') {
+    const { width, height } = await avatar.boundingBox()
+    await avatar.hover({ position: { x: Math.floor(width * .85), y: Math.floor(height * .5) } })
+    assert.ok(Number(await avatar.evaluate(node => node.style.getPropertyValue('--bt-portrait-x'))) > 0)
+  }
+  await avatar.click()
+  const sample = await page.waitForFunction(({ selector, eyes }) => {
+    const node = document.querySelector(selector)
+    const eyelids = node?.querySelector('canvas')
+    if (!eyelids || eyelids.hidden) return false
+    const animation = node.querySelector('.bt-portrait-gesture').getAnimations().find(item => item.playState === 'running')
+    if (!animation) return false
+    const painted = eyelids.getContext('2d')
+    const image = node.querySelector('img')
+    const original = document.createElement('canvas')
+    original.width = eyelids.width
+    original.height = eyelids.height
+    const source = original.getContext('2d')
+    source.drawImage(image, 0, 0)
+    const changes = eyes.map(([left, top, right, bottom]) => {
+      const box = [left, top, right - left, bottom - top]
+      const actual = painted.getImageData(...box).data
+      const before = source.getImageData(...box).data
+      let changed = 0
+      for (let i = 0; i < actual.length; i += 4) {
+        if (actual[i + 3] && Math.abs(actual[i] - before[i]) + Math.abs(actual[i + 1] - before[i + 1]) +
+          Math.abs(actual[i + 2] - before[i + 2]) > 30) changed++
+      }
+      return changed
+    })
+    if (changes.some(pixels => pixels < 60)) return false
+    return { frames: animation.effect.getKeyframes(), duration: animation.effect.getTiming().duration, changes }
+  }, { selector, eyes: PORTRAIT_RIGS[id].eyes }, { polling: 'raf', timeout: 2000 })
+  const { frames, duration, changes } = await sample.jsonValue()
+  await sample.dispose()
+  const heldIndex = frames.findIndex((frame, index) => {
+    const previous = frames[index - 1]
+    return previous && frame.transform === previous.transform && frame.offset - previous.offset >= .15
+  })
+  assert.ok(heldIndex > 0, id + ' must hold its main pose through several frames')
+  const held = frames[heldIndex]
+  const move = /translate\(([-.\d]+)%,\s*([-.\d]+)%\)/.exec(held.transform)
+  const roll = Math.abs(Number(/rotate\(([-.\d]+)deg\)/.exec(held.transform)?.[1]))
+  const vertical = Number(move?.[2])
+  assert.ok(roll >= 5 || Math.abs(vertical) >= 3, id + ' must have a clearly visible tilt or nod')
+  const holdMs = Math.round((held.offset - frames[heldIndex - 1].offset) * duration)
+  return { id, roll, vertical, holdMs, blinkChangedPixels: changes }
+}
+const checkReducedMotion = async (form, id) => {
+  const selector = motionSelector(id)
+  const avatar = form.locator(selector)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.waitForFunction(selector => {
+    const node = document.querySelector(selector)
+    return node && !node.hasAttribute('data-portrait-motion') && node.querySelector('canvas').hidden &&
+      node.querySelector('.bt-portrait-gesture').getAnimations().length === 0
+  }, selector, { polling: 'raf', timeout: 2000 })
+  await avatar.click()
+  assert.equal(await avatar.locator('canvas').isVisible(), false)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+}
 const createPortraitBot = async (form, name, id) => {
   const entry = await pickDraft(form, id)
   await form.getByRole('textbox', { name: '名字', exact: true }).fill(name)
@@ -108,7 +177,17 @@ try {
   await openCreate()
   let form = page.locator('.bt-create')
   await checkCreate(form)
-  await pickDraft(form, 'deepseek'); await capture('create-avatars-light')
+  for (const entry of MODEL_AVATARS) {
+    await pickDraft(form, entry.id)
+    motions.push(await checkMotion(form, entry.id))
+  }
+  assert.equal(new Set(motions.map(({ roll, vertical }) => JSON.stringify([roll, vertical]))).size, 4)
+  checks.push('all 19 real previews change both eyelids, hold a clearly visible greeting, and render four motion styles')
+  await pickDraft(form, 'deepseek')
+  await checkMotion(form, 'deepseek')
+  await checkReducedMotion(form, 'deepseek')
+  checks.push('the preview follows the pointer and reduced motion cancels the gesture and the blink')
+  await capture('create-avatars-light')
   await form.getByRole('tab', { name: 'Bot', exact: true }).click()
   await form.locator('.bt-shape').first().click()
   assert.equal(await form.locator('.bt-create-preview img').count(), 0)
@@ -178,6 +257,7 @@ try {
   await page.locator('.bt-settings-nav').getByRole('button', { name: 'Bot', exact: true }).click()
   await page.locator('.bt-settings').getByRole('button', { name: '新 Bot', exact: true }).click()
   form = page.locator('.bt-create-inline'); await checkCreate(form)
+  await pickDraft(form, 'doubao'); await checkMotion(form, 'doubao')
   await pickDraft(form, 'deepseek'); await capture('create-avatars-phone')
   await createPortraitBot(form, 'Phone Portrait Creation Check', 'deepseek')
   await page.reload(); await page.locator('.bp-workspace-shortcuts').waitFor({ state: 'attached' })
@@ -189,7 +269,7 @@ try {
   assert.deepEqual(errors, [])
   const report = { status: 'passed', buildLabel: 'local model-avatar verification build', packageVersion, actualHarnessRuntime: true, harnessVersion,
     apiMocks: false, syntheticUiShell: false, isolatedUserHome: true, nativeDesktopWindowVerified: false, paidModelCalls: 0,
-    avatars: MODEL_AVATARS.length, client: { bytes: expectedClient.length, sha256: hash(expectedClient), exactServedBytes: true }, checks, images, pageErrors: errors }
+    avatars: MODEL_AVATARS.length, motions, client: { bytes: expectedClient.length, sha256: hash(expectedClient), exactServedBytes: true }, checks, images, pageErrors: errors }
   await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n'); console.log(JSON.stringify(report))
 } catch (cause) {
   await capture('failure'); throw cause

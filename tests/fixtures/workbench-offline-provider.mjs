@@ -18,9 +18,9 @@ class WorkbenchOfflineAdapter extends LlmAdapter {
   async *stream() {
     await appendFile(join(process.env.DSH_HOME, 'offline-model-calls.jsonl'), JSON.stringify({ provider: PROVIDER, model: MODEL }) + '\n')
     await pause(1800)
-    yield { type: 'text-delta', text: 'Offline verification answer.' }
+    yield { type: 'text-delta', index: 0, text: 'Offline verification answer.' }
     yield { type: 'usage', usage: { inputTokens: 18, outputTokens: 7, totalTokens: 25 } }
-    yield { type: 'finish', reason: 'stop' }
+    yield { type: 'finish', reason: { kind: 'stop' } }
   }
 }
 

@@ -219,7 +219,7 @@
     {
       "path": "src/client/styles.js",
       "kind": "patched",
-      "summary": "Fits the model portrait grid in the creation form and the existing avatar popover, with accessible source tabs.",
+      "summary": "Fits the model portrait grid in the creation form and the existing avatar popover, with accessible source tabs. Styles layered model portrait motion in the existing avatar frame.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "b789349121d050381dc5da82b7473361551a12b20cdd87d382fbb7cd7d7787c5"
@@ -243,6 +243,25 @@
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "80ebfe7556ade34b7ac5fe5cef2b027c6a78a7866bca62fda033f41d643d656f"
       }
+    },
+    {
+      "path": "src/client/mark.js",
+      "kind": "patched",
+      "summary": "Renders built-in portrait motion in live marks using the existing avatar and state props.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "463ce1cb80d8cca13cfe8af158f7f2fc8a3b87843661530a03938fddb905365a"
+      }
+    },
+    {
+      "path": "src/client/model-portrait.js",
+      "kind": "product-file",
+      "summary": "Plays small state-based gestures and optional pointer acknowledgments in live model portraits."
+    },
+    {
+      "path": "src/client/model-portrait-eyes.js",
+      "kind": "product-file",
+      "summary": "Defines the eye bounds of the original portraits and renders their eyelid motion."
     }
   ],
   "files": [
@@ -298,8 +317,8 @@
     {
       "path": "vendor/ds-bot/client.js",
       "sourcePath": "ds-bot/client.js",
-      "sha256": "3bec7bbc7b99995aa7fa6f5a6f001f3c3182930c6c2dc82aec772e9bc842b5f8",
-      "gitBlob": "ad010739ad0b3572fc75900e193ad50a565c4029",
+      "sha256": "fa230dddc67fafd1c989185b1ce59dc9950b7f019e010d8d1230025a3fd13799",
+      "gitBlob": "a87838b12312e777a3dbd61d21bba8fb4f721ce3",
       "origin": "generated"
     },
     {
@@ -949,9 +968,9 @@
     {
       "path": "vendor/ds-bot/src/client/mark.js",
       "sourcePath": "ds-bot/src/client/mark.js",
-      "sha256": "463ce1cb80d8cca13cfe8af158f7f2fc8a3b87843661530a03938fddb905365a",
-      "gitBlob": "d7cdc9f025d2537bd7f18b2baaf75b0b0dfa8914",
-      "origin": "upstream"
+      "sha256": "5c74097849dbd1db1851a0b20841cd9b8ced16de52b04c881c9d9ac56f2b5902",
+      "gitBlob": "86974e47c7250831c6da8b420e26559ce02772f2",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/member-status.js",
@@ -986,6 +1005,20 @@
       "sourcePath": "ds-bot/src/client/model-menu.js",
       "sha256": "69a7388f92b874ba7b1da04505185a1abdcc73d1d42e67ca23ae0ce4f08056f9",
       "gitBlob": "3757efc44eab2a34057dc4c1c9e20b68a1e0d41b",
+      "origin": "overlay"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/model-portrait-eyes.js",
+      "sourcePath": "ds-bot/src/client/model-portrait-eyes.js",
+      "sha256": "b406ee4ec9c44b63c18f1399ad3ea1d15fa363272da86da9f41581b1eaa81f98",
+      "gitBlob": "a240d5d91da40aff93c378602ed3b6a138185a65",
+      "origin": "overlay"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/model-portrait.js",
+      "sourcePath": "ds-bot/src/client/model-portrait.js",
+      "sha256": "6573afbf538f8f660856711d734ef7e2921452098ce03a0ba5f414b3594a6c85",
+      "gitBlob": "7b0d41638ba5abde19855e97f5e9e37eb65416f6",
       "origin": "overlay"
     },
     {
@@ -1145,8 +1178,8 @@
     {
       "path": "vendor/ds-bot/src/client/styles.js",
       "sourcePath": "ds-bot/src/client/styles.js",
-      "sha256": "a1ecfa5e0566e6e98773bbccb13b162d233e03332ab986f2244fbf2f2473f6da",
-      "gitBlob": "3c626d61e92b9cffe77f2def999f0322af3d7ba8",
+      "sha256": "7c65c4743f7864c22faa9f602299256167a900e1480f34a82e031d6aa9c647da",
+      "gitBlob": "a8a393957e914307f150bbbc0f5ad0314936d477",
       "origin": "overlay"
     },
     {

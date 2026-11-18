@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm'
 import { fileURLToPath } from 'node:url'
 import { avatarBytes } from '../modules/bot-runtime/vendor/ds-bot/src/host/avatar.js'
 import { generateModelAvatarCatalog } from '../scripts/build-model-avatar-catalog.mjs'
+import { PORTRAIT_RIGS, PORTRAIT_SIZE } from '../modules/bot-runtime/product-overlay/files/src/client/model-portrait-eyes.js'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const bundle = await build({
@@ -53,4 +54,15 @@ test('picker names every model, marks only the current portrait, and sends the c
 
 test('the embedded catalog matches every checked-in optimized image and digest', async () => {
   assert.equal((await generateModelAvatarCatalog({ check: true })).avatars, 19)
+})
+
+test('every model portrait has two bounded, distinct eye regions for motion', () => {
+  assert.deepEqual(Object.keys(PORTRAIT_RIGS).sort(), Array.from(MODEL_AVATARS, entry => entry.id).sort())
+  for (const [id, rig] of Object.entries(PORTRAIT_RIGS)) {
+    assert.equal(rig.eyes.length, 2, id)
+    const [[left, top, right, bottom], [nextLeft, nextTop, nextRight, nextBottom]] = rig.eyes
+    assert.ok(left > 4 && top > 3 && right > left && bottom > top, id)
+    assert.ok(nextLeft - right >= 8 && nextTop > 3 && nextRight > nextLeft && nextBottom > nextTop, id)
+    assert.ok(nextRight + 4 <= PORTRAIT_SIZE && Math.max(bottom, nextBottom) + 9 <= PORTRAIT_SIZE, id)
+  }
 })

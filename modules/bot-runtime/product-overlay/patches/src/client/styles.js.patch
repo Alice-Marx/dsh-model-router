@@ -1,6 +1,22 @@
 --- a/src/client/styles.js
 +++ b/src/client/styles.js
-@@ -364,6 +364,7 @@
+@@ -1,6 +1,7 @@
+ import { INKS } from './inks.js'
+ import { DEFAULT_MASK } from './characters.js'
+ import { MENTION_ORIGIN } from './text.js'
++import { MODEL_PORTRAIT_CSS } from './model-portrait.js'
+ import { SPRING_SHAPE, SPRING_TAP, SPRING_STRETCH, SPRING_POP, spring } from './motion.js'
+ 
+ // The pill stretches for "Memory updated" on SPRING_STRETCH, and its icon pops on
+@@ -23,6 +24,7 @@
+ .bt-mark{display:inline-block;flex:none;position:relative;line-height:0}
+ .bt-mark svg{width:100%;height:100%;overflow:visible}
+ .bt-mark-img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;box-shadow:inset 0 0 0 1px var(--bt-line)}
++${MODEL_PORTRAIT_CSS}
+ .bt-mark .bt-b,.bt-mark .bt-eye,.bt-mark .bt-eyes,.bt-mark .bt-gaze{transform-box:fill-box}
+ .bt-mark .bt-b{transform-origin:50% 100%}
+ .bt-mark .bt-eye,.bt-mark .bt-eyes{transform-origin:center}
+@@ -364,6 +366,7 @@
  .bt-create-step{font-size:12px;line-height:16px;color:var(--bt-ink-2);margin-bottom:-10px}
  .bt-create-looks{display:flex;flex-direction:column;gap:10px;padding:10px;border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card)}
  .bt-create-lookbar{justify-content:center}
@@ -8,7 +24,7 @@
  .bt-create-foot{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}
  .bt-create-go{height:36px;padding:0 20px}
  @media (prefers-reduced-motion:reduce){.bt-create-card,.bt-create-pop{animation:none}}
-@@ -471,14 +472,21 @@
+@@ -471,14 +474,21 @@
  .bt-avatar-pencil{position:absolute;right:-2px;bottom:-2px;width:22px;height:22px;border-radius:50%;background:var(--bt-main);border:1px solid var(--bt-line-2);color:var(--bt-ink-2);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.12)}
  .bt-avedit{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);width:288px;box-sizing:border-box;background:var(--bt-glass-bg);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);border:.5px solid var(--bt-glass-rim);border-radius:16px;box-shadow:var(--bt-glass-shadow),0 16px 40px rgba(0,0,0,.16);padding:12px;z-index:70;display:flex;flex-direction:column;gap:12px;color:var(--bt-ink);transform-origin:top center;animation:bt-pop-drop ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .16s ease-out}
  .bt-bs .bt-avedit{transform-origin:32px 0}

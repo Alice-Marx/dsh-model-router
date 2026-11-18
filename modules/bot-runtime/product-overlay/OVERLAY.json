@@ -215,7 +215,7 @@
     {
       "path": "src/client/styles.js",
       "kind": "patched",
-      "summary": "Fits the model portrait grid in the creation form and the existing avatar popover, with accessible source tabs.",
+      "summary": "Fits the model portrait grid in the creation form and the existing avatar popover, with accessible source tabs. Styles layered model portrait motion in the existing avatar frame.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "b789349121d050381dc5da82b7473361551a12b20cdd87d382fbb7cd7d7787c5"
@@ -239,6 +239,25 @@
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "80ebfe7556ade34b7ac5fe5cef2b027c6a78a7866bca62fda033f41d643d656f"
       }
+    },
+    {
+      "path": "src/client/mark.js",
+      "kind": "patched",
+      "summary": "Renders built-in portrait motion in live marks using the existing avatar and state props.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "463ce1cb80d8cca13cfe8af158f7f2fc8a3b87843661530a03938fddb905365a"
+      }
+    },
+    {
+      "path": "src/client/model-portrait.js",
+      "kind": "product-file",
+      "summary": "Plays small state-based gestures and optional pointer acknowledgments in live model portraits."
+    },
+    {
+      "path": "src/client/model-portrait-eyes.js",
+      "kind": "product-file",
+      "summary": "Defines the eye bounds of the original portraits and renders their eyelid motion."
     }
   ]
 }
