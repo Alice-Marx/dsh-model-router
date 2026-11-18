@@ -902,7 +902,7 @@ function TuiPromptBox({ tool, tuiPrompt }) {
   </div>
 }
 
-export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi, tuiPrompt }) {
+export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi, tuiPrompt, openModelSetup }) {
   const workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries })
   const [catalogState, setCatalogState] = React.useState({ status: 'loading', catalog: null, error: '' })
   const [task, setTask] = React.useState(() => workbenchDraft().task)
@@ -913,6 +913,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   const [historyRunId, setHistoryRunId] = React.useState(null)
   const taskInput = React.useRef(null)
   const executionSection = React.useRef(null)
+  const executionPreview = React.useRef(null)
   const workspaceElement = React.useRef(null)
   const [query, setQuery] = React.useState('')
   const [plan, setPlan] = React.useState(null)
@@ -928,6 +929,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   React.useEffect(() => subscribeWorkbenchView(id => {
     setView(id)
     if (workspaceElement.current) workspaceElement.current.scrollTop = 0
+    if (id === 'plan') void refresh()
   }), [])
   const [attentionHidden, setAttentionHidden] = React.useState(() => {
     try { return globalThis.localStorage?.getItem(ATTENTION_VISIBILITY_KEY) === 'true' } catch { return false }
@@ -978,6 +980,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   const goToExecution = () => {
     executionSection.current?.scrollIntoView?.({ block: 'start', behavior: 'auto' })
     executionSection.current?.focus({ preventScroll: true })
+    executionPreview.current?.preview()
   }
   const openAttention = row => {
     if (row.target === 'history') setHistoryRunId(row.runId ?? null)
@@ -1192,8 +1195,15 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
                 <div className="mr-control-group mr-budget"><label className="mr-control-label" htmlFor="mr-budget">本次估算预算（USD）</label><input className="mr-input" id="mr-budget" type="number" min="0" step="0.01" value={budget} onChange={event => { budgetEdited.current = true; budgetValue.current = event.target.value; setBudget(event.target.value); invalidatePlan() }} /></div>
               </div>
               </details>
-              <div className="mr-actions"><button className="mr-button" type="button" disabled={!text(task) || catalogState.status !== 'ready' || routes.length === 0} onClick={goToExecution}>下一步：预览执行</button><button className="mr-button mr-button-secondary" type="button" disabled={!text(task) || catalogState.status !== 'ready' || routes.length === 0 || toolProbes === null} onClick={generate}>比较路由（可选）</button></div>
-              <p className="mr-caption">{catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? '目录读取失败，请在“模型配置”中刷新。' : routes.length === 0 ? '请先在 Harness 的“模型”页添加模型。' : '预览不会调用模型。需要比较路线或逐包手动分配时，可先比较路由。'}</p>
+              <div className="mr-actions">
+                {catalogState.status === 'error' ? <button className="mr-button" type="button" onClick={refresh}>重新读取模型目录</button>
+                  : catalogState.status === 'ready' && routes.length === 0 ? <button className="mr-button" type="button" onClick={openModelSetup ?? (() => selectView('models'))}>{openModelSetup ? '添加 AI 连接' : '查看模型配置'}</button>
+                    : <button className="mr-button" type="button" disabled={!text(task) || catalogState.status !== 'ready'} onClick={goToExecution}>下一步：预览执行</button>}
+                {routes.length > 0 && <button className="mr-button mr-button-secondary" type="button" disabled={!text(task) || toolProbes === null} onClick={generate}>比较路由（可选）</button>}
+              </div>
+              <p className="mr-caption">{catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? catalogState.error
+                : routes.length === 0 ? (openModelSetup ? '添加模型连接后可以返回此任务草稿。' : '请先在 Harness 的“模型”页添加模型，再刷新此工作台。')
+                  : '预览不会调用模型。需要比较路线或逐包手动分配时，可先比较路由。'}</p>
               {planError && <p className="mr-error" role="alert">{planError}</p>}
             </div>
           </section>
@@ -1216,7 +1226,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           directRoute={mode === 'direct' ? routes.find(route => `${route.provider}/${route.model}` === directKey) ?? routes[0] ?? null : null}
           defaultPreset={settingsScope.getSnapshot().value?.routingPreset ?? 'balanced'}
           disabledReason={catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? '模型目录读取失败，请在“模型配置”中刷新。' : routes.length === 0 ? '请先在官方“模型”页配置至少一条模型路线。' : ''}
-          onStarted={() => { void workbench.refreshLedger() }} /><div className="mr-actions"><button className="mr-button mr-button-secondary" type="button" onClick={() => selectView('history')}>打开执行记录</button><span className="mr-caption">查看任务结果、费用和受支持的重试。</span></div></div>
+          previewActionRef={executionPreview} onStarted={() => { void workbench.refreshLedger() }} /><div className="mr-actions"><button className="mr-button mr-button-secondary" type="button" onClick={() => selectView('history')}>打开执行记录</button><span className="mr-caption">查看任务结果、费用和受支持的重试。</span></div></div>
         </div>
         <div className="mr-view mr-stack" role="tabpanel" id="mr-panel-history" aria-labelledby="mr-tab-history" hidden={view !== 'history'}>
         <RunHistoryCard ledger={workbench.ledger.value} routes={routes} busy={workbench.busy} error={workbench.ledger.error}

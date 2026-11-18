@@ -64,6 +64,18 @@ for (const driver of ['codex', 'pi']) test(`${driver}: duplicate submit does not
   })
 })
 
+test('Codex observes the native account quota notification without requesting another account operation', async () => {
+  const readings = []
+  await setup('codex', async ({ engine, workspace }) => {
+    assert.equal((await engine.submitTurn({ text: 'report subscription' })).ok, true)
+    assert.deepEqual(readings, [[{ id: 'primary', remainingPercent: 65, durationMinutes: 300, resetAt: 1900000000000 }]])
+    assert.equal((await engine.submitTurn({ text: 'change account' })).ok, true)
+    assert.deepEqual(readings.at(-1), [])
+    const evidence = await readFile(join(workspace, 'native-fixture-evidence.jsonl'), 'utf8')
+    assert.doesNotMatch(evidence, /"method":"account\//)
+  }, { onSubscriptionQuota: windows => readings.push(windows) })
+})
+
 test('Step Code settled failure cannot be reported as a completed answer',async()=>{
  await setup('stepAgent',async({engine,workspace})=>{
   const result=await engine.submitTurn({text:'settled-failure'})

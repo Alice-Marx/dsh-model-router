@@ -428,6 +428,8 @@ function registerUi(ctx) {
     key: ROUTER_PANEL,
     inject: () => ({
       loadCatalog: () => ctx.remote.session.modelCatalog(),
+      ...(ROUTER_PACKAGE === '@ljwei-stak/dsh-model-route-bot'
+        ? { openModelSetup: () => ctx.layout.selectPanel('bot-product-ai') } : {}),
       settingsScope,
       listOfficialTools: () => officialToolsRemote.list(),
       loadOfficialInstallSettings: () => officialToolsRemote.installSettings(),

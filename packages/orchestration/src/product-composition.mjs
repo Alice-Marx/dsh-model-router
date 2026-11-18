@@ -1,4 +1,5 @@
 import { createBotRoutingService } from './bot-routing-service.mjs'
+import { projectSubscriptionQuota } from './subscription-quota.mjs'
 import { openBotRoutingSettings } from './bot-routing-settings.mjs'
 import { createWorkerBindingCommitter } from './bot-routing-dispatch.mjs'
 import { createBotTurnBackends } from './bot-routing-runtime.mjs'
@@ -830,7 +831,7 @@ export function startBotProduct(ctx, options = {}) {
         }
         return value
       }
-      conversationEngines = await mountConversationEngines({ llm: ctx.llm, profiles: engineProfiles,
+      conversationEngines = await mountConversationEngines({ llm: ctx.llm, profiles: engineProfiles, now,
         runtimeRoot: join(resolveStateHome(), 'model-router', 'conversation-engines'),
         onResult: (profile, health) => { if (profile.revision) cliProviders.markResult(profile.provider, health, profile.revision) },
         onActivity: (_profile, event) => nativeActivity?.observe(event),
@@ -1350,6 +1351,29 @@ export function startBotProduct(ctx, options = {}) {
           'machine.host.devices': ownerOnly(async (payload, context) => (await ensureEmbeddedComputer()).devices(payload, context)),
           'machine.host.revoke': ownerOnly(async (payload, context) => (await ensureEmbeddedComputer()).revoke(payload, context)),
           'ui.namespace': ownerOnly(payload => uiNamespace.read(payload)),
+          ...(funding ? { 'usage.subscriptionQuota': ownerOnly(async (_payload, { signal }) => {
+            signal?.throwIfAborted()
+            await product.rt.load()
+            const ledger = await funding.store.read()
+            signal?.throwIfAborted()
+            const mainIds = new Set(product.lifecycle.committedMainBotIds())
+            const plans = Object.values(product.rt.state?.bots ?? {}).flatMap(bot => {
+              const { settings } = botSettings.get(bot.id, { publishChange: false })
+              const main = mainIds.has(bot.id) ? settings.mainRoutes : null
+              const routes = main ? main.routes.filter(route => route.enabled && route.funding.mode === 'subscription') : [settings.model]
+              // Main Bot subscription routes share one allowance. Use the same committed
+              // funding decision as model admission and report that allowance once.
+              for (const route of routes) {
+                if (!route) continue
+                const plan = bindingFunding({ botId: bot.id, provider: route.provider, model: route.model })
+                if (plan?.funding !== 'subscription' || plan.subscriptionMaxCalls === null || plan.subscriptionMonthlyCalls === null) continue
+                return [{ botId: bot.id, name: bot.name, dailyCalls: plan.subscriptionMaxCalls, monthlyCalls: plan.subscriptionMonthlyCalls }]
+              }
+              return []
+            })
+            return projectSubscriptionQuota({ ledger, plans, usageFor: funding.store.fundingSubscriptionUsage,
+              accountQuotas: conversationEngines?.subscriptionQuota(), at: now() })
+          }) } : {}),
           'nativeActivity.list': ownerOnly((payload, context) => {
             const value = nativeActivity.list(payload, context)
             const failures = conversationEngines?.activityHealth?.().failures ?? 0

@@ -23,9 +23,10 @@ test('templates and remounts keep the draft without starting work; attention ope
   const ledger = { runs: [{ id: 'first', task: 'first fixture', status: 'failed', packages: [], reviews: [], createdAt: 1 },
     { id: 'second', task: 'second fixture', status: 'failed', packages: [], reviews: [], createdAt: 2 }],
     spent: { today: 0, month: 0 }, reserved: {}, budget: {}, settings: {} }
-  let previews = 0, starts = 0, root
+  let previews = 0, starts = 0, root, catalogReady = false, setupOpened = false
   const props = { settingsScope: { getSnapshot: () => ({ value, writable: false }), subscribe: () => () => {} },
-    loadCatalog: async () => ok({ groups: [{ id: 'fixture', models: [{ id: 'route' }] }], routableProviders: ['fixture'] }),
+    loadCatalog: async () => ok({ groups: catalogReady ? [{ id: 'fixture', models: [{ id: 'route' }] }] : [], routableProviders: ['fixture'] }),
+    openModelSetup: () => { setupOpened = true },
     toolHealth: async () => ok({ tools: [], onboarding: { completedAt: 1 } }), loadLedger: async () => ok(ledger), loadBoundaries: async () => ok({}),
     listOfficialTools: async () => ok({ probes: [], readiness: [], capabilities: [] }),
     previewRun: async () => { previews++; return ok({}) }, startRun: async () => { starts++; return ok({}) } }
@@ -57,6 +58,13 @@ test('templates and remounts keep the draft without starting work; attention ope
   assert.notEqual(host.querySelector('#mr-task').value, original)
   await click('撤销模板')
   assert.equal(host.querySelector('#mr-task').value, original)
+  await click('添加 AI 连接')
+  assert.equal(setupOpened, true)
+  catalogReady = true
+  await act(async () => { requestWorkbenchView('plan'); await new Promise(setImmediate) })
+  assert.equal(host.querySelector('#mr-task').value, original, 'returning from settings reloads routes without losing the task')
+  await click('下一步：预览执行')
+  assert.equal(document.activeElement.id, 'mr-launch-workspace', 'the first missing workspace gets focus')
   assert.equal(previews, 0); assert.equal(starts, 0)
   await act(() => root.unmount()); root = null
   await mount()

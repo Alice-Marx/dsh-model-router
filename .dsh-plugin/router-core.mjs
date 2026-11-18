@@ -14,6 +14,7 @@ import {
 } from './shared/subscription-billing.mjs'
 import { createRouterState, defaultStatePath, resolveStateHome } from './shared/router-state.mjs'
 import { createRunJobs } from './shared/run-jobs.mjs'
+import { workbenchFingerprint, workbenchSubmissions } from './shared/workbench-submissions.mjs'
 import { createBudgetReservations, reservationSpending } from './shared/budget-reservations.mjs'
 import { beginExecutionLifecycle } from './shared/execution-lifecycle.mjs'
 import { attachPlanAccounting, accountingEstimates, initialFunding, planningFundingPrices } from './shared/execution-accounting.mjs'
@@ -1066,7 +1067,7 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
   } })
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
   const startedAt = Date.now()
-  const runId = randomUUID()
+  const runId = options[WORKBENCH_RUN_ID] ?? randomUUID()
   const makeRecord = execution => buildRunRecord({ id: runId, createdAt: startedAt, finishedAt: Date.now(),
     task: taskText, plan, execution, preset: plan.preset ?? preset, workspace: options.workspace ?? '',
     pricingFor: item => routePricing(routes, item), billingFor: billingForResult,
@@ -1898,7 +1899,7 @@ export async function executeOfficialTeamPlan(ctx, config = {}, planned, options
     reason: '官方 Harness 进程沙箱不可用，不能执行官方 CLI 团队。' }
   throwIfAborted(options.signal)
   const startedAt = Date.now()
-  const runId = randomUUID()
+  const runId = options[WORKBENCH_RUN_ID] ?? randomUUID()
   const makeTeamRecord = (execution, location = {}) => {
     const run = buildTeamRunRecord({ id: runId, createdAt: startedAt, finishedAt: Date.now(), task: planned.taskText,
       plan: planned.plan, execution, mode: planned.mode, workspace,
@@ -2205,6 +2206,8 @@ export function dryRunOutcome(prepared = {}) {
   }
 }
 
+const WORKBENCH_RUN_ID = Symbol('Host workbench run identity')
+
 async function executePreparedWorkbenchRun(ctx, config, prepared, options = {}) {
   const { preview, request } = prepared
   // A rehearsal short-circuits every execution path, including official-team CLI runs.
@@ -2219,6 +2222,7 @@ async function executePreparedWorkbenchRun(ctx, config, prepared, options = {}) 
     const result = await (options.executeOfficialTeam ?? executeOfficialTeamPlan)(ctx, config, prepared.planned, {
       confirmOverBudget: confirmed.has('over-budget'), confirmUnsandboxed: confirmed.has('unsandboxed'), ...(options.teamOptions ?? {}),
       workspace: preview.workspace, root: preview.workspace, signal: options.signal, onProgress: options.onProgress,
+      [WORKBENCH_RUN_ID]: options[WORKBENCH_RUN_ID],
     })
     return { status: result.status, runId: result.runId ?? null, workspace: preview.workspace,
       executor: 'official-team', executionMode: request.executionMode, executionEnvironment: preview.executionEnvironment, decision: preview.decision,
@@ -2232,6 +2236,7 @@ async function executePreparedWorkbenchRun(ctx, config, prepared, options = {}) 
     budgetUsd: finiteNumber(request.budgetUsd, finiteNumber(configuredBudget, 0)),
     confirmOverBudget: confirmed.has('over-budget'), workspace: preview.workspace, ...options.planOptions,
     preparedAssignment: prepared.planned, signal: options.signal, onProgress: options.onProgress,
+    [WORKBENCH_RUN_ID]: options[WORKBENCH_RUN_ID],
   })
   const awaiting = result.awaitingConfirmation ?? []
   return {
@@ -2244,22 +2249,47 @@ async function executePreparedWorkbenchRun(ctx, config, prepared, options = {}) 
 /** Desktop starts an observable job after fresh preflight and confirmation checks. */
 export async function launchWorkbenchRun(ctx, config, supplied = {}, { runJobs, ...options } = {}) {
   if (!runJobs) throw new Error('工作台任务服务不可用，请重启 Harness 后重试。')
-  const prepared = await prepareWorkbenchPreview(ctx, config, supplied, options)
+  const request = parseRunRequest(supplied)
+  const key = request.requestKey
+  const submissions = key ? workbenchSubmissions(routerStateStore(), runJobs) : null
+  const fingerprint = key ? workbenchFingerprint(request) : null
+  const original = await submissions?.lookup(key, fingerprint)
+  if (original) return original
+  const prepared = await prepareWorkbenchPreview(ctx, config, request, options)
   // A rehearsal changes nothing, so it needs no confirmation: the preview already lists
   // which reasons an actual run would ask for.
   const refused = prepared?.request?.dryRun === true ? null : refusedWorkbenchStart(prepared)
   if (refused) return refused
-  return runJobs.start({
-    packages: prepared.preview.decision?.packages ?? [],
-    run: async ({ signal, onProgress }) => {
-      try { return await executePreparedWorkbenchRun(ctx, config, prepared, { ...options, signal, onProgress }) }
-      catch (error) {
-        if (error?.runId) return { status: signal.aborted ? 'cancelled' : 'failed', runId: error.runId,
-          workspace: prepared.preview.workspace, notice: '执行未完成，已产生的结果与费用请查看执行记录。' }
-        throw error
-      }
-    },
-  })
+  const claim = await submissions?.claim(key, fingerprint)
+  if (claim && !claim.accepted) return submissions.lookup(key, fingerprint)
+  const jobId = claim?.entry.jobId
+  const finish = outcome => submissions?.finish(key, jobId, outcome).catch(() => {})
+  try {
+    return runJobs.start({
+      ...(jobId ? { jobId } : {}),
+      packages: prepared.preview.decision?.packages ?? [],
+      run: async ({ signal, onProgress }) => {
+        let outcome = 'unknown'
+        try {
+          const result = await executePreparedWorkbenchRun(ctx, config, prepared, {
+            ...options, signal, onProgress, [WORKBENCH_RUN_ID]: jobId,
+          })
+          outcome = result.status
+          return result
+        } catch (error) {
+          if (!error?.runId) throw error
+          outcome = signal.aborted ? 'cancelled' : 'failed'
+          return { status: outcome, runId: error.runId, workspace: prepared.preview.workspace,
+            notice: '执行未完成，已产生的结果与费用请查看执行记录。' }
+        } finally {
+          await finish(outcome)
+        }
+      },
+    })
+  } catch (error) {
+    await finish('blocked')
+    throw error
+  }
 }
 
 /** Host operations behind the workbench RPC; the client never supplies commands or paths. */
@@ -2338,8 +2368,18 @@ export function routerRemoteServices(ctx, config, { terminals = null, assertPref
     boundaries: () => securityBoundaries(ctx, config),
     previewRun: request => previewWorkbenchRun(ctx, config, request, runOptions),
     startRun: request => launchWorkbenchRun(ctx, config, request, { ...runOptions, runJobs }),
-    runStatus: request => runJobs.status(parseRunJobRequest(request).jobId),
-    cancelRun: request => runJobs.cancel(parseRunJobRequest(request).jobId),
+    async runStatus(request) {
+      const { jobId, requestKey } = parseRunJobRequest(request)
+      if (!requestKey) return runJobs.status(jobId)
+      return (await workbenchSubmissions(routerStateStore(), runJobs).lookup(requestKey)) ?? { status: 'not-found' }
+    },
+    async cancelRun(request) {
+      const { jobId, requestKey } = parseRunJobRequest(request)
+      if (!requestKey) return runJobs.cancel(jobId)
+      const original = await workbenchSubmissions(routerStateStore(), runJobs).lookup(requestKey)
+      if (!original) throw new Error('Unknown run job id.')
+      return runJobs.lookup(original.jobId) ? runJobs.cancel(original.jobId) : original
+    },
   }
 }
 

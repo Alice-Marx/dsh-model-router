@@ -116,7 +116,7 @@ export function auditMigrationFinance(input={}){
     attribution.push({runId:run.id,botIds:bot,scopeIds:scope,projectIds:project})
    }
    const calendar=[...dates].sort(([a],[b])=>a.localeCompare(b)).map(([day,at])=>({day,month:monthKey(at),money:spending(normalized.runs,at,normalized.archivedSpending),subscription:subscriptionUsage(normalized.runs,at,normalized.archivedSubscriptionUsage)}))
-   const known=new Set(['version','runs','budgetReservations','historyIncomplete','subscriptionUsageIncomplete','onboarding','health','quota','authFailures','dynamicData','archivedSpending','archivedSubscriptionUsage','notices','terminalSessions'])
+   const known=new Set(['version','runs','budgetReservations','historyIncomplete','subscriptionUsageIncomplete','onboarding','health','quota','authFailures','dynamicData','archivedSpending','archivedSubscriptionUsage','notices','terminalSessions','workbenchSubmissions'])
    const rawArchives=Object.fromEntries(['archivedSpending','archivedSubscriptionUsage'].map(k=>[k,Object.hasOwn(original,k)?original[k]:normalized[k]]))
    result.router={runCount:runs.size,holdCount:holds.length,unassignedRunCount:unassigned,runs:[...runs].sort(([a],[b])=>a.localeCompare(b)),holds:holds.sort((a,b)=>a.id.localeCompare(b.id)),attribution,calendar,reservations:reservationSpending(normalized),normalizedDigest:hash(normalized),rawArchiveDigest:hash(rawArchives),extensionDigest:hash(Object.fromEntries(Object.entries(original).filter(([k])=>!known.has(k)))),historyIncomplete:normalized.historyIncomplete,subscriptionUsageIncomplete:normalized.subscriptionUsageIncomplete}
   }catch(e){add(e.code==='DUPLICATE_MONEY_RUN'?e.code:'ROUTER_STATE_INVALID')}

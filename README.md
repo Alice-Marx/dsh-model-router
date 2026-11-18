@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.76.1 · Windows Remote Agent: 0.1.3**
+**Current stable version: 0.77.0 · Windows Remote Agent: 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -80,8 +80,8 @@ Edit the Bot's name, role and standing instructions under **Identity & personali
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.76.1`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.76.1`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.77.0`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.77.0`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -89,10 +89,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.76.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.77.0
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.77.0
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -107,7 +107,7 @@ The model-routing workbench is available in both editions. In the full Bot works
 2. **Describe the result.** In **Task & execution**, choose **Project check**, **Organize documentation**, or **Compare approaches**, then edit the task and acceptance criteria. **Undo template** restores your previous text.
 3. **Go to the preview.** Click **Next: preview execution**, then **Preview execution plan**. Check the selected models/tools, workspace, permissions, and estimated API cost or subscription usage.
 4. **Confirm the run.** Read the confirmation items and choose **Confirm all and execute**. Creating or previewing a plan does not invoke a model; confirmation starts execution.
-5. **Inspect the result.** Open **Execution history** for output, receipts, status, cancellation, and supported retry actions. Verify the requested artifact before treating the task as complete.
+5. **Inspect the result.** Open **Execution history** for output, receipts, status, cancellation, and supported retry actions. Verify the requested artifact before treating the task as complete. If the start reply is lost, refresh the current window or choose **Check original submission** to recover the receipt.
 
 The application currently uses Chinese interface labels; English descriptions here explain the corresponding controls.
 
@@ -279,6 +279,7 @@ Binary transfers preserve the original bytes, with a **16 MiB per-file limit**; 
 - **Plan locally.** Route comparison and execution preflight do not call models. Confirmed execution sends the selected task/context to a provider or CLI and may incur charges.
 - **Control API spending.** Per-task estimates and daily/monthly limits check recorded spend plus active reservations. Unknown prices or amounts require the relevant confirmation under a finite budget. Estimates are planning controls; provider bills remain authoritative.
 - **Track subscriptions separately.** Subscription calls and reported input/output/cache tokens are recorded independently of API money. Missing usage remains unknown and does not imply zero usage or prove a vendor's remaining quota.
+- **Check subscription quota.** In the full Bot edition, **AI Connections → View subscription quota** shows configured daily and monthly call limits, remaining calls, and reset times in the Host time zone. It also displays the latest account quota reported during a configured native Codex conversation and active limits recorded by the Host.
 - **Choose fallback behavior.** Billing preferences can favor subscription, require subscription, or use API only. A subscription-to-API change requires fresh API estimation, budget admission, and any required confirmation. Managed editable/single-tool/team runs do not automatically retry on API.
 - **Recover from evidence.** Execution records retain attempts, receipts, reservations, and unknown effects. Review interrupted work before retrying; elapsed time or a stop request does not prove that a remote action stopped.
 - **Refine routing deliberately.** Optional stronger-model reviews may add calls. Explicit ratings adjust a bounded preference term; they do not raise measured quality or bypass quality floors. Learning can be disabled, ratings withdrawn, and the learning baseline reset.

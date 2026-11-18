@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-route-bot",
-  "version": "0.76.1",
+  "version": "0.77.0",
   "type": "module",
   "description": "DSH Bot workspace with integrated model routing, official tools and remote computers",
   "repository": {
@@ -101,6 +101,8 @@
     ".dsh-plugin/shared/package-assignments.mjs",
     ".dsh-plugin/shared/manual-plan.mjs",
     ".dsh-plugin/shared/run-jobs.mjs",
+    ".dsh-plugin/shared/workbench-request-key.mjs",
+    ".dsh-plugin/shared/workbench-submissions.mjs",
     ".dsh-plugin/shared/budget-reservations.mjs",
     ".dsh-plugin/shared/execution-lifecycle.mjs",
     ".dsh-plugin/shared/execution-accounting.mjs",

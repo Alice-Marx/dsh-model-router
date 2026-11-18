@@ -6,6 +6,17 @@ const bad = code => { throw Object.assign(new Error(code), { code }) }
 const number = value => Number.isSafeInteger(value) && value >= 0
 const modelOf = ctx => ctx.options.requestedModel
 
+function subscriptionWindows(snapshot) {
+  return ['primary', 'secondary'].flatMap(id => {
+    const window = snapshot?.[id]
+    if (!Number.isFinite(window?.usedPercent) || window.usedPercent < 0 || window.usedPercent > 100) return []
+    const resetAt = number(window.resetsAt) && window.resetsAt > 0 ? window.resetsAt * 1000 : null
+    return [{ id, remainingPercent: Math.round((100 - window.usedPercent) * 100) / 100,
+      durationMinutes: number(window.windowDurationMins) && window.windowDurationMins > 0 ? window.windowDurationMins : null,
+      resetAt: Number.isFinite(new Date(resetAt).getTime()) ? resetAt : null }]
+  })
+}
+
 /** The actual Codex App Server wire, retaining one thread in one native process.
  * Only text chat is enabled: no inherited MCP servers, shell, web, plugins, or agents.
  */
@@ -72,6 +83,17 @@ export function createCodexProtocol() {
         void ctx.send({ id: frame.id, error: { code: -32601, message: 'Host callback is not authorized' } }).catch(() => {}); return
       }
       if (typeof frame.method !== 'string') bad('CODEX_CHAT_FRAME_INVALID')
+      if (frame.method === 'account/rateLimits/updated') {
+        const snapshot = frame.params?.rateLimits
+        if (snapshot && (snapshot.limitId == null || snapshot.limitId === 'codex')) {
+          ctx.options.onSubscriptionQuota?.(subscriptionWindows(snapshot))
+        }
+        return
+      }
+      if (frame.method === 'account/updated') {
+        ctx.options.onSubscriptionQuota?.([])
+        return
+      }
       if (ctx.turn?.awaitingAck) {
         if (ctx.turn.earlyFrames.length >= 128) bad('CODEX_CHAT_EARLY_FRAME_LIMIT')
         ctx.turn.earlyFrames.push(frame); return

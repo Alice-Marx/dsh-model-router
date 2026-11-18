@@ -16,10 +16,11 @@ const PACKAGE_STATUS_TEXT = Object.freeze({ pending: '等待执行', running: '�
 const STAGE_TEXT = Object.freeze({ starting: '正在启动任务…', preparing: '正在准备执行计划…', executing: '正在安排工作包…',
   integrating: '正在整合工作包结果…', reviewing: '正在检查执行结果…', saving: '正在保存执行记录…' })
 const ACTIVE_JOB_KEY = 'dsh-model-router:active-run-job'
+const SUBMISSION_KEY = 'dsh-model-router:workbench-submission'
 const isJobSnapshot = value => Boolean(text(value?.jobId) && JOB_STATUSES.has(value.status))
 const REMOTE_WAIT_MS = 15_000
-// Only retryable reads/cancel requests use this deadline. Aborting their HTTP
-// wait does not cancel a Host job, and startRun must never be replayed on timeout.
+// The deadline bounds the browser's wait. When a start response times out,
+// the next operation reads the original submission key.
 async function waitForRemote(operation, controllers) {
   const controller = new AbortController()
   controllers.add(controller)
@@ -47,6 +48,29 @@ function rememberJob(jobId) {
 function forgetJob(jobId) {
   try { if (typeof sessionStorage !== 'undefined' && savedJob() === jobId) sessionStorage.removeItem(ACTIVE_JOB_KEY) } catch { /* storage may be disabled */ }
 }
+let inMemorySubmission = ''
+function savedSubmission() {
+  try { return inMemorySubmission || text(sessionStorage.getItem(SUBMISSION_KEY)) } catch { return inMemorySubmission }
+}
+function rememberSubmission(key) {
+  inMemorySubmission = key
+  try {
+    if (key) sessionStorage.setItem(SUBMISSION_KEY, key)
+    else sessionStorage.removeItem(SUBMISSION_KEY)
+  } catch { /* storage may be disabled */ }
+}
+function forgetSubmission(key) {
+  if (key && savedSubmission() === key) rememberSubmission('')
+}
+
+function newSubmissionKey() {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 15) | 64
+  bytes[8] = (bytes[8] & 63) | 128
+  const hex = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('')
+  return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-')
+}
 const unknownJob = error => /unknown run job id\.?/i.test(text(error?.message))
 // A launch ACK may outlive its panel. Keep only an opaque in-memory identity
 // until it arrives, so a replacement panel can wait and take over the job.
@@ -55,11 +79,12 @@ const launchListeners = new Set()
 function notifyLaunch(event) {
   for (const listener of launchListeners) listener(event)
 }
-function settleLaunch(identity, value, error) {
+function settleLaunch(identity, requestKey, value, error) {
   if (pendingLaunch !== identity) return
   pendingLaunch = null
   if (isJobSnapshot(value) && LIVE_STATUSES.has(value.status)) rememberJob(value.jobId)
-  notifyLaunch({ kind: 'settled', identity, value, error })
+  if (!error && value?.status !== 'unconfirmed' && (!isJobSnapshot(value) || !LIVE_STATUSES.has(value.status))) forgetSubmission(requestKey)
+  notifyLaunch({ kind: 'settled', identity, requestKey, value, error })
 }
 
 /**
@@ -68,7 +93,7 @@ function settleLaunch(identity, value, error) {
  * Routed runs are read-only; official teams can use an isolated editable
  * worktree. Nothing starts before the user presses the confirm button.
  */
-export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, runStatus, cancelRun, onStarted, disabledReason, planningRevision, assignmentMode = 'algorithm', packageAssignments = {}, packagePlanKey }) {
+export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, runStatus, cancelRun, onStarted, disabledReason, planningRevision, assignmentMode = 'algorithm', packageAssignments = {}, packagePlanKey, previewActionRef }) {
   const [preset, setPreset] = React.useState(defaultPreset || 'balanced')
   // Rehearsal: plan and report the same work, call nothing, cost nothing.
   const [dryRun, setDryRun] = React.useState(false)
@@ -88,26 +113,54 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
   const [now, setNow] = React.useState(Date.now)
   const mounted = React.useRef(true)
   const confirmRef = React.useRef(null)
+  const workspaceRef = React.useRef(null)
   const pendingRequest = React.useRef(0)
   // This identity is independent of the editable form and preview revision.
   const activeRun = React.useRef(null)
   const launchSequence = React.useRef(0)
+  const reconciliation = React.useRef(0)
   const launching = React.useRef(false)
   const awaitingLaunch = React.useRef(null)
   const pendingRemotes = React.useRef(new Set())
   const onFinished = React.useRef(onStarted)
   onFinished.current = onStarted
-  const inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey, packageAssignments])
+  const inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey, packageAssignments, dryRun])
   const latestSignature = React.useRef(inputSignature)
   latestSignature.current = inputSignature
+  const resume = (jobId, snapshot, requestKey) => {
+    activeRun.current = { token: ++launchSequence.current, jobId, requestKey, terminal: false, cancelRequested: false,
+      cancelPending: false, requestSequence: 0, appliedSequence: 0, restoring: true }
+    launching.current = true
+    setPhase({ kind: 'running', job: snapshot ?? { jobId, status: 'running' }, restoring: !snapshot })
+  }
+  const reconcileSubmission = async (requestKey = savedSubmission()) => {
+    if (!requestKey || pendingLaunch) return
+    const attempt = ++reconciliation.current
+    const current = () => mounted.current && reconciliation.current === attempt && savedSubmission() === requestKey
+    const unknown = { kind: 'unconfirmed', requestKey, message: '尚未核对到这次提交的结果。' }
+    if (typeof runStatus !== 'function') { setPhase(unknown); return }
+    setPhase({ ...unknown, checking: true })
+    try {
+      const value = unwrapRemote(await waitForRemote(signal => runStatus({ requestKey }, signal), pendingRemotes.current), '无法核对原提交。')
+      if (!current()) return
+      if (!isJobSnapshot(value)) {
+        setPhase({ ...unknown, runId: value?.result?.runId })
+      } else if (LIVE_STATUSES.has(value.status)) {
+        resume(value.jobId, value, requestKey)
+      } else {
+        forgetJob(value.jobId)
+        forgetSubmission(requestKey)
+        launching.current = false
+        const result = value.result ?? { status: value.status }
+        setPhase({ kind: 'done', value: result, job: value })
+        onFinished.current?.(result.runId)
+      }
+    } catch {
+      if (current()) setPhase(unknown)
+    }
+  }
   React.useEffect(() => {
     mounted.current = true
-    const resume = (jobId, snapshot) => {
-      activeRun.current = { token: ++launchSequence.current, jobId, terminal: false, cancelRequested: false,
-        cancelPending: false, requestSequence: 0, appliedSequence: 0, restoring: true }
-      launching.current = true
-      setPhase({ kind: 'running', job: snapshot ?? { jobId, status: 'running' }, restoring: !snapshot })
-    }
     const receiveLaunch = event => {
       if (!mounted.current) return
       if (event.kind === 'pending') {
@@ -122,12 +175,16 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
       awaitingLaunch.current = null
       const value = event.value
       if (isJobSnapshot(value) && LIVE_STATUSES.has(value.status)) {
-        resume(value.jobId, value)
+        resume(value.jobId, value, event.requestKey)
         return
       }
       launching.current = false
-      if (event.error || value?.status === 'needs-confirmation') {
-        setPhase({ kind: 'error', message: event.error || '启动前的确认项已变化，请重新预览并确认执行。' })
+      if (event.error || value?.status === 'unconfirmed') {
+        void reconcileSubmission(event.requestKey)
+        return
+      }
+      if (value?.status === 'needs-confirmation') {
+        setPhase({ kind: 'error', message: '启动前的确认项已变化，请重新预览并确认执行。' })
         return
       }
       const result = isJobSnapshot(value) ? value.result ?? { status: value.status } : value
@@ -138,11 +195,14 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
     launchListeners.add(receiveLaunch)
     if (pendingLaunch) receiveLaunch({ kind: 'pending', identity: pendingLaunch })
     else {
+      const key = savedSubmission()
       const jobId = savedJob()
-      if (jobId && !activeRun.current) resume(jobId)
+      if (key) void reconcileSubmission(key)
+      else if (jobId && !activeRun.current) resume(jobId)
     }
     return () => {
       mounted.current = false
+      reconciliation.current += 1
       for (const controller of pendingRemotes.current) controller.abort()
       pendingRemotes.current.clear()
       launchListeners.delete(receiveLaunch)
@@ -189,6 +249,7 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
       active.terminal = true
       launching.current = false
       forgetJob(value.jobId)
+      forgetSubmission(active.requestKey)
       const result = value.result ?? { status: value.status }
       setPhase({ kind: 'done', value: result, job })
       onFinished.current?.(result.runId)
@@ -220,7 +281,8 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
             active.terminal = true
             launching.current = false
             forgetJob(runningJobId)
-            setPhase({ kind: 'error', message: '无法找到此前的执行，可能已过期或工作台已重新启动。请刷新下方执行记录核对结果。' })
+            if (active.requestKey) void reconcileSubmission(active.requestKey)
+            else setPhase({ kind: 'error', message: '无法找到此前的执行，请查看执行记录核对结果。' })
           } else {
             setPhase(previous => previous.kind === 'running' && previous.job?.jobId === runningJobId
               ? { ...previous, restoring: false, pollError: '暂时无法更新执行进度，将自动重试；任务可能仍在执行。' } : previous)
@@ -246,7 +308,7 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
     assignmentMode: manual ? 'manual' : 'algorithm', packageAssignments, packagePlanKey, dryRun })
   const unavailable = typeof previewRun !== 'function' || typeof startRun !== 'function'
   const blocked = disabledReason || (unavailable ? '工作台执行服务尚未加载，请更新插件后重试。' : !text(task) ? '先在上方“任务规划”中描述任务。' : manual && !packagePlanKey ? '请重新生成工作包后再手动分配。' : runExecutor === 'official-team' && mode !== 'team' ? '官方工具协作需要先在上方选择“团队分工”。' : '')
-  const busy = phase.kind === 'previewing' || phase.kind === 'running' || phase.kind === 'starting'
+  const busy = ['previewing', 'running', 'starting', 'unconfirmed'].includes(phase.kind)
   // Reruns update the ledger separately from the original startRun response.
   // Only the launcher's own run may replace its displayed terminal status.
   const recordedRun = phase.kind === 'done' && phase.value.runId
@@ -267,6 +329,12 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
       if (mounted.current && current === pendingRequest.current && signature === latestSignature.current) setPhase({ kind: 'error', message: text(error?.message) || '执行预览失败。' })
     }
   }
+  React.useImperativeHandle(previewActionRef, () => ({
+    preview() {
+      if (text(workspace) || lastWorkspace) void preview()
+      else workspaceRef.current?.focus()
+    },
+  }))
   const confirm = async () => {
     if (launching.current || pendingLaunch || currentPhase.current !== phase || blocked || phase.kind !== 'preview' || phase.signature !== latestSignature.current || phase.value.status === 'blocked') return
     const shown = phase.value
@@ -274,15 +342,19 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
     const signature = phase.signature
     launching.current = true
     const identity = Symbol('launch')
-    const active = { token: ++launchSequence.current, launchIdentity: identity, jobId: null, terminal: false, cancelRequested: false,
+    const requestKey = newSubmissionKey()
+    rememberSubmission(requestKey)
+    const active = { token: ++launchSequence.current, launchIdentity: identity, requestKey, jobId: null, terminal: false, cancelRequested: false,
       cancelPending: false, requestSequence: 0, appliedSequence: 0 }
     activeRun.current = active
     pendingLaunch = identity
     notifyLaunch({ kind: 'pending', identity })
     setPhase({ kind: 'running', value: shown, request: snapshot, signature })
     try {
-      const value = unwrapRemote(await startRun({ ...snapshot, confirmedReasons: (shown.reasons ?? []).map(item => item.code) }), '执行失败。')
-      settleLaunch(identity, value)
+      const payload = { ...snapshot, requestKey, confirmedReasons: (shown.reasons ?? []).map(item => item.code) }
+      const value = unwrapRemote(await waitForRemote(() => startRun(payload), pendingRemotes.current), '执行失败。')
+      if (typeof value?.status !== 'string') throw new Error('未收到启动结果。')
+      settleLaunch(identity, requestKey, value)
       if (!mounted.current) return
       if (activeRun.current !== active) return
       if (isJobSnapshot(value)) {
@@ -292,6 +364,10 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
       }
       active.terminal = true
       launching.current = false
+      if (value.status === 'unconfirmed') {
+        void reconcileSubmission(requestKey)
+        return
+      }
       if (value.status === 'needs-confirmation') {
         setPhase(signature === latestSignature.current ? { kind: 'preview', value, request: snapshot, signature, changed: true } : { kind: 'idle' })
         return
@@ -299,11 +375,11 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
       setPhase({ kind: 'done', value })
       onStarted?.(value.runId)
     } catch (error) {
-      settleLaunch(identity, null, text(error?.message) || '执行失败。')
+      settleLaunch(identity, requestKey, null, text(error?.message) || '执行失败。')
       if (mounted.current && activeRun.current === active) {
         active.terminal = true
         launching.current = false
-        setPhase({ kind: 'error', message: text(error?.message) || '执行失败。' })
+        void reconcileSubmission(requestKey)
       }
     }
   }
@@ -333,8 +409,8 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
         <p className="mr-card-copy">先预览，核对模型、工作区与费用，再确认开始。预览不会调用模型；确认执行才会启动模型或 CLI。</p>
       </div></div>
       <div className="mr-card-body">
-        <div className="mr-control-group mr-launch-workspace"><label className="mr-control-label" htmlFor="mr-launch-workspace">工作区（可选）</label>
-          <input className="mr-input" id="mr-launch-workspace" value={workspace} disabled={busy} placeholder={lastWorkspace ? `留空沿用上次运行：${lastWorkspace}` : '可填写项目绝对路径，最终使用的目录会显示在预览中'} onChange={event => setWorkspace(event.target.value)} />
+        <div className="mr-control-group mr-launch-workspace"><label className="mr-control-label" htmlFor="mr-launch-workspace">{lastWorkspace ? '工作区（可沿用上次）' : '工作区'}</label>
+          <input ref={workspaceRef} className="mr-input" id="mr-launch-workspace" value={workspace} disabled={busy} placeholder={lastWorkspace ? `留空沿用上次运行：${lastWorkspace}` : '可填写项目绝对路径，最终使用的目录会显示在预览中'} onChange={event => setWorkspace(event.target.value)} />
         </div>
         <details className="mr-form-options"><summary>执行选项 · {runExecutor === 'official-team' ? '官方工具协作' : manual ? '手动分配' : '模型路由'} · {runMode === 'workspace-write' ? '编辑文件' : '只读'} · {ROUTING_PRESETS[runPreset]?.label ?? runPreset}</summary>
         <div className="mr-controls">
@@ -382,6 +458,16 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
         </div>
         {phase.kind === 'previewing' && <p className="mr-empty" role="status">正在按当前模型目录、登录状态和预算生成执行计划…</p>}
         {phase.kind === 'starting' && <p className="mr-empty" role="status">正在等待已确认任务的启动结果，请稍候…</p>}
+        {phase.kind === 'unconfirmed' && <div className="mr-error" role="status">
+          <p>{phase.checking ? '正在核对原提交…' : phase.message}{phase.runId && ` 可在执行记录中查看运行 ${phase.runId.slice(0, 8)}。`}</p>
+          <button className="mr-button mr-button-secondary" type="button" disabled={phase.checking} onClick={() => { void reconcileSubmission(phase.requestKey) }}>核对原提交</button>
+          <details><summary>已检查执行记录</summary><p>如果要开始另一项任务，可以清除本窗口的核对记录。</p>
+            <button className="mr-button mr-button-secondary" type="button" disabled={phase.checking} onClick={() => {
+              forgetSubmission(phase.requestKey)
+              forgetJob(savedJob())
+              setPhase({ kind: 'idle' })
+            }}>清除本窗口核对记录</button></details>
+        </div>}
         {phase.kind === 'error' && <p className="mr-error" role="alert">{phase.message}</p>}
         {((phase.kind === 'preview' && phase.signature === inputSignature) || (phase.kind === 'running' && !phase.job)) && <LaunchPreview value={phase.value} request={phase.request} changed={phase.changed} running={phase.kind === 'running'} confirmRef={confirmRef}
           onConfirm={() => { void confirm() }} onCancel={() => { if (!launching.current) setPhase({ kind: 'idle' }) }} />}

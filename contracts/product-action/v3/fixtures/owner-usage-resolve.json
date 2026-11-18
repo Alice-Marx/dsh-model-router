@@ -1,0 +1,10 @@
+{
+  "action": "usage.resolve",
+  "payload": {
+    "botId": "main",
+    "runId": "run-1",
+    "kind": "attested",
+    "costUsd": 0.2,
+    "note": "vendor receipt"
+  }
+}

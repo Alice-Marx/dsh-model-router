@@ -37,6 +37,13 @@ async function handle(frame) {
   if (text.includes('ask')) emit(codex ? { id: 'ask-1', method: 'item/commandExecution/requestApproval', params: { threadId: session, turnId: id } }
     : { type: 'extension_ui_request', id: 'ask-1', method: 'confirm', title: 'fixture request' })
   if (text.includes('reroute') && codex) { notification('model/rerouted', { threadId: session, toModel: 'ungranted-model' }); return }
+  if (codex && text === 'report subscription') {
+    notification('account/rateLimits/updated', { rateLimits: { limitId: 'codex',
+      primary: { usedPercent: 35, windowDurationMins: 300, resetsAt: 1900000000, account: 'fixture-private-field' },
+      secondary: { usedPercent: 200 } } })
+    notification('account/rateLimits/updated', { rateLimits: { limitId: 'model-only', primary: { usedPercent: 60 } } })
+  }
+  if (codex && text === 'change account') notification('account/updated', { authMode: null })
   const answer = `turn-${turns}: ${text}`
   if (codex) notification('item/agentMessage/delta', { threadId: session, turnId: id, itemId: 'item-' + id, delta: answer })
   else emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: answer } })

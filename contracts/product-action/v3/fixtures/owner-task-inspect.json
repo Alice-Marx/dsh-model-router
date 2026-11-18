@@ -1,0 +1,7 @@
+{
+  "action": "task.inspect",
+  "payload": {
+    "botId": "main",
+    "taskId": "task-7c1"
+  }
+}

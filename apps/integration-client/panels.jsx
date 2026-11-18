@@ -8,6 +8,7 @@ import { LibraryPanel } from './library-panel.jsx'
 import { SecurePairingSetup } from './secure-pairing.jsx'
 import { LocalComputerHost } from './local-computer-host.jsx'
 import { UsageExplorer } from './usage-explorer.jsx'
+import { SubscriptionQuota } from './subscription-quota.jsx'
 import { DesktopWorkbench } from './desktop-pane.jsx'
 import { RoutinesPanel } from './routines-panel.jsx'
 import { UiIcon } from './ui-icons.jsx'
@@ -18,7 +19,7 @@ import { BotThreadsPanel } from './bot-threads-panel.jsx'
 import { WebPanelsPanel } from './web-panel-page.jsx'
 import { BotConversationLink } from './independent-chat-entry.jsx'
 import { openIndependentChat } from './independent-chat-navigation.mjs'
-import { requestWorkbenchView } from '../../.dsh-plugin/client/workbench-state.mjs'
+import { requestWorkbenchView, workbenchDraft } from '../../.dsh-plugin/client/workbench-state.mjs'
 import { routingSubmissions, submissionCode } from './routing-submissions.mjs'
 import { WORKSPACE_SECTIONS, workspaceNavigation } from './workspace-navigation.mjs'
 import { AiProvidersPage } from './ai-providers.jsx'
@@ -749,9 +750,11 @@ function UnknownReview({ item, dispatch, busy }) {
 
 export function Usage({ snapshot, dispatch, busy, openAdvanced, scope }) {
   const section = snapshot.usage
-  if (section?.status !== 'available') return <><Blocked value={section} /><button onClick={openAdvanced}>打开已有 MR 费用与订阅面板</button></>
+  const quota = snapshot.availableActions?.includes('usage.subscriptionQuota') && typeof scope?.dispatch === 'function'
+    ? <SubscriptionQuota productApi={scope}/> : null
+  if (section?.status !== 'available') return <>{quota}<Blocked value={section} /><button onClick={openAdvanced}>打开已有 MR 费用与订阅面板</button></>
   const unresolved = section.unresolved ?? []
-  return <><p className="bp-muted">以宿主唯一资金库的收据和预占为准。未知费用保留未知；Token 统计与实际计费分开呈现。</p>
+  return <>{quota}<p className="bp-muted">以宿主唯一资金库的收据和预占为准。未知费用保留未知；Token 统计与实际计费分开呈现。</p>
     {section.summary && <dl className="bp-facts bp-card"><Value label="已知 API 费用">{money(section.summary.apiUsd)}</Value><Value label="当前预占">{money(section.summary.reservedUsd)}</Value>
       <Value label="未知费用记录">{section.summary.unknownCount ?? '未报告'}</Value><Value label="订阅用量">{subscriptionText(section.summary.subscriptionSummary)}</Value></dl>}
     {unresolved.length ? <section className="bp-card" aria-label="待人工核对的未确认费用">
@@ -977,7 +980,9 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
       {section === 'library' && <Library snapshot={snapshot} dispatch={dispatch} busy={disabled} focus={focus} />}
       {section === 'data' && <DataPanel snapshot={snapshot} dispatch={dispatch} busy={disabled || !snapshot.availableActions?.includes('data.catalog')} focus={focus} transport={desktopTransport} scope={productApi} />}
       {section === 'usage' && <Usage snapshot={snapshot} dispatch={dispatch} busy={disabled} scope={productApi} openAdvanced={() => openPanel('model-router-galgame')} />}
-      {section === 'ai' && !snapshotStale && snapshotApi.current === productApi && <AiProvidersPage productApi={productApi} onOpenTools={() => { requestWorkbenchView('tools'); openPanel('model-router-galgame') }} onOpenBindings={() => onNavigate({ section: 'bindings' })}/>}
+      {section === 'ai' && !snapshotStale && snapshotApi.current === productApi && <AiProvidersPage productApi={productApi} onOpenTools={() => { requestWorkbenchView('tools'); openPanel('model-router-galgame') }} onOpenBindings={() => onNavigate({ section: 'bindings' })}
+        onOpenQuota={snapshot.availableActions?.includes('usage.subscriptionQuota') ? () => onNavigate({ section: 'usage' }) : undefined}
+        onReturnToTask={workbenchDraft().task.trim() ? () => { requestWorkbenchView('plan'); openPanel('model-router-galgame') } : undefined}/>}
       <footer className="bp-page-footer bp-muted">上次同步 {new Date(snapshot.observedAt).toLocaleString('zh-CN')}</footer></>}
     </div></div>
   </main><WorkspaceCommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} snapshot={snapshotApi.current === productApi ? snapshot : null} onNavigate={onNavigate} openSession={snapshotApi.current === productApi ? openSession : undefined}/>

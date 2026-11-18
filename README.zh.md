@@ -14,7 +14,7 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.76.1 · Windows Remote Agent：0.1.3**
+**当前正式版：0.77.0 · Windows Remote Agent：0.1.3**
 
 以 Bot 联系人和聊天为主要入口，集中使用独立 AI 连接、多模型路线、团队委派、私有资料库、数据分析与自有 Windows 电脑。任务、通知和执行记录保存在工作空间中，Main Bot 可在已保存的多条模型路线之间调度。
 
@@ -80,8 +80,8 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.76.1`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.76.1`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.77.0`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.77.0`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 完整版本进入 Bot 工作区，在 **设置 → AI** 添加独立模型连接，再为 Bot 选择模型。纯路由版本从侧栏打开 **模型路由**，使用 Harness 已配置路线。
 
@@ -89,10 +89,10 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.76.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.77.0
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.77.0
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -107,7 +107,7 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.76.1
 2. **写清结果。** 在 **任务与执行** 选择 **项目检查**、**整理说明** 或 **方案比较** 模板，再修改任务与验收标准。**撤销模板** 可恢复原文。
 3. **查看预览。** 点击 **下一步：预览执行**，再点击 **预览执行计划**，核对模型/工具、工作区、权限及 API 费用或订阅用量估算。
 4. **确认启动。** 阅读确认项，点击 **全部确认并执行**。填写任务、生成建议和预览都不会调用模型；确认执行才会启动。
-5. **检查结果。** 打开 **执行记录** 查看输出、收据、状态、取消和受支持的重试操作，再检查所要求的产物是否达成。
+5. **检查结果。** 打开 **执行记录** 查看输出、收据、状态、取消和受支持的重试操作，再检查所要求的产物是否达成。启动响应中断时，刷新当前窗口或点击 **核对原提交** 查找已受理的任务。
 
 当前应用界面使用中文；英文文档提供对应控件的操作解释。
 
@@ -279,6 +279,7 @@ Main Bot 也可调用 `bot_route_task` 或同义工具 `bot_dispatch`；两者�
 - **本地规划。** 路线比较和执行预检不调用模型；确认执行会将所选任务/上下文发送给供应商或 CLI，并可能产生费用。
 - **API 预算。** 单次估算与日/月限额共同检查已记录支出和其他预占。有限预算下，未知价格或金额需相应确认；估算用于规划控制，实际账单以供应商为准。
 - **订阅单独核对。** 调用次数和已报告的输入/输出/缓存 token 与 API 金额分别记账。缺失用量保持未知，不视为零，也不据此推算厂商剩余总额度。
+- **查看订阅额度。** 在完整 Bot 版打开 **AI 连接 → 查看订阅额度**，可查看每日和每月的调用上限、剩余次数及按宿主时区计算的重置时间。面板也显示 Codex 原生会话最近报告的账号额度，以及宿主记录的限流和额度用尽状态。
 - **选择回退策略。** 可优先订阅、仅订阅或仅 API；订阅转 API 需重新估算、预算准入及必要确认。托管可编辑/单工具/团队运行不会自动在 API 上重试。
 - **依据记录恢复。** 保留执行尝试、收据、预占和未知影响证据；中断后先核对再重试，经过时间或发出停止请求不能证明远程操作已停止。
 - **有依据地优化选择。** 可选更强模型复核会增加调用。显式评分只调整有界偏好，不提高客观质量分或绕过质量下限；可禁用学习、撤回评分或重置学习起点。

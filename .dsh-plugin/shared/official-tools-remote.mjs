@@ -7,6 +7,7 @@
  */
 import { getOfficialTool, installMethodsFor } from './official-tool-registry.mjs'
 import { parsePackageAssignments } from './package-assignments.mjs'
+import { workbenchRequestKey } from './workbench-request-key.mjs'
 import {
   parseTerminalRead,
   parseTerminalResize,
@@ -124,7 +125,9 @@ const idText = (value, subject) => {
 /** A status/cancel request can only address an existing Host-owned run. */
 export function parseRunJobRequest(value) {
   const request = plainObject(value, 'run job request')
-  if (Object.keys(request).some(key => key !== 'jobId')) throw new TypeError('run job request only accepts jobId')
+  const keys = Object.keys(request)
+  if (keys.length === 1 && keys[0] === 'requestKey') return { requestKey: workbenchRequestKey(request.requestKey) }
+  if (keys.some(key => key !== 'jobId')) throw new TypeError('run job request only accepts jobId or requestKey')
   return { jobId: idText(request.jobId, 'jobId') }
 }
 
@@ -203,6 +206,7 @@ export function parseRunRequest(value) {
   }
   return {
     task: request.task,
+    ...(request.requestKey === undefined ? {} : { requestKey: workbenchRequestKey(request.requestKey) }),
     ...(officialTeam ? { executor: 'official-team', executionMode: request.executionMode ?? 'read-only',
       ...(request.executionEnvironment === undefined ? {} : { executionEnvironment: request.executionEnvironment }) } : {}),
     ...(provider ? { provider, model } : {}),

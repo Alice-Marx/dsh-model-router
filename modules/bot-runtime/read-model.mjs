@@ -18,7 +18,7 @@ const ACTIONS = new Set([
   'botProfile.inspect', 'botProfile.save',
   'independentChat.send', 'independentChat.inspect', 'independentChat.cancel', 'independentChat.view', 'independentChat.messages',
   'independentChat.newConversation',
-  'task.inspect', 'task.attention', 'task.cancel', 'task.retry', 'task.reconcile', 'task.plan.submit', 'task.plan.cancel', 'usage.resolve',
+  'task.inspect', 'task.attention', 'task.cancel', 'task.retry', 'task.reconcile', 'task.plan.submit', 'task.plan.cancel', 'usage.resolve', 'usage.subscriptionQuota',
   'threads.readModel', 'threads.list', 'threads.create', 'threads.rename', 'threads.switch', 'threads.open', 'threads.archive', 'threads.unarchive', 'threads.ensure', 'threads.recover', 'threads.reconcile',
   'webPanels.list', 'webPanels.probe', 'webPanels.save', 'webPanels.remove', 'webPanels.order',
   'notifications.readModel', 'notifications.list', 'notifications.read', 'notifications.markAll',
@@ -37,7 +37,7 @@ const ACTIONS = new Set([
   'botRoutingInspect', 'botRoutingDecide', 'botRouting.dispatch', 'botRouting.save', 'botRouting.status',
   'botRuntimeStatus', 'botRuntimeMove', 'botRuntimeHistory', 'botRuntimeMessage',
 ])
-const READ_ONLY_ACTIONS = new Set(['independentChat.inspect', 'independentChat.view', 'independentChat.messages', 'nativeActivity.list'])
+const READ_ONLY_ACTIONS = new Set(['independentChat.inspect', 'independentChat.view', 'independentChat.messages', 'nativeActivity.list', 'usage.subscriptionQuota'])
 const plain = value => value && typeof value === 'object' && !Array.isArray(value)
 const error = (code, message) => Object.assign(new Error(message), { code })
 const desktopClientOrigin = request => {

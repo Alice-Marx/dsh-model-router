@@ -121,9 +121,10 @@ export function createRunJobs({ now = Date.now, maxJobs = 50, maxActive = 4 } = 
   }
 
   return {
-    start({ run, packages = [] } = {}) {
+    start({ run, packages = [], jobId = randomUUID() } = {}) {
       if (disposed) throw new Error('Run job manager is disposed.')
       if (typeof run !== 'function') throw new TypeError('Run job requires a run function.')
+      if (jobs.has(jobId)) throw new Error('Run job already exists.')
       if ([...jobs.values()].filter(job => ACTIVE.has(job.snapshot.status)).length >= maxActive) {
         throw new Error('Too many active run jobs.')
       }
@@ -137,7 +138,7 @@ export function createRunJobs({ now = Date.now, maxJobs = 50, maxActive = 4 } = 
       const job = {
         controller: new AbortController(),
         snapshot: {
-          jobId: randomUUID(), status: 'running', startedAt: timestamp(), finishedAt: null,
+          jobId, status: 'running', startedAt: timestamp(), finishedAt: null,
           cancelRequested: false,
           progress: { total: 0, completed: 0, current: null, stage: 'starting', packages: [] },
           result: null,
@@ -159,6 +160,7 @@ export function createRunJobs({ now = Date.now, maxJobs = 50, maxActive = 4 } = 
       return snapshot(job)
     },
     status(jobId) { return snapshot(find(jobId)) },
+    lookup(jobId) { const job = jobs.get(jobId); return job ? snapshot(job) : null },
     cancel(jobId) { return requestCancel(find(jobId)) },
     dispose() {
       if (disposed) return

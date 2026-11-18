@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { createProductReadModel } from '../modules/bot-runtime/read-model.mjs'
 
 test('every declared product action reaches its registered handler through the real dispatcher', async () => {
-  const contract = JSON.parse(await readFile(new URL('../contracts/product-action/v2/actions.json', import.meta.url), 'utf8'))
+  const contract = JSON.parse(await readFile(new URL('../contracts/product-action/v3/actions.json', import.meta.url), 'utf8'))
   const names = Object.keys(contract.actions)
   assert.ok(names.length >= 70)
   const calls = []
@@ -20,7 +20,7 @@ test('every declared product action reaches its registered handler through the r
 })
 
 test('read-only recovery permits observation with trusted readOnly context but blocks chat sends and cancellations', async () => {
-  const reads = ['independentChat.view', 'independentChat.inspect', 'independentChat.messages']
+  const reads = ['independentChat.view', 'independentChat.inspect', 'independentChat.messages', 'usage.subscriptionQuota']
   const writes = ['independentChat.send', 'independentChat.cancel', 'independentChat.newConversation', 'botProfile.save']
   const calls = []
   let readOnlyChecks = 0

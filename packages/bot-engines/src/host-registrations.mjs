@@ -74,7 +74,7 @@ export async function provisionClaudeProfile(home, profile, resolveSecret) {
 /** Mount explicitly configured text-only routes into the Host's public model catalog.
  * Registration starts no native process; the existing model waterfall owns all money.
  */
-export async function mountConversationEngines({ llm, profiles = [], runtimeRoot, identityFor, fundingFor, resolveSecret, requestFor, toolsFor, onActivity, onResult } = {}) {
+export async function mountConversationEngines({ llm, profiles = [], runtimeRoot, identityFor, fundingFor, resolveSecret, requestFor, toolsFor, onActivity, onResult, now = Date.now } = {}) {
   const registrations = []
   let closed = false, pending = Promise.resolve()
   if (profiles.length && (typeof llm?.registerAdapter !== 'function' || !isAbsolute(runtimeRoot ?? '')
@@ -94,8 +94,12 @@ export async function mountConversationEngines({ llm, profiles = [], runtimeRoot
       const createEngine = profile.driver === 'claude' ? createClaudeEngine : profile.driver === 'codex' ? createCodexEngine : profile.driver === 'pi' ? createPiEngine
         : profile.driver === 'stepAgent' ? createStepEngine
         : profile.driver === 'museCode' ? createMuseEngine : options => createAcpChatEngine(profile, options)
+      let subscriptionQuota = null
+      const onSubscriptionQuota = windows => {
+        subscriptionQuota = windows.length ? { observedAt: now(), windows } : null
+      }
       const engineFactory = async options => {
-        const engine = await createEngine(options)
+        const engine = await createEngine(profile.driver === 'codex' ? { ...options, onSubscriptionQuota } : options)
         return Object.freeze({ ...engine, get closed() { return engine.closed }, get busy() { return engine.busy },
           async submitTurn(input) {
             try { const result = await engine.submitTurn(input); onResult?.(profile, { kind: result.ok && result.outcome === 'succeeded' ? 'verified' : 'error' }); return result }
@@ -118,7 +122,7 @@ export async function mountConversationEngines({ llm, profiles = [], runtimeRoot
       await mkdir(join(runtimeRoot, profile.id, 'workspace'), { recursive: true, mode: 0o700 })
       try {
         const release = llm.registerAdapter([profile.provider], adapter)
-        registrations.push({ profileId: profile.id, profile, adapter, release })
+        registrations.push({ profileId: profile.id, profile, adapter, release, subscriptionQuota: () => subscriptionQuota })
       } catch (error) { await adapter.close(); throw error }
   }
   try { for (const profile of profiles) await add(profile) } catch (error) { await close(); throw error }
@@ -138,6 +142,9 @@ export async function mountConversationEngines({ llm, profiles = [], runtimeRoot
   }
   return Object.freeze({ close, reconcile,
     activityHealth: () => ({ failures: registrations.reduce((total, item) => total + (item.adapter.snapshot().activityObserverFailures ?? 0), 0) }),
+    subscriptionQuota: () => registrations.filter(item => item.profile.driver === 'codex').map(item => ({
+      id: item.profileId, name: item.profile.name, reading: item.subscriptionQuota(),
+    })),
     invalidateBot: (profileId, botId, reason) => registrations.find(item => item.profileId === profileId)?.adapter.invalidateBot(botId, reason),
     async retireBot(botId, reason = 'new-conversation') {
       const retired = await Promise.all(registrations.map(item => item.adapter.invalidateBot(botId, reason)))

@@ -18,6 +18,7 @@ import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { archiveSpending, sanitizeArchivedSpending } from './run-ledger.mjs'
 import { sanitizeBudgetReservations } from './budget-reservations.mjs'
+import { inspectWorkbenchSubmissions } from './workbench-submissions.mjs'
 import { archiveSubscriptionUsage, invalidArchivedSubscriptionUsage, invalidSubscriptionAttempts,
   sanitizeArchivedSubscriptionUsage } from './subscription-usage.mjs'
 
@@ -137,6 +138,7 @@ function sanitize(value, maxRuns) {
       .filter(([, entry]) => Number.isFinite(entry?.at))),
     runs,
     budgetReservations: held.reservations,
+    ...(value.workbenchSubmissions === undefined ? {} : { workbenchSubmissions: inspectWorkbenchSubmissions(value.workbenchSubmissions) }),
     dynamicData: value.dynamicData && typeof value.dynamicData === 'object' && !Array.isArray(value.dynamicData) ? value.dynamicData : { liveBench: null, pricing: null, status: {}, revision: '' },
     archivedSpending: sanitizeArchivedSpending(value.archivedSpending),
     archivedSubscriptionUsage: sanitizeArchivedSubscriptionUsage(value.archivedSubscriptionUsage,

@@ -18,7 +18,7 @@ const healthText = provider => provider.health?.kind === 'error'
 let nextScope = 0
 export function AiProvidersPage(props) { const key = useMemo(() => ++nextScope, [props.productApi]); return <AiProviders key={key} {...props}/> }
 
-function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
+function AiProviders({ productApi, onOpenTools, onOpenBindings, onReturnToTask, onOpenQuota }) {
   const [section, setSection] = useState('api'), [visitedCli, setVisitedCli] = useState(false), [visitedSubscriptions, setVisitedSubscriptions] = useState(false)
   const [setupTool,setSetupTool]=useState(null)
   const [view, setView] = useState(null), [cli, setCli] = useState(null), [error, setError] = useState(''), [notice, setNotice] = useState('')
@@ -101,7 +101,11 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings }) {
   }
   return <section className="bp-ai" aria-label="AI 提供方设置">
     <header className="bp-ai-heading"><div><h2>AI 提供方</h2><p><UiIcon name="computer" size={15}/>适用于这台电脑 · 插件独立配置</p></div>
-      {!draft && section !== 'subscriptions' && <button type="button" disabled={Boolean(busy) || !view} onClick={allCheck}><UiIcon name="refresh" size={15}/>{busy === 'check-all' ? '正在检查…' : '重新检查'}</button>}</header>
+      {!draft && <div className="bp-actions">
+        {onOpenQuota && <button type="button" onClick={onOpenQuota}>查看订阅额度</button>}
+        {onReturnToTask && <button type="button" disabled={Boolean(busy)} onClick={onReturnToTask}>返回任务草稿</button>}
+        {section !== 'subscriptions' && <button type="button" disabled={Boolean(busy) || !view} onClick={allCheck}><UiIcon name="refresh" size={15}/>{busy === 'check-all' ? '正在检查…' : '重新检查'}</button>}
+      </div>}</header>
     {!draft && <div className="bp-connection-tabs bp-ai-tabs" role="group" aria-label="AI 连接类型">{[['api','模型 API','spark'],['subscriptions','订阅账户','bot'],['cli','CLI 聊天','bot'],['tools','官方工具','settings']].map(([id,label,icon]) => <button key={id} type="button" aria-pressed={section === id} onClick={() => { setSection(id); if (id === 'cli') setVisitedCli(true); if (id === 'subscriptions') setVisitedSubscriptions(true) }}><UiIcon name={icon} size={16}/>{label}</button>)}</div>}
     {error && <div className="bp-ai-alert" role="alert">{error}<button type="button" disabled={editingBusy} onClick={() => void load()}>刷新</button></div>}
     {notice && <p className="bp-ai-notice" role="status">{notice}</p>}

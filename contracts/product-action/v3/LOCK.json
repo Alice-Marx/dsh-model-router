@@ -1,0 +1,13 @@
+{
+  "id": "product-action/v3",
+  "schemaHash": "ca27210a2b4f858941f3ae3f7159a51081518815a63139f5f6fc3c28f565d3e7",
+  "files": {
+    "fixtures/bot-routing-save.json": "03ea222974a8f40b88e98ba7c55dcc819b15ed51dd13da4b08b6916d8cf25694",
+    "fixtures/owner-subscription-quota.json": "1714d381beaf3c1056fde6f4f0069c201386263e6b8ff91ed8958a641e109f95",
+    "fixtures/owner-subscriptions-login.json": "531e877aa4028a65e48242ae862c0efd666a41087f914a0baa07df9acbdd6dfc",
+    "fixtures/owner-task-inspect.json": "d4095578d90f14435f50c127ba2a6435a14ef3446a034f58aca479e56d2de637",
+    "fixtures/owner-usage-resolve.json": "061737e627cff7d52a4929040ef3f8054126525e4a9929a0a894d7188fec9641",
+    "actions.json": "e269ea55bf5026cacf23704a5300dbaca814940a8ccad904b7903212f97c0f10"
+  },
+  "digest": "6a68ee8c2f123d547b52625f3f46e9f7ee9fad2f22a1494c387a9268a97f8b4d"
+}
