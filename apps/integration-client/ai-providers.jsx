@@ -100,7 +100,7 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings, onReturnToTask, 
     change({ models: [...draft.models, modelForm(model)] })
   }
   return <section className="bp-ai" aria-label="AI 提供方设置">
-    <header className="bp-ai-heading"><div><h2>AI 提供方</h2><p><UiIcon name="computer" size={15}/>适用于这台电脑 · 插件独立配置</p></div>
+    <header className="bp-ai-heading"><div><h2>AI 提供方</h2><p><UiIcon name="computer" size={15}/>{section === 'subscriptions' ? '由 DS Bot 托管 · 授权资料保存在本机' : '适用于这台电脑 · 插件独立配置'}</p></div>
       {!draft && <div className="bp-actions">
         {onOpenQuota && <button type="button" onClick={onOpenQuota}>查看订阅额度</button>}
         {onReturnToTask && <button type="button" disabled={Boolean(busy)} onClick={onReturnToTask}>返回任务草稿</button>}
@@ -152,7 +152,7 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings, onReturnToTask, 
       </React.Fragment>)}</div>
       {!(cli?.tools?.length) && <p className="bp-ai-hint">点击“重新检查”读取本机 CLI 状态；安装与登录在官方工具面板完成。</p>}
       </div>
-      {onOpenBindings && <button type="button" className="bp-ai-bot-link" onClick={onOpenBindings}>为 Bot 选择模型<UiIcon name="chevron" size={15}/></button>}
+      {onOpenBindings && section !== 'subscriptions' && <button type="button" className="bp-ai-bot-link" onClick={onOpenBindings}>为 Bot 选择模型<UiIcon name="chevron" size={15}/></button>}
     </>}
   </section>
 }

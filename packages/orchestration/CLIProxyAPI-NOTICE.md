@@ -1,6 +1,6 @@
 # CLIProxyAPI runtime notice
 
-The optional subscription login component is downloaded from https://github.com/router-for-me/CLIProxyAPI/releases/tag/v8.0.72 (source commit e96d4c4818851cf0e96d27b2bc8b67379e449d9e). The archive is verified against the pinned SHA256 in src/cli-proxy-release.mjs. It runs locally, in a private data directory. Its license is reproduced below.
+DS Bot prepares the subscription login component from https://github.com/router-for-me/CLIProxyAPI/releases/tag/v8.0.77 (source commit a5e8f69e56309e1ef6d6872e667da81fdfbce2ce) when the owner connects a subscription account. The full Bot package includes the upstream Windows x64 archive. Each archive is verified against the pinned SHA256 in src/cli-proxy-release.mjs. The Host runs the component on loopback with a private data directory. Its license is reproduced below.
 
 MIT License
 

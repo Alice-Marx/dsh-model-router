@@ -57,6 +57,62 @@ test('login sessions survive an owner-page reopen, complete model synchronizatio
   assert.equal(service.list(owner).pendingLogins.length, 0)
   await assert.rejects(service.loginStatus({ loginId: cancelled.loginId }, owner), { code: 'SUBSCRIPTION_LOGIN_EXPIRED' })
 }))
+test('choosing a provider prepares the service once and keeps the same login across owner views', async () => setup(async ({ service, gateway }) => {
+  await gateway.runtime.stop()
+  const ready = Promise.withResolvers()
+  let preparations = 0
+  gateway.runtime.ensureReady = async () => {
+    preparations++
+    await ready.promise
+    return gateway.runtime.enable()
+  }
+  await assert.rejects(service.login({ provider: 'codex' }, { kind: 'bot' }), { code: 'REMOTE_OWNER_REQUIRED' })
+  const first = await service.login({ provider: 'codex' }, owner)
+  assert.equal(first.preparing, true)
+  assert.equal(first.url, undefined)
+  assert.deepEqual(service.list(owner).pendingLogins, [first])
+  assert.deepEqual(await service.login({ provider: 'codex' }, owner), first)
+  assert.equal(preparations, 1)
+  assert.equal((await service.loginStatus({ loginId: first.loginId }, owner)).status, 'preparing')
+  assert.equal(gateway.sessions.size, 0)
+  ready.resolve()
+  await new Promise(setImmediate)
+  const pending = await service.loginStatus({ loginId: first.loginId }, owner)
+  assert.equal(pending.status, 'pending')
+  assert.equal(pending.login.loginId, first.loginId)
+  assert.equal(new URL(pending.login.url).hostname, 'auth.openai.com')
+  assert.equal(pending.service.phase, 'ready')
+  assert.equal(gateway.sessions.size, 1)
+}))
+test('a canceled preparation cannot create OAuth state, and a failed preparation can be retried', async () => setup(async ({ service, gateway }) => {
+  await gateway.runtime.stop()
+  const firstReady = Promise.withResolvers()
+  gateway.runtime.ensureReady = async () => {
+    await firstReady.promise
+    return gateway.runtime.enable()
+  }
+  const canceled = await service.login({ provider: 'codex' }, owner)
+  await service.cancelLogin({ loginId: canceled.loginId }, owner)
+  firstReady.resolve()
+  await new Promise(setImmediate)
+  assert.equal(gateway.sessions.size, 0)
+  assert.deepEqual(service.list(owner).pendingLogins, [])
+
+  await gateway.runtime.stop()
+  gateway.runtime.ensureReady = async () => { throw Object.assign(new Error('组件下载未完成。'), { code: 'SUBSCRIPTION_COMPONENT_DOWNLOAD' }) }
+  const failed = await service.login({ provider: 'codex' }, owner)
+  const outcome = await service.loginStatus({ loginId: failed.loginId }, owner)
+  assert.equal(outcome.code, 'SUBSCRIPTION_COMPONENT_DOWNLOAD')
+  assert.equal(outcome.status, 'error')
+  assert.deepEqual(service.list(owner).pendingLogins, [])
+
+  gateway.runtime.ensureReady = async () => gateway.runtime.enable()
+  const retry = await service.login({ provider: 'codex' }, owner)
+  assert.notEqual(retry.loginId, failed.loginId)
+  await new Promise(setImmediate)
+  assert.equal((await service.loginStatus({ loginId: retry.loginId }, owner)).status, 'pending')
+  assert.equal(gateway.sessions.size, 1)
+}))
 test('manual callback accepts only the original loopback destination and state, relays no caller-selected provider, and waits for confirmed login', async () => setup(async ({ service, gateway }) => {
   const login = await service.login({ provider: 'codex' }, owner), state = new URL(login.url).searchParams.get('state')
   assert.equal(login.supportsCallback, true)

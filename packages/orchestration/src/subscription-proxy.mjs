@@ -153,9 +153,28 @@ export function openSubscriptionProxy({ Database, file, root, llm, runtime: supp
   const stateChanged = () => { if (!closed) void serial(async () => { if (runtime.status().phase === 'ready') await synchronize(); else { syncAdapters(); await publish() } }).catch(() => {}) }
   runtime = suppliedRuntime ?? createCliProxyRuntime({ root, onState: stateChanged })
   for (const row of rows()) owned.add(row.route)
+  const loginView = (loginId, session) => ({
+    loginId, provider: session.provider, expiresAt: session.expiresAt,
+    ...(session.state ? { url: session.url, supportsCallback: Boolean(session.callbackUri), ...(session.userCode ? { userCode: session.userCode } : {}) } : { preparing: true }),
+  })
   const list = context => { owner(context); syncAdapters(); return { schemaVersion: 1, service: runtime.status(), providers: SUBSCRIPTION_PROVIDERS.map(({ id, name }) => ({ id, name })), accounts: rows().map(accountView),
-    pendingLogins: [...sessions].filter(([, session]) => session.expiresAt > now()).map(([loginId, session]) => ({ loginId, provider: session.provider, url: session.url, expiresAt: session.expiresAt, supportsCallback: Boolean(session.callbackUri), ...(session.userCode ? { userCode: session.userCode } : {}) })) } }
+    pendingLogins: [...sessions].filter(([, session]) => session.expiresAt > now()).map(([loginId, session]) => loginView(loginId, session)) } }
   const loginEntry = (payload, keys = ['loginId']) => { payloadKeys(payload, keys); const session = sessions.get(payload.loginId); if (!session || session.expiresAt <= now()) fail('SUBSCRIPTION_LOGIN_EXPIRED', '此登录已过期，请重新发起授权。'); return session }
+  const authorize = async (loginId, session, provider) => {
+    const { generation } = runtime.connection()
+    let started
+    // The Host retains accepted authorization even if the owner page closes.
+    try { started = await runtime.request('/v8/management/oauth/auth-url', { method: 'POST', body: { provider: provider.id, is_webui: true }, timeout: 45_000 }) }
+    catch (error) { if (error.status === 404) fail('SUBSCRIPTION_PROVIDER_UNAVAILABLE', '此提供方暂时无法使用订阅登录。可在 CLI 聊天中查看可用的官方连接。'); throw error }
+    if (typeof started.state !== 'string' || !/^[A-Za-z0-9._~-]{8,512}$/.test(started.state)) fail('SUBSCRIPTION_PROXY_RESPONSE', '订阅服务没有返回有效的登录状态。')
+    let url
+    try { url = subscriptionAuthUrl(started.url, provider) }
+    catch (error) { await runtime.request('/v8/management/oauth/session?state=' + encodeURIComponent(started.state), { method: 'DELETE' }).catch(() => {}); throw error }
+    if (runtime.connection().generation !== generation) fail('SUBSCRIPTION_LOGIN_EXPIRED', '订阅连接已重新启动，请再次选择提供方。')
+    Object.assign(session, { state: started.state, expiresAt: now() + 5 * 60_000, generation, url,
+      callbackUri: callbackDestination(url), userCode: safeText(started.user_code, 80) })
+    return loginView(loginId, session)
+  }
   const timer = setInterval(() => {
     for (const [id, session] of sessions) if (session.expiresAt <= now()) sessions.delete(id)
     if (!closed && runtime.status().phase === 'ready' && !sessions.size) void serial(() => synchronize()).catch(() => {})
@@ -167,30 +186,42 @@ export function openSubscriptionProxy({ Database, file, root, llm, runtime: supp
     stop: (payload, context) => serial(async () => { owner(context); payloadKeys(payload, []); await runtime.stop(); sessions.clear(); syncAdapters(); await publish(); return list(context) }),
     refresh: (payload, context) => serial(async () => { owner(context); payloadKeys(payload, []); await synchronize(context); return list(context) }),
     login: (payload, context) => serial(async () => {
-      owner(context); payloadKeys(payload, ['provider'])
+      owner(context); payloadKeys(payload, ['provider', 'proxyUrl'])
       const provider = SUBSCRIPTION_PROVIDERS.find(item => item.id === payload.provider)
       if (!provider) fail('SUBSCRIPTION_INVALID', '请选择支持的订阅提供方。')
-      for (const [id, session] of sessions) if (session.expiresAt <= now()) sessions.delete(id)
+      if (payload.proxyUrl !== undefined && typeof payload.proxyUrl !== 'string') fail('SUBSCRIPTION_INVALID', '网络代理地址无效。')
+      const generation = runtime.status().phase === 'ready' ? runtime.connection().generation : null
+      for (const [id, session] of sessions) {
+        if (session.expiresAt <= now() || session.failure || (session.state && session.generation !== generation)) sessions.delete(id)
+      }
+      const existing = [...sessions].find(([, session]) => session.provider === provider.id)
+      if (existing) return loginView(...existing)
       if (sessions.size >= 8) fail('SUBSCRIPTION_LOGIN_LIMIT', '请先完成或取消已有的登录。')
-      let started
-      // Once accepted, retain the session even if the owner page closes. A later
-      // owner view can resume it; abandoning an HTTP response must not lose PKCE state.
-      try { started = await runtime.request('/v8/management/oauth/auth-url', { method: 'POST', body: { provider: provider.id, is_webui: true }, timeout: 45_000 }) }
-      catch (error) { if (error.status === 404) fail('SUBSCRIPTION_PROVIDER_UNAVAILABLE', '当前登录组件尚未启用此提供方。请检查 CLIProxyAPI 插件或使用官方 CLI 连接。'); throw error }
-      if (typeof started.state !== 'string' || !/^[A-Za-z0-9._~-]{8,512}$/.test(started.state)) fail('SUBSCRIPTION_PROXY_RESPONSE', '订阅服务没有返回有效的登录状态。')
-      let url
-      try { url = subscriptionAuthUrl(started.url, provider) }
-      catch (error) { await runtime.request('/v8/management/oauth/session?state=' + encodeURIComponent(started.state), { method: 'DELETE' }).catch(() => {}); throw error }
-      const loginId = randomUUID().replaceAll('-', ''), expiresAt = now() + 5 * 60_000
-      const callbackUri = callbackDestination(url)
-      sessions.set(loginId, { provider: provider.id, state: started.state, expiresAt, generation: runtime.connection().generation, url, callbackUri, userCode: safeText(started.user_code, 80) })
-      return { loginId, provider: provider.id, url, expiresAt, supportsCallback: Boolean(callbackUri), ...(safeText(started.user_code, 80) ? { userCode: started.user_code } : {}) }
+      const loginId = randomUUID().replaceAll('-', '')
+      const session = { provider: provider.id, expiresAt: now() + 5 * 60_000 }
+      sessions.set(loginId, session)
+      if (generation !== null) {
+        try { return await authorize(loginId, session, provider) }
+        catch (error) { sessions.delete(loginId); throw error }
+      }
+      // Download and startup must leave the owner queue free for list and cancel.
+      session.deferred = true
+      void runtime.ensureReady({ proxyUrl: payload.proxyUrl }).then(() => serial(async () => {
+        if (sessions.get(loginId) === session && session.expiresAt > now()) await authorize(loginId, session, provider)
+      })).catch(error => {
+        if (sessions.get(loginId) !== session) return
+        const code = safeText(error?.code)
+        session.failure = { status: 'error', code, message: code.startsWith('SUBSCRIPTION_') && safeText(error.message, 240) || '订阅连接未完成，请重试。' }
+      })
+      return loginView(loginId, session)
     }),
     loginStatus: (payload, context) => serial(async () => {
       owner(context); const session = loginEntry(payload)
+      if (session.failure) { sessions.delete(payload.loginId); return session.failure }
+      if (!session.state) return { status: 'preparing', service: runtime.status() }
       if (runtime.connection().generation !== session.generation) { sessions.delete(payload.loginId); fail('SUBSCRIPTION_LOGIN_EXPIRED', '订阅服务已重新启动，请重新登录。') }
       const result = await runtime.request('/v8/management/oauth/status?state=' + encodeURIComponent(session.state), { signal: context.signal })
-      if (result.status === 'wait') return { status: 'pending' }
+      if (result.status === 'wait') return { status: 'pending', ...(session.deferred ? { login: loginView(payload.loginId, session), service: runtime.status() } : {}) }
       if (result.status === 'error') { sessions.delete(payload.loginId); return { status: 'error', message: '授权未完成或已过期，请重新登录。' } }
       if (result.status !== 'ok') fail('SUBSCRIPTION_PROXY_RESPONSE', '订阅服务返回了未知授权状态。')
       await synchronize(context); sessions.delete(payload.loginId)
@@ -198,6 +229,7 @@ export function openSubscriptionProxy({ Database, file, root, llm, runtime: supp
     }),
     callback: (payload, context) => serial(async () => {
       owner(context); const session = loginEntry(payload, ['loginId', 'callbackUrl'])
+      if (!session.state) fail('SUBSCRIPTION_LOGIN_NOT_READY', '授权链接正在准备，请稍候。')
       if (runtime.connection().generation !== session.generation) fail('SUBSCRIPTION_LOGIN_EXPIRED', '订阅服务已重新启动，请重新登录。')
       if (session.callbackSubmitted) fail('SUBSCRIPTION_CALLBACK_SUBMITTED', '已提交授权结果，请等待登录完成。')
       let callback, expected
@@ -215,7 +247,14 @@ export function openSubscriptionProxy({ Database, file, root, llm, runtime: supp
       session.callbackSubmitted = true
       return { accepted: true }
     }),
-    cancelLogin: (payload, context) => serial(async () => { owner(context); const session = loginEntry(payload); await runtime.request('/v8/management/oauth/session?state=' + encodeURIComponent(session.state), { method: 'DELETE', signal: context.signal }); sessions.delete(payload.loginId); return { cancelled: true } }),
+    cancelLogin: (payload, context) => serial(async () => {
+      owner(context); const session = loginEntry(payload)
+      if (session.state && runtime.status().phase === 'ready' && runtime.connection().generation === session.generation) {
+        await runtime.request('/v8/management/oauth/session?state=' + encodeURIComponent(session.state), { method: 'DELETE', signal: context.signal })
+      }
+      sessions.delete(payload.loginId)
+      return { cancelled: true }
+    }),
     remove: (payload, context) => serial(async () => {
       owner(context); payloadKeys(payload, ['id', 'expectedRevision']); const account = read(entryId(payload))
       if (!account) fail('SUBSCRIPTION_NOT_FOUND', '此订阅账户已退出，请刷新。')

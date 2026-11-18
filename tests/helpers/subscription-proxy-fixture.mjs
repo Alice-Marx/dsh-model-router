@@ -26,6 +26,7 @@ export async function subscriptionFixture() {
     connection: () => { if (phase !== 'ready') throw Object.assign(new Error('fixture offline'), { code: 'SUBSCRIPTION_PROXY_NOT_READY' }); return { endpoint: `http://127.0.0.1:${server.address().port}`, apiKey: key, managementKey, generation } },
     async initialize() {},
     enable() { phase = 'ready'; return runtime.status() },
+    async ensureReady(options) { return runtime.enable(options) },
     async stop() { phase = 'disabled'; return runtime.status() },
     async close() { phase = 'disabled' },
     async request(path, options = {}) {

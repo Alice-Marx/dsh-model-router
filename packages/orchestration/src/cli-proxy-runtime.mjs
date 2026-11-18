@@ -4,13 +4,17 @@ import { chmod, copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rename, rm,
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { createServer } from 'node:net'
 import { execFile } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { Agent, ProxyAgent, EnvHttpProxyAgent, fetch as httpFetch } from 'undici'
 import { cliProxyArtifact, CLI_PROXY_VERSION } from './cli-proxy-release.mjs'
 import { spawnCliProxyComponent, stopCliProxyComponent } from './cli-proxy-process.mjs'
 
 const execute = promisify(execFile)
+const bundledComponents = fileURLToPath(new URL('../../../assets/cli-proxy/', import.meta.url))
+const maxArchiveBytes = 80_000_000
 const fail = (code, message) => { throw Object.assign(new Error(message), { code }) }
+const subscriptionError = error => typeof error?.code === 'string' && error.code.startsWith('SUBSCRIPTION_')
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
 const fileSha = async file => { const hash = createHash('sha256'); for await (const bytes of createReadStream(file)) hash.update(bytes); return hash.digest('hex') }
 const privateJson = async (file, value) => {
@@ -62,7 +66,9 @@ async function systemProxy() {
   if (process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy) return null
   if (process.platform !== 'win32') return null
   try {
-    const { stdout } = await execute('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Get-ItemProperty -LiteralPath "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" | Select-Object ProxyEnable,ProxyServer | ConvertTo-Json -Compress'], { windowsHide: true, timeout: 3000, maxBuffer: 8192 })
+    const systemRoot = process.env.SystemRoot ?? process.env.windir ?? 'C:\\Windows'
+    const powershell = join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+    const { stdout } = await execute(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', 'Get-ItemProperty -LiteralPath "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" | Select-Object ProxyEnable,ProxyServer | ConvertTo-Json -Compress'], { windowsHide: true, timeout: 5000, maxBuffer: 8192 })
     const config = JSON.parse(stdout)
     if (!config.ProxyEnable || typeof config.ProxyServer !== 'string') return null
     const selected = config.ProxyServer.split(';').find(v => v.startsWith('https='))?.slice(6) ?? config.ProxyServer.split(';')[0].replace(/^http=/, '')
@@ -78,13 +84,13 @@ export function subscriptionProxyUrl(raw) {
   return url.href.replace(/\/$/, '')
 }
 
-export function createCliProxyRuntime({ root, onState = () => {}, download, spawnProcess = spawnCliProxyComponent, now = Date.now } = {}) {
+export function createCliProxyRuntime({ root, onState = () => {}, download, bundledDir = bundledComponents, fetchRelease = httpFetch, spawnProcess = spawnCliProxyComponent, now = Date.now } = {}) {
   if (!root || !isAbsolute(root)) fail('SUBSCRIPTION_STORAGE_REQUIRED', '订阅登录需要本机的私有存储目录。')
   let artifact
   try { artifact = cliProxyArtifact() } catch (error) {
     const status = () => ({ phase: 'unsupported', installed: false, enabled: false, version: CLI_PROXY_VERSION, errorCode: error.code })
     const unavailable = () => { throw error }
-    return Object.freeze({ status, connection: unavailable, request: async () => unavailable(), enable: unavailable, stop: async () => status(), verifyInstalled: async () => false, initialize: async () => status(), close: async () => {} })
+    return Object.freeze({ status, connection: unavailable, request: async () => unavailable(), enable: unavailable, ensureReady: async () => unavailable(), stop: async () => status(), verifyInstalled: async () => false, initialize: async () => status(), close: async () => {} })
   }
   const localAgent = new Agent(), closedSignal = new AbortController()
   let phase = 'disabled', installed = false, errorCode = null, child = null, endpoint = null, secrets = null, job = null, enabled = false, proxyUrl = '', closed = false
@@ -99,7 +105,7 @@ export function createCliProxyRuntime({ root, onState = () => {}, download, spaw
     return installed
   }
   const connection = () => {
-    if (closed || phase !== 'ready' || !endpoint || !secrets || !child || child.exitCode !== null) fail('SUBSCRIPTION_PROXY_NOT_READY', '订阅登录服务尚未就绪，请先启用或重试。')
+    if (closed || phase !== 'ready' || !endpoint || !secrets || !child || child.exitCode !== null) fail('SUBSCRIPTION_PROXY_NOT_READY', '订阅连接尚未就绪，请重试。')
     return { endpoint, apiKey: secrets.apiKey, managementKey: secrets.managementKey, generation: child.pid }
   }
   const requestAt = async (origin, secret, path, { method = 'GET', body, signal, timeout = 20_000 } = {}) => {
@@ -108,7 +114,7 @@ export function createCliProxyRuntime({ root, onState = () => {}, download, spaw
       const response = await httpFetch(origin + path, { method, headers: { authorization: 'Bearer ' + secret, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: joined, redirect: 'error', dispatcher: localAgent })
       return await cliProxyJson(response)
-    } catch (error) { if (error.code?.startsWith('SUBSCRIPTION_')) throw error; if (signal?.aborted) signal.throwIfAborted(); fail('SUBSCRIPTION_PROXY_UNREACHABLE', '本机订阅服务未响应，请重新启动服务。') }
+    } catch (error) { if (subscriptionError(error)) throw error; if (signal?.aborted) signal.throwIfAborted(); fail('SUBSCRIPTION_PROXY_UNREACHABLE', '本机订阅连接未响应，请在 DS Bot 中重试。') }
   }
   const request = (path, options = {}) => {
     if (!/^\/v8\/management\//.test(path) && path !== '/v1/models') fail('SUBSCRIPTION_PROXY_PATH', '不支持的订阅管理操作。')
@@ -139,6 +145,7 @@ export function createCliProxyRuntime({ root, onState = () => {}, download, spaw
     const env = {}
     for (const key of ['PATH', 'Path', 'PATHEXT', 'SystemRoot', 'windir', 'ComSpec', 'USERPROFILE', 'HOME', 'APPDATA', 'LOCALAPPDATA', 'TEMP', 'TMP', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR']) if (process.env[key]) env[key] = process.env[key]
     env.MANAGEMENT_PASSWORD = secrets.managementKey
+    signal.throwIfAborted()
     const processChild = spawnProcess(join(root, 'bin', artifact.version, artifact.binary), ['--config', join(root, 'config.json')], { cwd: root, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     child = processChild
     processChild.stdout?.resume(); processChild.stderr?.resume()
@@ -149,39 +156,97 @@ export function createCliProxyRuntime({ root, onState = () => {}, download, spaw
     while (now() < deadline) {
       signal.throwIfAborted()
       if (launchError || processChild.exitCode !== null || child !== processChild) fail('SUBSCRIPTION_PROXY_START', '订阅登录服务启动失败，请检查组件并重试。')
-      try { const ready = await requestAt(origin, secrets.managementKey, '/v8/management/credentials', { signal, timeout: 1200 }); if (!Array.isArray(ready.files)) throw Error('shape'); endpoint = origin; setPhase('ready'); enabled = true; await privateJson(join(root, 'settings.json'), { enabled, proxyUrl }); return status() }
+      let ready
+      try { ready = await requestAt(origin, secrets.managementKey, '/v8/management/credentials', { signal, timeout: 1200 }) }
       catch { signal.throwIfAborted() }
+      if (Array.isArray(ready?.files)) {
+        await privateJson(join(root, 'settings.json'), { enabled: true, proxyUrl })
+        signal.throwIfAborted()
+        if (child !== processChild || launchError || processChild.exitCode !== null) fail('SUBSCRIPTION_PROXY_START', '订阅连接启动失败，请重试。')
+        enabled = true
+        endpoint = origin
+        setPhase('ready')
+        return status()
+      }
       await new Promise(done => setTimeout(done, 150))
     }
     fail('SUBSCRIPTION_PROXY_START', '订阅登录服务启动超时，请重试。')
   }
   const downloadArtifact = async signal => {
     if (download) return download(artifact, signal)
-    const proxy = proxyUrl || await systemProxy(), dispatcher = proxy && /^https?:/.test(proxy) ? new ProxyAgent(proxy) : new EnvHttpProxyAgent()
+    const bundled = join(bundledDir, artifact.filename)
     try {
-      const response = await httpFetch(artifact.url, { signal: AbortSignal.any([signal, AbortSignal.timeout(180_000)]), dispatcher, redirect: 'follow' })
-      if (!response.ok) { await response.body?.cancel().catch(() => {}); fail('SUBSCRIPTION_COMPONENT_DOWNLOAD', '订阅登录组件下载失败，请重试或检查网络代理。') }
-      const chunks = []; let size = 0
-      for await (const bytes of response.body) { size += bytes.length; if (size > 80_000_000) fail('SUBSCRIPTION_COMPONENT_DOWNLOAD', '订阅登录组件下载大小异常。'); chunks.push(bytes) }
-      return Buffer.concat(chunks)
+      const stat = await lstat(bundled)
+      if (!stat.isFile() || stat.size > maxArchiveBytes) fail('SUBSCRIPTION_COMPONENT_ARCHIVE', '内置的订阅组件文件无效。')
+      return await readFile(bundled, { signal })
+    } catch (error) { if (error.code !== 'ENOENT') throw error }
+    const proxy = proxyUrl || await systemProxy(), dispatcher = proxy && /^https?:/.test(proxy) ? new ProxyAgent(proxy) : new EnvHttpProxyAgent()
+    const budget = AbortSignal.any([signal, AbortSignal.timeout(180_000)])
+    try {
+      for (const url of [artifact.url, artifact.assetUrl]) {
+        const inactive = new AbortController()
+        let timer
+        const resetIdle = () => {
+          clearTimeout(timer)
+          timer = setTimeout(() => inactive.abort(), 25_000)
+        }
+        try {
+          budget.throwIfAborted()
+          resetIdle()
+          const response = await fetchRelease(url, { signal: AbortSignal.any([budget, inactive.signal]), dispatcher,
+            redirect: 'follow', headers: { accept: 'application/octet-stream' } })
+          if (!response.ok || !response.body || /json|text\/html/i.test(response.headers.get('content-type') ?? '')) {
+            await response.body?.cancel().catch(() => {})
+            continue
+          }
+          const chunks = []
+          let size = 0
+          for await (const bytes of response.body) {
+            resetIdle()
+            size += bytes.length
+            if (size > maxArchiveBytes) fail('SUBSCRIPTION_COMPONENT_DOWNLOAD', '订阅组件下载大小异常。')
+            chunks.push(bytes)
+          }
+          return Buffer.concat(chunks)
+        } catch (error) {
+          signal.throwIfAborted()
+          if (subscriptionError(error)) throw error
+          if (budget.aborted) break
+        } finally { clearTimeout(timer) }
+      }
+      fail('SUBSCRIPTION_COMPONENT_DOWNLOAD', '订阅组件下载失败，请检查网络并重试。')
     } finally { await dispatcher.close().catch(() => {}) }
   }
   const enable = (options = {}) => {
     if (closed) fail('SUBSCRIPTION_CLOSED', '订阅登录服务已关闭。')
+    if (phase === 'stopping') fail('SUBSCRIPTION_PROXY_STOPPING', '订阅连接正在停止，请稍后重试。')
     if (job || phase === 'ready') return status()
     if (child && child.exitCode === null) fail('SUBSCRIPTION_STOP_UNCONFIRMED', '订阅服务尚未确认停止，请先重试停止。')
     proxyUrl = subscriptionProxyUrl(options.proxyUrl ?? proxyUrl)
     const controller = new AbortController(), operation = { controller }; job = operation
     setPhase('installing')
     operation.done = (async () => {
-      if (!await verifyInstalled()) await installCliProxyArtifact(await downloadArtifact(controller.signal), root, artifact)
+      if (!await verifyInstalled()) {
+        const archive = await downloadArtifact(controller.signal)
+        controller.signal.throwIfAborted()
+        await installCliProxyArtifact(archive, root, artifact)
+      }
       installed = true; controller.signal.throwIfAborted(); await start(controller.signal)
     })().catch(async error => {
+      if (controller.signal.aborted) return
       const failedChild = child; endpoint = null
       try { await stopCliProxyComponent(failedChild); if (child === failedChild) child = null }
-      catch { if (!closed) setPhase('error', 'SUBSCRIPTION_STOP_UNCONFIRMED'); return }
-      if (!closed) setPhase(controller.signal.aborted ? 'disabled' : 'error', controller.signal.aborted ? null : error.code?.startsWith('SUBSCRIPTION_') ? error.code : 'SUBSCRIPTION_COMPONENT_DOWNLOAD')
+      catch { if (!closed && !controller.signal.aborted) setPhase('error', 'SUBSCRIPTION_STOP_UNCONFIRMED'); return }
+      if (closed || controller.signal.aborted) return
+      const failure = subscriptionError(error) ? error.code : phase === 'starting' ? 'SUBSCRIPTION_PROXY_START' : 'SUBSCRIPTION_COMPONENT_INSTALL'
+      setPhase('error', failure)
     }).finally(() => { if (job === operation) job = null })
+    return status()
+  }
+  const ensureReady = async options => {
+    enable(options)
+    await job?.done
+    if (phase !== 'ready') fail(errorCode ?? 'SUBSCRIPTION_PROXY_NOT_READY', '订阅连接未能就绪，请重试。')
     return status()
   }
   const stop = async ({ persist = true } = {}) => {
@@ -194,8 +259,16 @@ export function createCliProxyRuntime({ root, onState = () => {}, download, spaw
     if (!closed) setPhase('disabled')
     return status()
   }
-  return Object.freeze({ status, connection, request, fetchInference, enable, stop, verifyInstalled,
-    async initialize() { await verifyInstalled(); try { const settings = JSON.parse(await readFile(join(root, 'settings.json'), 'utf8')); proxyUrl = subscriptionProxyUrl(settings.proxyUrl); if (settings.enabled === true && installed) enable() } catch {} return status() },
+  return Object.freeze({ status, connection, request, fetchInference, enable, ensureReady, stop, verifyInstalled,
+    async initialize() {
+      await verifyInstalled()
+      try {
+        const settings = JSON.parse(await readFile(join(root, 'settings.json'), 'utf8'))
+        proxyUrl = subscriptionProxyUrl(settings.proxyUrl)
+        if (settings.enabled === true) enable()
+      } catch {}
+      return status()
+    },
     async close() { if (closed) return; closed = true; closedSignal.abort(); await stop({ persist: false }); await localAgent.close().catch(() => {}) },
   })
 }

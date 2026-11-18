@@ -1,10 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, readdir } from 'node:fs/promises'
 import { resolve, join, relative } from 'node:path'
 import { createRequire } from 'node:module'
 import { buildRouterPackage, bundleRouterClient } from '../scripts/build-router-package.mjs'
 import { assertRuntimeClosure } from '../scripts/check-package.mjs'
+import { cliProxyArtifact } from '../packages/orchestration/src/cli-proxy-release.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const parent = join(ROOT, 'tmp/integration/package-editions')
@@ -21,6 +23,14 @@ test('full edition declares all independent-runtime files required by its Bot en
     assert.ok(manifest.files.some(item => path === item || item.endsWith('/') && path.startsWith(item)), `Full edition must include ${path}`)
     assert.ok((await readFile(join(ROOT, path))).length > 0)
   }
+})
+
+test('the full edition ships the exact pinned Windows subscription component', async () => {
+  const manifest = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'))
+  const artifact = cliProxyArtifact('win32', 'x64')
+  assert.ok(manifest.files.includes('assets/cli-proxy/'))
+  const bytes = await readFile(join(ROOT, 'assets/cli-proxy', artifact.filename))
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), artifact.sha256)
 })
 
 test('router edition builds a self-contained Host and client without DS Bot or full-product dependencies', async () => {

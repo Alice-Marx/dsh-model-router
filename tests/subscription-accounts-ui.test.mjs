@@ -12,7 +12,7 @@ import { subscriptionFixture } from './helpers/subscription-proxy-fixture.mjs'
 import { attachNativeLlm } from './helpers/product-native-llm.mjs'
 const Database = createRequire(import.meta.url)('better-sqlite3')
 
-test('subscription account UI enables the real service contract, completes a login, synchronizes models, and exits without displaying credentials', async () => {
+test('one provider click prepares the subscription connection, completes a login, and syncs models without exposing credentials', async () => {
   const base = resolve('tmp/integration/subscription-account-ui'); await mkdir(base, { recursive: true }); const directory = await mkdtemp(join(base, 'case-'))
   const built = await build({ entryPoints: ['apps/integration-client/subscription-accounts.jsx'], bundle: true, platform: 'node', format: 'esm', external: ['react', 'react-dom', 'react-dom/*'], loader: { '.css': 'text' }, write: false })
   await writeFile(join(directory, 'ui.mjs'), built.outputFiles[0].contents)
@@ -32,9 +32,11 @@ test('subscription account UI enables the real service contract, completes a log
   let bindings = 0
   try {
     await settle(() => root.render(React.createElement(SubscriptionAccounts, { productApi, onOpenBindings: () => bindings++ })))
-    await waitFor(() => document.body.textContent.includes('启动登录服务'))
-    await click('启动登录服务'); await waitFor(() => document.body.textContent.includes('登录服务已就绪'))
-    await click('ChatGPT / Codex'); await waitFor(() => Boolean(document.querySelector('a[target="_blank"]')))
+    await waitFor(() => [...document.querySelectorAll('.bp-sub-providers button')].some(button => !button.disabled))
+    assert.ok(!document.body.textContent.includes('启动登录服务'))
+    await click('ChatGPT / Codex')
+    await waitFor(() => Boolean(document.querySelector('a[target="_blank"]')))
+    assert.ok(!dispatched.includes('subscriptions.enable'))
     assert.equal(new URL(document.querySelector('a[target="_blank"]').href).hostname, 'auth.openai.com')
     gateway.addAccount(); gateway.completeLogin()
     await waitFor(() => Boolean(document.querySelector('[data-subscription-account]')))
@@ -42,8 +44,9 @@ test('subscription account UI enables the real service contract, completes a log
     assert.doesNotMatch(document.documentElement.outerHTML, /fixture-private-oauth-token|fixture-subscription-.*key|managementKey|access_token/)
     await click('为 Bot 选择订阅模型'); assert.equal(bindings, 1)
     await click('退出账户'); await waitFor(() => !document.querySelector('[data-subscription-account]'))
-    await click('停止登录服务'); await waitFor(() => document.body.textContent.includes('启动登录服务'))
-    assert.ok(dispatched.includes('subscriptions.enable')); assert.ok(dispatched.includes('subscriptions.login')); assert.ok(dispatched.includes('subscriptions.loginStatus')); assert.ok(dispatched.includes('subscriptions.remove'))
+    await click('暂停订阅连接')
+    await waitFor(() => document.body.textContent.includes('订阅连接已暂停'))
+    assert.ok(dispatched.includes('subscriptions.login')); assert.ok(dispatched.includes('subscriptions.loginStatus')); assert.ok(dispatched.includes('subscriptions.remove'))
   } finally {
     await act(async () => root.unmount()); await service.close(); await release(); await gateway.close(); dom.window.close()
     for (const [key, descriptor] of Object.entries(prior)) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key] }
