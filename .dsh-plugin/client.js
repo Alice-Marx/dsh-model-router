@@ -16125,7 +16125,7 @@ function SecretHead({ bot, title, detail, name, onClose }) {
 function SecretCard({ sessionId, bot, request, roster, actions, inline = !1 }) {
   let [value, setValue] = (0, import_react18.useState)(""), [scope, setScope] = (0, import_react18.useState)("all"), [replacing, setReplacing] = (0, import_react18.useState)(!1), [busy, setBusy] = (0, import_react18.useState)(!1), [error, setError] = (0, import_react18.useState)(""), busyRef = (0, import_react18.useRef)(!1), hold = useDockHold(sessionId, "secret", request.id, actions, inline), noteId = (0, import_react18.useId)(), secret = (roster.secrets ?? []).find((entry) => entry.name === request.name), run2 = (make) => {
     if (!busyRef.current)
-      return hold(), busyRef.current = !0, setBusy(!0), setError(""), Promise.resolve().then(make).then(() => setValue(""), (failure3) => setError(failure3?.message ?? String(failure3))).finally(() => {
+      return hold(), busyRef.current = !0, setBusy(!0), setError(""), Promise.resolve().then(make).then(() => setValue(""), (failure4) => setError(failure4?.message ?? String(failure4))).finally(() => {
         busyRef.current = !1, setBusy(!1);
       });
   }, cancel = () => run2(() => actions.secretCancel(request.id)), long = value.trim().length >= MIN_VALUE, save = () => {
@@ -18422,9 +18422,9 @@ function UpdateButton({ useUpdate, actions }) {
     rect && setBox({ left: Math.max(8, Math.min(rect.left, window.innerWidth - 288)), top: rect.bottom + 6 });
   }, [open, tick]), !update?.available && !dshRow && phase === "idle" && dshPhase === "idle") return null;
   let cloudPhase = phase === "installing" || dshPhase === "installing" ? "installing" : phase !== "idle" ? phase : dshPhase, toggle = () => setOpen((value) => !value), start = () => {
-    setError(""), actions.installUpdate().catch((failure3) => setError(hostText(failure3?.message ?? String(failure3))));
+    setError(""), actions.installUpdate().catch((failure4) => setError(hostText(failure4?.message ?? String(failure4))));
   }, startDsh = () => {
-    setDshError(""), actions.installDshUpdate().catch((failure3) => setDshError(hostText(failure3?.message ?? String(failure3))));
+    setDshError(""), actions.installDshUpdate().catch((failure4) => setDshError(hostText(failure4?.message ?? String(failure4))));
   }, label = phase === "installing" ? t("Updating DS Bot…") : dshPhase === "installing" ? t("Updating DSH…") : phase === "installed" ? t("DS Bot {version} is installed. Restart DSH to use it.", { version: update.installed ?? update.latest }) : phase === "updated" ? t("DS Bot {version} is installed.", { version: update.installed ?? update.latest }) : dshPhase === "installed" ? t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified }) : update?.available ? t("DS Bot {version} is available", { version: update.latest }) : t("DSH {version} is available", { version: dsh?.verified }), message2 = error || (phase === "failed" ? update.error : ""), dshMessage = dshError || (dshPhase === "failed" ? dsh?.error : ""), dshText = dshPhase === "installed" ? t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified }) : dsh?.available === !1 && dsh?.blockedBy ? t("Update DS Bot {version} first.", { version: dsh.blockedBy }) : t("You have {version}.", { version: dsh?.current });
   return (0, import_react23.createElement)(
     import_react23.Fragment,
@@ -19884,8 +19884,8 @@ function ModelChoiceDock({ sessionId, useRoster, actions }) {
   let models = roster.models ?? [], usable = models.filter((model) => !model.needsKey), lost = bot.model ? !models.some((model) => model.ref === bot.model) : !1;
   if (bot.model && (!lost || models.length === 0)) return null;
   let keyFor = usable.length === 0 && actions.setProviderKey ? models.find((model) => model.needsKey) : void 0, manage = manageModels(actions), pick3 = (ref2) => {
-    setBusy(ref2), setError(""), Promise.resolve(actions.updateBot(bot.id, { model: ref2 })).catch((failure3) => {
-      setError(failure3?.message ?? String(failure3)), actions.refreshModels?.();
+    setBusy(ref2), setError(""), Promise.resolve(actions.updateBot(bot.id, { model: ref2 })).catch((failure4) => {
+      setError(failure4?.message ?? String(failure4)), actions.refreshModels?.();
     }).finally(() => setBusy(""));
   }, text8 = lost ? t("{model} is not available anymore. Pick another model for me.", { model: bot.model.split("/").slice(1).join("/") }) : keyFor ? t("Hi, I'm {name}. I need a {provider} API key before I can start.", { name: bot.name, provider: keyFor.providerName ?? keyFor.provider }) : usable.length === 0 ? t("Hi, I'm {name}. I don't have a model yet. How do you want to set one up?", { name: bot.name }) : t("Hi, I'm {name}. Pick a model for me first. You can change it later in my details.", { name: bot.name }), choices = usable.length === 0 ? setupChoices(actions).map(([label, run2]) => (0, import_react27.createElement)("button", { key: label, type: "button", className: "bt-model-chip", onClick: run2 }, label)) : [
     ...groupModels(usable).map(([provider, list2]) => (0, import_react27.createElement)(
@@ -19931,7 +19931,7 @@ function ModelKeyCard({ model, actions, onSaved }) {
   let [value, setValue] = (0, import_react27.useState)(""), [busy, setBusy] = (0, import_react27.useState)(!1), [error, setError] = (0, import_react27.useState)(""), label = t("{provider} API key", { provider: model.providerName ?? model.provider }), ready = value.trim() !== "" && !busy, save = () => {
     ready && (setBusy(!0), setError(""), Promise.resolve(actions.setProviderKey(model.provider, value)).then(() => {
       setValue(""), onSaved?.();
-    }, (failure3) => setError(hostText(failure3?.message ?? String(failure3)))).finally(() => setBusy(!1)));
+    }, (failure4) => setError(hostText(failure4?.message ?? String(failure4)))).finally(() => setBusy(!1)));
   }, official = model.provider === "deepseek-official";
   return (0, import_react27.createElement)(
     "div",
@@ -20128,7 +20128,7 @@ function FailureCell({ node, sessionId, useRoster, useTurnClock, actions }) {
       actions.showDetails?.(sessionId);
       return;
     }
-    model !== bot.model && (setError(""), Promise.resolve(actions.updateBot(bot.id, { model })).catch((failure3) => setError(hostText(failure3?.message ?? String(failure3)))));
+    model !== bot.model && (setError(""), Promise.resolve(actions.updateBot(bot.id, { model })).catch((failure4) => setError(hostText(failure4?.message ?? String(failure4)))));
   }, listed = accountModel(roster);
   (0, import_react28.useEffect)(() => {
     if (joining === null || !signedIn) return;
@@ -20167,8 +20167,8 @@ function FailureCell({ node, sessionId, useRoster, useTurnClock, actions }) {
     "sign-in-again": () => actions.signIn(),
     model: actions.showDetails ? () => actions.showDetails(sessionId) : void 0
   }, fixes = fixesFor(data.code, { canSignIn, official, topUp: topUp !== void 0, onAccount: provider === ACCOUNT }).filter((fix) => fix === "top-up" || runs[fix] !== void 0), retrying = !isHiddenTurn(roster, sessionId, data.turn) && typeof actions.resume == "function" && retryShown(data.code, blocked), retryFirst = retrying && (fixes.length === 0 || CREDENTIAL_CODES.has(data.code)), resume = () => {
-    setRetry("busy"), setError(""), Promise.resolve(actions.resume(bot.id)).then(() => setRetry("sent"), (failure3) => {
-      setRetry("idle"), setError(hostText(failure3?.message ?? String(failure3)));
+    setRetry("busy"), setError(""), Promise.resolve(actions.resume(bot.id)).then(() => setRetry("sent"), (failure4) => {
+      setRetry("idle"), setError(hostText(failure4?.message ?? String(failure4)));
     });
   }, button = (fix, primary) => {
     let className = primary ? "bt-send bt-fail-go" : "bt-soft bt-soft-sm";
@@ -20397,7 +20397,7 @@ function FolderMenu({ value, group = !1, team = !1, actions, run: run2, onPick, 
   }, browse = (path) => {
     setProblem(""), Promise.resolve(actions.folderList(path)).then((next) => {
       setListing(next), setView("browse");
-    }).catch((failure3) => setProblem(failure3?.message ?? String(failure3)));
+    }).catch((failure4) => setProblem(failure4?.message ?? String(failure4)));
   }, pickNative = () => {
     close(), run2(Promise.resolve(actions.folderPick()).then((path) => path ? onPick(path) : void 0));
   }, typed = () => {
@@ -20617,8 +20617,8 @@ function TaskForm({ roster, actions, start, onDone, onCancel }) {
       setError(t("Pick a date and time")), setBusy(!1);
       return;
     }
-    actions.scheduleCreate({ target, title, prompt, when: when4 }).then(onDone, (failure3) => {
-      setError(hostText(failure3?.message ?? String(failure3))), setBusy(!1);
+    actions.scheduleCreate({ target, title, prompt, when: when4 }).then(onDone, (failure4) => {
+      setError(hostText(failure4?.message ?? String(failure4))), setBusy(!1);
     });
   }, toggleDay = (day) => setWeekdays((days) => days.includes(day) ? days.filter((item) => item !== day) : [...days, day].sort());
   return (0, import_react31.createElement)(
@@ -20843,14 +20843,14 @@ function CapabilityForm({ draft: draft2, setDraft, items, actions, onClose }) {
     try {
       payload = { name: draft2.name.trim(), kind: draft2.kind, description: draft2.description }, draft2.kind === "mcp" && draft2.transport === "stdio" ? (payload.transport = "stdio", payload.command = draft2.command, payload.args = draft2.argsText.split(`
 `).filter((line) => line !== ""), payload.env = parseMap(draft2.envText, t("Environment"))) : draft2.kind === "mcp" ? (payload.transport = "streamable-http", payload.url = draft2.url, payload.headers = parseMap(draft2.headersText, t("Headers"))) : draft2.kind === "skill" ? payload.content = draft2.content : payload.items = draft2.items;
-    } catch (failure3) {
-      setError(failure3?.message ?? String(failure3));
+    } catch (failure4) {
+      setError(failure4?.message ?? String(failure4));
       return;
     }
     try {
       await actions.saveCapability(payload), onClose();
-    } catch (failure3) {
-      setError(failure3?.message ?? String(failure3));
+    } catch (failure4) {
+      setError(failure4?.message ?? String(failure4));
     }
   }, available = items.filter((item) => item.name !== draft2.name && ["mcp", "skill"].includes(item.kind));
   return (0, import_react32.createElement)(
@@ -21029,8 +21029,8 @@ async function importPhotos(photos, actions) {
     try {
       let result = await actions.importAvatars(chunk);
       imported.push(...result?.imported ?? []), duplicates.push(...result?.duplicates ?? []), failed.push(...result?.failed ?? []);
-    } catch (failure3) {
-      failed.push(...chunk.map((photo) => ({ name: photo.name, message: failure3?.message ?? String(failure3) })));
+    } catch (failure4) {
+      failed.push(...chunk.map((photo) => ({ name: photo.name, message: failure4?.message ?? String(failure4) })));
     }
   }
   return { imported, duplicates, failed };
@@ -21044,8 +21044,8 @@ function AvatarLibraryPanel({ actions, onPick }) {
     try {
       let page = await loadLibrary(actions, { offset: from });
       setItems((previous) => append ? [...previous ?? [], ...page.items] : page.items), setTotal(page.total), setOffset(page.next);
-    } catch (failure3) {
-      setError(failure3?.message ?? String(failure3));
+    } catch (failure4) {
+      setError(failure4?.message ?? String(failure4));
     }
   }, [actions]);
   (0, import_react33.useEffect)(() => {
@@ -21058,8 +21058,8 @@ function AvatarLibraryPanel({ actions, onPick }) {
     for (let file of files)
       try {
         photos.push({ name: file.name, image: await avatarImage(file) });
-      } catch (failure3) {
-        failed.push({ name: file.name, message: failure3?.message ?? String(failure3) });
+      } catch (failure4) {
+        failed.push({ name: file.name, message: failure4?.message ?? String(failure4) });
       }
     let result = await importPhotos(photos, actions);
     setReport({ imported: result.imported, duplicates: result.duplicates, failed: [...failed, ...result.failed] }), await load(), setBusy(!1);
@@ -21067,8 +21067,8 @@ function AvatarLibraryPanel({ actions, onPick }) {
     setBusy(!0), setError("");
     try {
       await actions.deleteAvatar(entry.id), await load();
-    } catch (failure3) {
-      setError(failure3?.message ?? String(failure3));
+    } catch (failure4) {
+      setError(failure4?.message ?? String(failure4));
     } finally {
       setBusy(!1);
     }
@@ -21408,8 +21408,8 @@ function useMemoryView(id3, actions) {
       show2(next), next.summarizing && (timer.current = setTimeout(() => {
         load({ summarize: flags.summarize || flags.regenerate });
       }, POLL_MS2));
-    } catch (failure3) {
-      alive.current && ticket === latest.current && setError(failure3?.message ?? String(failure3));
+    } catch (failure4) {
+      alive.current && ticket === latest.current && setError(failure4?.message ?? String(failure4));
     }
   }, [id3]);
   return (0, import_react34.useEffect)(() => (alive.current = !0, load({ summarize: !0 }), () => {
@@ -21447,14 +21447,14 @@ function MemoryDialog({ owner, actions, leaving = !1 }) {
   }, remove = async (entry) => {
     try {
       return show2(await actions.memoryForget(owner.id, entry)), !0;
-    } catch (failure3) {
-      return setAnswer({ asked: entry.text, error: failure3?.message ?? String(failure3) }), !1;
+    } catch (failure4) {
+      return setAnswer({ asked: entry.text, error: failure4?.message ?? String(failure4) }), !1;
     }
   }, undo = async (row) => {
     try {
       return show2(await actions.memoryRestore(owner.id, row.id)), !0;
-    } catch (failure3) {
-      return setAnswer({ asked: row.text, error: failure3?.message ?? String(failure3) }), !1;
+    } catch (failure4) {
+      return setAnswer({ asked: row.text, error: failure4?.message ?? String(failure4) }), !1;
     }
   }, ask = async (event) => {
     event.preventDefault();
@@ -21464,8 +21464,8 @@ function MemoryDialog({ owner, actions, leaving = !1 }) {
       try {
         let result = await actions.memoryAsk(owner.id, asked);
         setAnswer({ asked, reply: result.reply, changes: result.changes }), show2(result.view), result.changes.some((change) => change.ok) && load({ summarize: page === "summary" });
-      } catch (failure3) {
-        setAnswer({ asked, error: failure3?.message ?? String(failure3) });
+      } catch (failure4) {
+        setAnswer({ asked, error: failure4?.message ?? String(failure4) });
       }
       inputRef.current?.focus();
     }
@@ -21932,12 +21932,12 @@ function CreateBot({ roster, actions, start, brief = "", onBack, canGoBack, onCr
       try {
         let bot = await actions.createBot(createPayload({ name: finalName, look, image, model, effort, brief }));
         onCreated(bot);
-      } catch (failure3) {
-        setError(failure3?.message ?? String(failure3)), setBusy(!1);
+      } catch (failure4) {
+        setError(failure4?.message ?? String(failure4)), setBusy(!1);
       }
     }
   }, upload = (file) => {
-    file && (setError(""), avatarImage(file).then(setImage, (failure3) => setError(failure3?.message ?? String(failure3))));
+    file && (setError(""), avatarImage(file).then(setImage, (failure4) => setError(failure4?.message ?? String(failure4))));
   }, previewLook = image ? { ...look, image } : look, card = (0, import_react36.createElement)(
     "div",
     { className: "bt-create-card" },
@@ -22062,8 +22062,8 @@ function NewChat({ mode, roster, actions }) {
       setError(""), setBusy(!0);
       try {
         await task();
-      } catch (failure3) {
-        setError(failure3?.message ?? String(failure3));
+      } catch (failure4) {
+        setError(failure4?.message ?? String(failure4));
       } finally {
         setBusy(!1);
       }
@@ -23354,9 +23354,9 @@ function UsagePage({ roster, actions, focusId }) {
         let value = await actions.usage();
         if (stopped) return;
         (0, import_react43.startTransition)(() => setView(value)), setError(""), timer = setTimeout(load, value.scanning ? 3e3 : 2e4);
-      } catch (failure3) {
+      } catch (failure4) {
         if (stopped) return;
-        setError(failure3?.message ?? String(failure3)), timer = setTimeout(load, 1e4);
+        setError(failure4?.message ?? String(failure4)), timer = setTimeout(load, 1e4);
       }
     };
     return load(), () => {
@@ -23688,7 +23688,7 @@ function statusText2(connector) {
 function ConnectorRow({ connector, actions }) {
   let [form, setForm] = (0, import_react44.useState)(!1), [token, setToken] = (0, import_react44.useState)(""), [busy, setBusy] = (0, import_react44.useState)(!1), [error, setError] = (0, import_react44.useState)(null), run2 = (task, after) => (setBusy(!0), setError(null), task.then(() => {
     after?.();
-  }, (failure3) => setError(failure3?.message ?? String(failure3))).finally(() => setBusy(!1))), connect = () => {
+  }, (failure4) => setError(failure4?.message ?? String(failure4))).finally(() => setBusy(!1))), connect = () => {
     busy || token.trim() === "" || run2(actions.connectorConnect(connector.id, token), () => {
       setToken(""), setForm(!1);
     });
@@ -24490,7 +24490,7 @@ function GroupsPage({ roster, actions, run: run2 }) {
 function SettingsDialog({ page, id: id3, roster, actions, useUpdate, leaving = !1 }) {
   let [error, setError] = (0, import_react49.useState)(""), close = (0, import_react49.useCallback)(() => actions.closeSettings(), []);
   useEscape(close);
-  let run2 = (promise) => Promise.resolve(promise).then(() => (setError(""), !0)).catch((failure3) => (setError(failure3?.message ?? String(failure3)), !1)), bot = page === "bots" && id3 ? roster.byId[id3] : void 0, room2 = page === "groups" && id3 ? roster.roomsById[id3] : void 0, pages = SETTINGS_PAGES.filter(([key]) => key !== "models" || actions.providers !== void 0), shown = pages.some(([key]) => key === page) ? page : "general", usageFocus = shown === "usage" && id3 ? id3 : null, label = t(pages.find(([key]) => key === shown)[1]), back = bot ? t("Back to Bots") : room2 ? t("Back to group chats") : usageFocus ? t("All usage") : null, nav = useGlide(shown, { axis: "y" }), pageKey = `${shown}:${bot?.id ?? room2?.id ?? ""}`, depth = bot || room2 ? 1 : 0, last = (0, import_react49.useRef)({ key: pageKey, depth, move: "up" });
+  let run2 = (promise) => Promise.resolve(promise).then(() => (setError(""), !0)).catch((failure4) => (setError(failure4?.message ?? String(failure4)), !1)), bot = page === "bots" && id3 ? roster.byId[id3] : void 0, room2 = page === "groups" && id3 ? roster.roomsById[id3] : void 0, pages = SETTINGS_PAGES.filter(([key]) => key !== "models" || actions.providers !== void 0), shown = pages.some(([key]) => key === page) ? page : "general", usageFocus = shown === "usage" && id3 ? id3 : null, label = t(pages.find(([key]) => key === shown)[1]), back = bot ? t("Back to Bots") : room2 ? t("Back to group chats") : usageFocus ? t("All usage") : null, nav = useGlide(shown, { axis: "y" }), pageKey = `${shown}:${bot?.id ?? room2?.id ?? ""}`, depth = bot || room2 ? 1 : 0, last = (0, import_react49.useRef)({ key: pageKey, depth, move: "up" });
   last.current.key !== pageKey && (last.current = { key: pageKey, depth, move: depth > last.current.depth ? "in" : depth < last.current.depth ? "out" : "up" });
   let [usageOpened, setUsageOpened] = (0, import_react49.useState)(shown === "usage");
   shown === "usage" && !usageOpened && setUsageOpened(!0);
@@ -24708,8 +24708,8 @@ function DesktopPane({ bot }) {
           return;
         }
         setFrame(next), setStatus("ready");
-      } catch (failure3) {
-        setStatus("error"), setError(String(failure3?.message ?? failure3));
+      } catch (failure4) {
+        setStatus("error"), setError(String(failure4?.message ?? failure4));
       }
     }
   }, [api, bot.id, machineId, pane]);
@@ -24732,8 +24732,8 @@ function DesktopPane({ bot }) {
       try {
         let result = await api.act(bot.id, machineId, frame.screenshotId, action);
         result?.status && result.status !== "succeeded" && setError(`操作未成功：${result.status}`), live || await capture();
-      } catch (failure3) {
-        setError(String(failure3?.message ?? failure3));
+      } catch (failure4) {
+        setError(String(failure4?.message ?? failure4));
       }
     }
   }, clickOn = (event, element) => {
@@ -25257,7 +25257,7 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, roster, a
   last.current.view !== view ? last.current = { view, tab, move: view === "settings" ? "in" : "out" } : last.current.tab !== tab && (last.current = { view, tab, move: "tab" });
   let move = last.current.move, side = move === "tab" ? void 0 : move, close = () => actions.closeOverlay();
   useEscape(close);
-  let bot = owner, running = useSessionStatus((map) => map.get(part)?.running === !0), doing = useActivity((map) => map[bot?.id ?? sessionId]), transcript = useSessions((list2) => transcriptOf(list2, part, bot?.name ?? room2?.name ?? t("Bot"), roster.exchangeTurns[part])), usage = useSessions((list2) => usageOf(list2, [part, ...thread === void 0 ? bot?.parts ?? room2?.parts ?? [] : []])), run2 = (promise) => Promise.resolve(promise).then(() => (setError(""), !0)).catch((failure3) => (setError(failure3?.message ?? String(failure3)), !1)), share = () => {
+  let bot = owner, running = useSessionStatus((map) => map.get(part)?.running === !0), doing = useActivity((map) => map[bot?.id ?? sessionId]), transcript = useSessions((list2) => transcriptOf(list2, part, bot?.name ?? room2?.name ?? t("Bot"), roster.exchangeTurns[part])), usage = useSessions((list2) => usageOf(list2, [part, ...thread === void 0 ? bot?.parts ?? room2?.parts ?? [] : []])), run2 = (promise) => Promise.resolve(promise).then(() => (setError(""), !0)).catch((failure4) => (setError(failure4?.message ?? String(failure4)), !1)), share = () => {
     navigator.clipboard?.writeText(transcript).then(() => {
       setCopied(!0), setTimeout(() => setCopied(!1), 1600);
     });
@@ -26974,8 +26974,8 @@ function lineDiff(before, after) {
 var failedAnswers = /* @__PURE__ */ new Map();
 function ProposalCard({ proposal, initialError = "", onFailure, onResolved, actions }) {
   let [busy, setBusy] = (0, import_react56.useState)(!1), [error, setError] = (0, import_react56.useState)(initialError), busyRef = (0, import_react56.useRef)(!1), titleId = (0, import_react56.useId)(), answer = (approve) => {
-    busyRef.current || (busyRef.current = !0, setBusy(!0), setError(""), Promise.resolve().then(() => actions.learningAnswer(proposal.id, approve)).then(() => onResolved(proposal.id), (failure3) => {
-      let message2 = failure3?.message ?? String(failure3);
+    busyRef.current || (busyRef.current = !0, setBusy(!0), setError(""), Promise.resolve().then(() => actions.learningAnswer(proposal.id, approve)).then(() => onResolved(proposal.id), (failure4) => {
+      let message2 = failure4?.message ?? String(failure4);
       setError(message2), onFailure(proposal, message2);
     }).finally(() => {
       busyRef.current = !1, setBusy(!1);
@@ -40631,7 +40631,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.79.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.80.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -40989,7 +40989,7 @@ function TerminalPane({ api, session, active: active2, onEnded, onStatus }) {
 `), onEnded(session.sessionId, event);
       },
       onStatus: (status) => onStatus(session.sessionId, status),
-      onError: (failure3) => setError(errorText(failure3, "终端通信失败。"))
+      onError: (failure4) => setError(errorText(failure4, "终端通信失败。"))
     });
     term.attachCustomKeyEventHandler((event) => {
       if (event.type !== "keydown") return !0;
@@ -43395,7 +43395,7 @@ function RemoteNotice({ row }) {
   return remote ? stopKnown(row) ? remote.notStarted === !0 && remote.possiblyApplied !== !0 ? /* @__PURE__ */ import_react65.default.createElement("small", null, "原操作未启动。") : remote.status === "succeeded" ? /* @__PURE__ */ import_react65.default.createElement("small", null, "写入已确认。", row.state === "cancelled" ? "取消未撤销文件变更。" : "") : remote.possiblyApplied === !0 ? /* @__PURE__ */ import_react65.default.createElement("small", null, "操作已停止，文件可能已改变；重试不会撤销已有变更，请先核对产物。") : null : /* @__PURE__ */ import_react65.default.createElement("small", { role: "status" }, "写入或停止尚未确认，请核对原操作；不会自动重发，也暂不能重试。") : null;
 }
 function TaskDetail({ task, inspect, busy, actions, dispatch, onClose, bot, openSession, focusAttemptId }) {
-  let [history, setHistory] = (0, import_react65.useState)(null), [failure3, setFailure] = (0, import_react65.useState)(""), [loading, setLoading] = (0, import_react65.useState)(!1), [reload, setReload] = (0, import_react65.useState)(0), ref2 = (0, import_react65.useRef)(null), key = taskKey(task);
+  let [history, setHistory] = (0, import_react65.useState)(null), [failure4, setFailure] = (0, import_react65.useState)(""), [loading, setLoading] = (0, import_react65.useState)(!1), [reload, setReload] = (0, import_react65.useState)(0), ref2 = (0, import_react65.useRef)(null), key = taskKey(task);
   (0, import_react65.useEffect)(() => {
     ref2.current?.focus({ preventScroll: !0 }), ref2.current?.scrollIntoView?.({ block: "nearest" });
   }, [key]), (0, import_react65.useEffect)(() => {
@@ -43416,7 +43416,7 @@ function TaskDetail({ task, inspect, busy, actions, dispatch, onClose, bot, open
   let data = history?.task ?? task, requestedAttempt = focusAttemptId && history?.attempts.find((item) => item.attemptId === focusAttemptId), missingAttempt = !!(history && focusAttemptId && !requestedAttempt), historical = !!(focusAttemptId && focusAttemptId !== data.attemptId), readOnlyDetail = !!(task.unloaded && !history || focusAttemptId && (!history || historical || missingAttempt));
   return (0, import_react65.useEffect)(() => {
     requestedAttempt && ref2.current?.querySelector("[data-focused-attempt]")?.scrollIntoView?.({ block: "nearest" });
-  }, [history, focusAttemptId]), /* @__PURE__ */ import_react65.default.createElement("article", { className: "bp-card bp-task-detail", "aria-label": "任务详情", ref: ref2, tabIndex: -1 }, /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react65.default.createElement("div", null, /* @__PURE__ */ import_react65.default.createElement("h2", null, "任务详情"), /* @__PURE__ */ import_react65.default.createElement("p", null, taskTitle(data))), /* @__PURE__ */ import_react65.default.createElement("button", { type: "button", onClick: onClose }, "关闭")), /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react65.default.createElement(Tag2, null, TASK_STATES[data.state] ?? data.state), /* @__PURE__ */ import_react65.default.createElement("span", null, bot?.name ?? task.botId ?? "未取得归属"), bot?.sessionId && openSession && /* @__PURE__ */ import_react65.default.createElement("button", { type: "button", onClick: () => openSession(bot.sessionId) }, "打开 Bot 私聊"), !readOnlyDetail && /* @__PURE__ */ import_react65.default.createElement(TaskActions, { row: data, actions, dispatch, busy })), task.unloaded && /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-muted" }, "原任务未包含在当前列表，详情通过原 Bot 与 Task 编号单独读取。"), missingAttempt && /* @__PURE__ */ import_react65.default.createElement("p", { role: "alert", className: "bp-blocked" }, "未找到所选的原执行尝试。请在原 Bot 会话核对执行记录。"), requestedAttempt && /* @__PURE__ */ import_react65.default.createElement("section", { className: "bp-blocked", "aria-label": "所选原执行尝试" }, /* @__PURE__ */ import_react65.default.createElement("strong", null, "第 ", requestedAttempt.number, " 次尝试 · ", TASK_STATES[requestedAttempt.state] ?? requestedAttempt.state), historical && /* @__PURE__ */ import_react65.default.createElement("p", null, "此处定位历史尝试，当前任务已进入后续尝试。原记录只读。"), /* @__PURE__ */ import_react65.default.createElement("p", null, "开始 ", date(requestedAttempt.startedAt), " · 结束 ", date(requestedAttempt.finishedAt)), /* @__PURE__ */ import_react65.default.createElement("small", { className: "bp-code" }, requestedAttempt.attemptId, " · ", requestedAttempt.operationId)), /* @__PURE__ */ import_react65.default.createElement(RemoteNotice, { row: data }), /* @__PURE__ */ import_react65.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react65.default.createElement(Value, { label: "创建" }, date(data.createdAt)), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "最近更新" }, date(data.updatedAt)), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "期限" }, date(data.deadlineAt)), data.attribution?.label && /* @__PURE__ */ import_react65.default.createElement(Value, { label: "执行进度" }, data.attribution.label)), /* @__PURE__ */ import_react65.default.createElement("h3", null, "任务时间线"), loading && /* @__PURE__ */ import_react65.default.createElement("p", { role: "status", className: "bp-muted" }, "正在读取原任务日志…"), failure3 && /* @__PURE__ */ import_react65.default.createElement("p", { role: "alert", className: "bp-error" }, failure3), inspect && actions.includes("task.inspect") && /* @__PURE__ */ import_react65.default.createElement("button", { type: "button", disabled: loading, onClick: () => setReload((value) => value + 1) }, "重新读取时间线"), !actions.includes("task.inspect") && /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-muted" }, "此宿主尚未提供任务时间线，可在下方查看现有收据依据。"), history && /* @__PURE__ */ import_react65.default.createElement(import_react65.default.Fragment, null, /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-muted" }, history.attempts.length, " 次执行尝试 · ", history.timeline.total, " 条日志", history.timeline.truncated ? `，显示最近 ${history.timeline.items.length} 条` : "", "。停止请求需等待原操作确认。"), /* @__PURE__ */ import_react65.default.createElement("ol", { className: "bp-task-timeline" }, history.timeline.items.map((event) => /* @__PURE__ */ import_react65.default.createElement("li", { key: event.seq, "data-focused-attempt": focusAttemptId && event.attemptId === focusAttemptId ? "" : void 0 }, /* @__PURE__ */ import_react65.default.createElement("span", { className: "bp-timeline-dot", "aria-hidden": "true" }), /* @__PURE__ */ import_react65.default.createElement("div", null, /* @__PURE__ */ import_react65.default.createElement("strong", null, TASK_EVENTS[event.kind] ?? "任务状态更新"), /* @__PURE__ */ import_react65.default.createElement("small", null, /* @__PURE__ */ import_react65.default.createElement("time", null, date(event.at)), event.attemptNumber != null ? ` · 第 ${event.attemptNumber} 次尝试` : "", event.outcome ? ` · ${TASK_STATES[event.outcome] ?? (event.outcome === "unknown" ? "结果未知" : event.outcome)}` : ""), event.code && /* @__PURE__ */ import_react65.default.createElement("small", { className: "bp-code" }, event.code))))), history.timeline.items.length === 0 && /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-muted" }, "原日志中暂无事件。"), /* @__PURE__ */ import_react65.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react65.default.createElement("summary", null, "每次尝试的身份与时间"), /* @__PURE__ */ import_react65.default.createElement("ul", { className: "bp-checklist" }, history.attempts.map((attempt) => /* @__PURE__ */ import_react65.default.createElement("li", { key: attempt.attemptId }, /* @__PURE__ */ import_react65.default.createElement("strong", null, "第 ", attempt.number, " 次 · ", TASK_STATES[attempt.state] ?? attempt.state), /* @__PURE__ */ import_react65.default.createElement("small", null, "开始 ", date(attempt.startedAt), " · 结束 ", date(attempt.finishedAt)), /* @__PURE__ */ import_react65.default.createElement("small", { className: "bp-code" }, attempt.attemptId, " · ", attempt.operationId)))))), /* @__PURE__ */ import_react65.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react65.default.createElement("summary", null, "原任务与操作编号"), /* @__PURE__ */ import_react65.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react65.default.createElement(Value, { label: "Task" }, taskIdOf(data)), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "Package" }, data.packageId), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "Attempt" }, data.attemptId), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "Operation" }, data.operationId), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "MR 运行" }, data.legacyRunIds?.join("、")))), /* @__PURE__ */ import_react65.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react65.default.createElement("summary", null, "执行与收据依据"), /* @__PURE__ */ import_react65.default.createElement("pre", null, JSON.stringify({ attempts: history?.attempts ?? task.attempts, executionRef: task.executionRef, remoteReceipt: data.result?.remote, reconciliation: data.reconciliation, packages: task.packages }, null, 2))));
+  }, [history, focusAttemptId]), /* @__PURE__ */ import_react65.default.createElement("article", { className: "bp-card bp-task-detail", "aria-label": "任务详情", ref: ref2, tabIndex: -1 }, /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react65.default.createElement("div", null, /* @__PURE__ */ import_react65.default.createElement("h2", null, "任务详情"), /* @__PURE__ */ import_react65.default.createElement("p", null, taskTitle(data))), /* @__PURE__ */ import_react65.default.createElement("button", { type: "button", onClick: onClose }, "关闭")), /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react65.default.createElement(Tag2, null, TASK_STATES[data.state] ?? data.state), /* @__PURE__ */ import_react65.default.createElement("span", null, bot?.name ?? task.botId ?? "未取得归属"), bot?.sessionId && openSession && /* @__PURE__ */ import_react65.default.createElement("button", { type: "button", onClick: () => openSession(bot.sessionId) }, "打开 Bot 私聊"), !readOnlyDetail && /* @__PURE__ */ import_react65.default.createElement(TaskActions, { row: data, actions, dispatch, busy })), task.unloaded && /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-muted" }, "原任务未包含在当前列表，详情通过原 Bot 与 Task 编号单独读取。"), missingAttempt && /* @__PURE__ */ import_react65.default.createElement("p", { role: "alert", className: "bp-blocked" }, "未找到所选的原执行尝试。请在原 Bot 会话核对执行记录。"), requestedAttempt && /* @__PURE__ */ import_react65.default.createElement("section", { className: "bp-blocked", "aria-label": "所选原执行尝试" }, /* @__PURE__ */ import_react65.default.createElement("strong", null, "第 ", requestedAttempt.number, " 次尝试 · ", TASK_STATES[requestedAttempt.state] ?? requestedAttempt.state), historical && /* @__PURE__ */ import_react65.default.createElement("p", null, "此处定位历史尝试，当前任务已进入后续尝试。原记录只读。"), /* @__PURE__ */ import_react65.default.createElement("p", null, "开始 ", date(requestedAttempt.startedAt), " · 结束 ", date(requestedAttempt.finishedAt)), /* @__PURE__ */ import_react65.default.createElement("small", { className: "bp-code" }, requestedAttempt.attemptId, " · ", requestedAttempt.operationId)), /* @__PURE__ */ import_react65.default.createElement(RemoteNotice, { row: data }), /* @__PURE__ */ import_react65.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react65.default.createElement(Value, { label: "创建" }, date(data.createdAt)), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "最近更新" }, date(data.updatedAt)), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "期限" }, date(data.deadlineAt)), data.attribution?.label && /* @__PURE__ */ import_react65.default.createElement(Value, { label: "执行进度" }, data.attribution.label)), /* @__PURE__ */ import_react65.default.createElement("h3", null, "任务时间线"), loading && /* @__PURE__ */ import_react65.default.createElement("p", { role: "status", className: "bp-muted" }, "正在读取原任务日志…"), failure4 && /* @__PURE__ */ import_react65.default.createElement("p", { role: "alert", className: "bp-error" }, failure4), inspect && actions.includes("task.inspect") && /* @__PURE__ */ import_react65.default.createElement("button", { type: "button", disabled: loading, onClick: () => setReload((value) => value + 1) }, "重新读取时间线"), !actions.includes("task.inspect") && /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-muted" }, "此宿主尚未提供任务时间线，可在下方查看现有收据依据。"), history && /* @__PURE__ */ import_react65.default.createElement(import_react65.default.Fragment, null, /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-muted" }, history.attempts.length, " 次执行尝试 · ", history.timeline.total, " 条日志", history.timeline.truncated ? `，显示最近 ${history.timeline.items.length} 条` : "", "。停止请求需等待原操作确认。"), /* @__PURE__ */ import_react65.default.createElement("ol", { className: "bp-task-timeline" }, history.timeline.items.map((event) => /* @__PURE__ */ import_react65.default.createElement("li", { key: event.seq, "data-focused-attempt": focusAttemptId && event.attemptId === focusAttemptId ? "" : void 0 }, /* @__PURE__ */ import_react65.default.createElement("span", { className: "bp-timeline-dot", "aria-hidden": "true" }), /* @__PURE__ */ import_react65.default.createElement("div", null, /* @__PURE__ */ import_react65.default.createElement("strong", null, TASK_EVENTS[event.kind] ?? "任务状态更新"), /* @__PURE__ */ import_react65.default.createElement("small", null, /* @__PURE__ */ import_react65.default.createElement("time", null, date(event.at)), event.attemptNumber != null ? ` · 第 ${event.attemptNumber} 次尝试` : "", event.outcome ? ` · ${TASK_STATES[event.outcome] ?? (event.outcome === "unknown" ? "结果未知" : event.outcome)}` : ""), event.code && /* @__PURE__ */ import_react65.default.createElement("small", { className: "bp-code" }, event.code))))), history.timeline.items.length === 0 && /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-muted" }, "原日志中暂无事件。"), /* @__PURE__ */ import_react65.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react65.default.createElement("summary", null, "每次尝试的身份与时间"), /* @__PURE__ */ import_react65.default.createElement("ul", { className: "bp-checklist" }, history.attempts.map((attempt) => /* @__PURE__ */ import_react65.default.createElement("li", { key: attempt.attemptId }, /* @__PURE__ */ import_react65.default.createElement("strong", null, "第 ", attempt.number, " 次 · ", TASK_STATES[attempt.state] ?? attempt.state), /* @__PURE__ */ import_react65.default.createElement("small", null, "开始 ", date(attempt.startedAt), " · 结束 ", date(attempt.finishedAt)), /* @__PURE__ */ import_react65.default.createElement("small", { className: "bp-code" }, attempt.attemptId, " · ", attempt.operationId)))))), /* @__PURE__ */ import_react65.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react65.default.createElement("summary", null, "原任务与操作编号"), /* @__PURE__ */ import_react65.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react65.default.createElement(Value, { label: "Task" }, taskIdOf(data)), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "Package" }, data.packageId), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "Attempt" }, data.attemptId), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "Operation" }, data.operationId), /* @__PURE__ */ import_react65.default.createElement(Value, { label: "MR 运行" }, data.legacyRunIds?.join("、")))), /* @__PURE__ */ import_react65.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react65.default.createElement("summary", null, "执行与收据依据"), /* @__PURE__ */ import_react65.default.createElement("pre", null, JSON.stringify({ attempts: history?.attempts ?? task.attempts, executionRef: task.executionRef, remoteReceipt: data.result?.remote, reconciliation: data.reconciliation, packages: task.packages }, null, 2))));
 }
 function TaskWorkspace({ snapshot, dispatch, busy, scope, inspect, openSession, routingCard, focus }) {
   let progress = (0, import_react65.useMemo)(() => taskProgress(snapshot), [snapshot]), [botId, setBotId] = (0, import_react65.useState)(""), [status, setStatus] = (0, import_react65.useState)("all"), [query, setQuery] = (0, import_react65.useState)(""), [expanded, setExpanded] = (0, import_react65.useState)(!1), [selection, setSelection] = (0, import_react65.useState)(null), [view, setView] = (0, import_react65.useState)("list"), [focusMissing, setFocusMissing] = (0, import_react65.useState)(!1);
@@ -44240,8 +44240,8 @@ function CliChatConnections({ productApi, onOpenTools, onOpenBindings, initialSe
         let selected = result.drivers.find((item) => item.id === initialSetup.driver && item.implemented && item.available !== !1);
         selected && !result.profiles.some((item) => item.driver === selected.id) && setDraft({ ...freshDraft(selected), entry: entryView(initialSetup.entry) });
       }
-    } catch (failure3) {
-      current.live && epoch === current.loadEpoch && setError(errorText2(failure3));
+    } catch (failure4) {
+      current.live && epoch === current.loadEpoch && setError(errorText2(failure4));
     }
   };
   (0, import_react68.useEffect)(() => {
@@ -44261,8 +44261,8 @@ function CliChatConnections({ productApi, onOpenTools, onOpenBindings, initialSe
     current.busy = !0, setBusy(kind), setError(""), setNotice("");
     try {
       await operation();
-    } catch (failure3) {
-      current.live && (kind !== "inspect" || version === draftVersion.current) && setError(errorText2(failure3));
+    } catch (failure4) {
+      current.live && (kind !== "inspect" || version === draftVersion.current) && setError(errorText2(failure4));
     } finally {
       current.busy = !1, current.live && setBusy("");
     }
@@ -44669,8 +44669,8 @@ function LibraryPanel({ snapshot, dispatch, busy, focus }) {
       try {
         let rows2 = await call2("library.list", { botId, relativePath: path });
         generation === sequence.current && (setEntries(Array.isArray(rows2) ? rows2 : []), setError(""));
-      } catch (failure3) {
-        generation === sequence.current && setError(String(failure3?.message ?? failure3));
+      } catch (failure4) {
+        generation === sequence.current && setError(String(failure4?.message ?? failure4));
       }
   }, [botId, path, call2]);
   (0, import_react71.useEffect)(() => (setEditor(null), setDeleteName(null), setEntries([]), setSearchResults(null), load(), () => {
@@ -44689,8 +44689,8 @@ function LibraryPanel({ snapshot, dispatch, busy, focus }) {
     setWorking(!0), setError(""), setStatus("");
     try {
       await work();
-    } catch (failure3) {
-      setError(String(failure3?.message ?? failure3));
+    } catch (failure4) {
+      setError(String(failure4?.message ?? failure4));
     } finally {
       setWorking(!1);
     }
@@ -44857,8 +44857,8 @@ function PairingQrReader({ onRead, disabled = !1 }) {
           return;
         }
         camera.current = stream, video.current.srcObject = stream, await video.current.play(), generation.current === active2 && tick();
-      } catch (failure3) {
-        fail6(failure3.name === "NotAllowedError" ? "摄像头未获允许，可以改用二维码图片或邀请码。" : String(failure3.message ?? failure3));
+      } catch (failure4) {
+        fail6(failure4.name === "NotAllowedError" ? "摄像头未获允许，可以改用二维码图片或邀请码。" : String(failure4.message ?? failure4));
       }
     };
     return dialog.current?.querySelector("button")?.focus(), start(), () => {
@@ -44885,8 +44885,8 @@ function PairingQrReader({ onRead, disabled = !1 }) {
       } finally {
         bitmap.close();
       }
-    } catch (failure3) {
-      mounted.current && active2 === generation.current && setError(failure3.code ? "这不是受支持的设备配对二维码。" : String(failure3.message ?? failure3));
+    } catch (failure4) {
+      mounted.current && active2 === generation.current && setError(failure4.code ? "这不是受支持的设备配对二维码。" : String(failure4.message ?? failure4));
     } finally {
       mounted.current && active2 === generation.current && setReading(!1);
     }
@@ -44921,7 +44921,7 @@ var errors = {
   PAIRING_DEVICE_LIMIT: "目标电脑的已配对设备已达上限，请先在目标电脑撤销不再使用的设备。"
 };
 function SecurePairingSetup({ snapshot, dispatch, busy }) {
-  let [text8, setText] = (0, import_react74.useState)(""), [code, setCode] = (0, import_react74.useState)(""), [working, setWorking] = (0, import_react74.useState)(!1), [failure3, setFailure] = (0, import_react74.useState)(null), [status, setStatus] = (0, import_react74.useState)(""), [clock4, setClock] = (0, import_react74.useState)(Date.now()), request = (0, import_react74.useRef)(null), mounted = (0, import_react74.useRef)(!0), sequence = (0, import_react74.useRef)(0), active2 = (0, import_react74.useRef)(!1), fileInput = (0, import_react74.useRef)(null), importSequence = (0, import_react74.useRef)(0);
+  let [text8, setText] = (0, import_react74.useState)(""), [code, setCode] = (0, import_react74.useState)(""), [working, setWorking] = (0, import_react74.useState)(!1), [failure4, setFailure] = (0, import_react74.useState)(null), [status, setStatus] = (0, import_react74.useState)(""), [clock4, setClock] = (0, import_react74.useState)(Date.now()), request = (0, import_react74.useRef)(null), mounted = (0, import_react74.useRef)(!0), sequence = (0, import_react74.useRef)(0), active2 = (0, import_react74.useRef)(!1), fileInput = (0, import_react74.useRef)(null), importSequence = (0, import_react74.useRef)(0);
   (0, import_react74.useEffect)(() => (mounted.current = !0, () => {
     mounted.current = !1, sequence.current++, importSequence.current++;
   }), []), (0, import_react74.useEffect)(() => {
@@ -44935,7 +44935,7 @@ function SecurePairingSetup({ snapshot, dispatch, busy }) {
     } catch (error) {
       return { error: error.code };
     }
-  }, [text8]), invite = parsed.invite, seconds = invite ? Math.max(0, Math.ceil((invite.expiresAt - clock4) / 1e3)) : 0, probeBotId = snapshot.mainBotId ?? snapshot.bots?.[0]?.id, allowed2 = invite?.ceiling.hostManagedBots || invite?.ceiling.botIds.includes(probeBotId), recoverable = request.current !== null && !!failure3, ready = invite && /^\d{6}$/.test(code) && probeBotId && allowed2 && (seconds > 0 || recoverable), change = (value) => {
+  }, [text8]), invite = parsed.invite, seconds = invite ? Math.max(0, Math.ceil((invite.expiresAt - clock4) / 1e3)) : 0, probeBotId = snapshot.mainBotId ?? snapshot.bots?.[0]?.id, allowed2 = invite?.ceiling.hostManagedBots || invite?.ceiling.botIds.includes(probeBotId), recoverable = request.current !== null && !!failure4, ready = invite && /^\d{6}$/.test(code) && probeBotId && allowed2 && (seconds > 0 || recoverable), change = (value) => {
     importSequence.current++, setText(value), request.current = null, setCode(""), setFailure(null), setStatus("");
   }, submit = async () => {
     if (!ready || active2.current || busy) return;
@@ -44979,7 +44979,7 @@ function SecurePairingSetup({ snapshot, dispatch, busy }) {
     importSequence.current++, setCode(event.target.value.replace(/\D/g, "")), request.current = null, setFailure(null);
   }, placeholder: "000000" })), invite && /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", className: "bp-button-primary", disabled: !ready || busy || working, onClick: () => {
     submit();
-  } }, working ? "正在验证设备…" : recoverable ? "继续核对原配对" : "验证并配对"), recoverable && /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: working, onClick: () => change("") }, "清除本地表单")), failure3 && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-error", role: "alert" }, failure3.message), status && /* @__PURE__ */ import_react74.default.createElement("p", { role: "status" }, status)) : /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "宿主尚未提供安全配对操作，请更新 Host 与 Remote Agent。"));
+  } }, working ? "正在验证设备…" : recoverable ? "继续核对原配对" : "验证并配对"), recoverable && /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: working, onClick: () => change("") }, "清除本地表单")), failure4 && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-error", role: "alert" }, failure4.message), status && /* @__PURE__ */ import_react74.default.createElement("p", { role: "status" }, status)) : /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "宿主尚未提供安全配对操作，请更新 Host 与 Remote Agent。"));
 }
 
 // apps/integration-client/local-computer-host.jsx
@@ -44998,7 +44998,7 @@ function LocalComputerHost(props) {
   return /* @__PURE__ */ import_react75.default.createElement(LocalComputerHostView, { key: scope, ...props });
 }
 function LocalComputerHostView({ snapshot, dispatch, transport = dispatch, busy }) {
-  let available = (snapshot.availableActions ?? []).includes("machine.host.status"), [view, setView] = (0, import_react75.useState)(null), [draft2, setDraft] = (0, import_react75.useState)(null), [devices, setDevices] = (0, import_react75.useState)([]), [pending, setPending] = (0, import_react75.useState)(""), [failure3, setFailure] = (0, import_react75.useState)(""), [notice, setNotice] = (0, import_react75.useState)(""), [invitation, setInvitation] = (0, import_react75.useState)(null), [time2, setTime] = (0, import_react75.useState)(Date.now()), live = (0, import_react75.useRef)(!1), mutation = (0, import_react75.useRef)(!1), dirty = (0, import_react75.useRef)(!1), generation = (0, import_react75.useRef)(0), refreshBusy = (0, import_react75.useRef)(!1), call2 = async (action, payload, timeout = 15e3) => {
+  let available = (snapshot.availableActions ?? []).includes("machine.host.status"), [view, setView] = (0, import_react75.useState)(null), [draft2, setDraft] = (0, import_react75.useState)(null), [devices, setDevices] = (0, import_react75.useState)([]), [pending, setPending] = (0, import_react75.useState)(""), [failure4, setFailure] = (0, import_react75.useState)(""), [notice, setNotice] = (0, import_react75.useState)(""), [invitation, setInvitation] = (0, import_react75.useState)(null), [time2, setTime] = (0, import_react75.useState)(Date.now()), live = (0, import_react75.useRef)(!1), mutation = (0, import_react75.useRef)(!1), dirty = (0, import_react75.useRef)(!1), generation = (0, import_react75.useRef)(0), refreshBusy = (0, import_react75.useRef)(!1), call2 = async (action, payload, timeout = 15e3) => {
     let timer;
     try {
       let value = await Promise.race([transport === dispatch ? dispatch(action, payload, { errorResult: !0 }) : transport(action, payload), new Promise((_2, reject) => {
@@ -45076,7 +45076,7 @@ function LocalComputerHostView({ snapshot, dispatch, transport = dispatch, busy 
   let locked = !!(pending || busy), connected = view?.listening === !0;
   return /* @__PURE__ */ import_react75.default.createElement("section", { className: "bp-card bp-local-computer", "aria-label": "本机远程访问" }, /* @__PURE__ */ import_react75.default.createElement("header", { className: "bp-connection-heading" }, /* @__PURE__ */ import_react75.default.createElement("span", { className: "bp-connection-icon" }, /* @__PURE__ */ import_react75.default.createElement(UiIcon, { name: "computer", size: 23 })), /* @__PURE__ */ import_react75.default.createElement("div", null, /* @__PURE__ */ import_react75.default.createElement("h3", null, view?.config?.name ?? "这台电脑"), /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-connection-state", "data-online": connected, role: "status" }, /* @__PURE__ */ import_react75.default.createElement("i", null), labels[view?.state] ?? "正在读取…")), connected && /* @__PURE__ */ import_react75.default.createElement("button", { type: "button", disabled: locked, onClick: () => {
     run2("stop", "machine.host.stop", { expectedRevision: view.revision });
-  } }, pending === "stop" ? "正在关闭…" : "关闭远程访问")), /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-muted" }, "共享文件与桌面，邀请另一台电脑连接。"), failure3 && /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-error", role: "alert" }, failure3), view?.errorCode && /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-error" }, messages[view.errorCode] || `本机服务未就绪：${view.errorCode}`), draft2 && /* @__PURE__ */ import_react75.default.createElement("details", { className: "bp-local-settings", open: !view.config || void 0 }, /* @__PURE__ */ import_react75.default.createElement("summary", null, /* @__PURE__ */ import_react75.default.createElement(UiIcon, { name: "settings", size: 15 }), view.config ? "共享设置" : "选择共享内容", /* @__PURE__ */ import_react75.default.createElement(UiIcon, { name: "chevron", size: 14 })), /* @__PURE__ */ import_react75.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react75.default.createElement("label", null, "这台电脑名称", /* @__PURE__ */ import_react75.default.createElement("input", { "aria-label": "本机名称", value: draft2.name, maxLength: 60, disabled: locked, onChange: (e) => change("name", e.target.value) })), /* @__PURE__ */ import_react75.default.createElement("label", null, "共享文件夹", /* @__PURE__ */ import_react75.default.createElement("input", { "aria-label": "本机共享文件夹", value: draft2.sharedDirectory, disabled: locked, onChange: (e) => change("sharedDirectory", e.target.value) })), /* @__PURE__ */ import_react75.default.createElement("div", { className: "bp-sharing-options" }, /* @__PURE__ */ import_react75.default.createElement("label", null, /* @__PURE__ */ import_react75.default.createElement("span", null, /* @__PURE__ */ import_react75.default.createElement(UiIcon, { name: "folder", size: 17 }), "文件修改"), /* @__PURE__ */ import_react75.default.createElement("input", { type: "checkbox", role: "switch", "aria-label": "允许修改共享文件夹", checked: draft2.allowWrite, disabled: locked, onChange: (e) => change("allowWrite", e.target.checked) })), /* @__PURE__ */ import_react75.default.createElement("label", null, /* @__PURE__ */ import_react75.default.createElement("span", null, /* @__PURE__ */ import_react75.default.createElement(UiIcon, { name: "computer", size: 17 }), "桌面控制"), /* @__PURE__ */ import_react75.default.createElement("input", { type: "checkbox", role: "switch", "aria-label": "允许查看与控制 Windows 桌面", checked: draft2.allowDesktop, disabled: locked || !view.desktopSupported, onChange: (e) => change("allowDesktop", e.target.checked) }))), /* @__PURE__ */ import_react75.default.createElement("details", { className: "bp-connection-advanced" }, /* @__PURE__ */ import_react75.default.createElement("summary", null, "网络与高级设置"), /* @__PURE__ */ import_react75.default.createElement("label", null, "连接网卡", /* @__PURE__ */ import_react75.default.createElement("select", { "aria-label": "本机连接网卡", value: draft2.listenAddress, disabled: locked, onChange: (e) => change("listenAddress", e.target.value) }, view.addresses.map((address) => /* @__PURE__ */ import_react75.default.createElement("option", { key: address }, address)))), /* @__PURE__ */ import_react75.default.createElement("label", null, "端口", /* @__PURE__ */ import_react75.default.createElement("input", { "aria-label": "本机接入端口", type: "number", min: 1, max: 65535, value: draft2.port, disabled: locked, onChange: (e) => change("port", Number(e.target.value)) })), /* @__PURE__ */ import_react75.default.createElement("label", null, "连接地址（可选）", /* @__PURE__ */ import_react75.default.createElement("input", { "aria-label": "本机连接地址", value: draft2.endpoint, disabled: locked, placeholder: `http://${draft2.listenAddress}:${draft2.port}`, onChange: (e) => change("endpoint", e.target.value) })), /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-muted" }, "跨网需已有 VPN 或可达地址；必要时放行所选 TCP 端口。配对不提供公网穿透。"), /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-muted" }, "对方可在所选范围内管理其团队 Bot。"), /* @__PURE__ */ import_react75.default.createElement("button", { type: "button", disabled: locked, onClick: () => {
+  } }, pending === "stop" ? "正在关闭…" : "关闭远程访问")), /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-muted" }, "共享文件与桌面，邀请另一台电脑连接。"), failure4 && /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-error", role: "alert" }, failure4), view?.errorCode && /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-error" }, messages[view.errorCode] || `本机服务未就绪：${view.errorCode}`), draft2 && /* @__PURE__ */ import_react75.default.createElement("details", { className: "bp-local-settings", open: !view.config || void 0 }, /* @__PURE__ */ import_react75.default.createElement("summary", null, /* @__PURE__ */ import_react75.default.createElement(UiIcon, { name: "settings", size: 15 }), view.config ? "共享设置" : "选择共享内容", /* @__PURE__ */ import_react75.default.createElement(UiIcon, { name: "chevron", size: 14 })), /* @__PURE__ */ import_react75.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react75.default.createElement("label", null, "这台电脑名称", /* @__PURE__ */ import_react75.default.createElement("input", { "aria-label": "本机名称", value: draft2.name, maxLength: 60, disabled: locked, onChange: (e) => change("name", e.target.value) })), /* @__PURE__ */ import_react75.default.createElement("label", null, "共享文件夹", /* @__PURE__ */ import_react75.default.createElement("input", { "aria-label": "本机共享文件夹", value: draft2.sharedDirectory, disabled: locked, onChange: (e) => change("sharedDirectory", e.target.value) })), /* @__PURE__ */ import_react75.default.createElement("div", { className: "bp-sharing-options" }, /* @__PURE__ */ import_react75.default.createElement("label", null, /* @__PURE__ */ import_react75.default.createElement("span", null, /* @__PURE__ */ import_react75.default.createElement(UiIcon, { name: "folder", size: 17 }), "文件修改"), /* @__PURE__ */ import_react75.default.createElement("input", { type: "checkbox", role: "switch", "aria-label": "允许修改共享文件夹", checked: draft2.allowWrite, disabled: locked, onChange: (e) => change("allowWrite", e.target.checked) })), /* @__PURE__ */ import_react75.default.createElement("label", null, /* @__PURE__ */ import_react75.default.createElement("span", null, /* @__PURE__ */ import_react75.default.createElement(UiIcon, { name: "computer", size: 17 }), "桌面控制"), /* @__PURE__ */ import_react75.default.createElement("input", { type: "checkbox", role: "switch", "aria-label": "允许查看与控制 Windows 桌面", checked: draft2.allowDesktop, disabled: locked || !view.desktopSupported, onChange: (e) => change("allowDesktop", e.target.checked) }))), /* @__PURE__ */ import_react75.default.createElement("details", { className: "bp-connection-advanced" }, /* @__PURE__ */ import_react75.default.createElement("summary", null, "网络与高级设置"), /* @__PURE__ */ import_react75.default.createElement("label", null, "连接网卡", /* @__PURE__ */ import_react75.default.createElement("select", { "aria-label": "本机连接网卡", value: draft2.listenAddress, disabled: locked, onChange: (e) => change("listenAddress", e.target.value) }, view.addresses.map((address) => /* @__PURE__ */ import_react75.default.createElement("option", { key: address }, address)))), /* @__PURE__ */ import_react75.default.createElement("label", null, "端口", /* @__PURE__ */ import_react75.default.createElement("input", { "aria-label": "本机接入端口", type: "number", min: 1, max: 65535, value: draft2.port, disabled: locked, onChange: (e) => change("port", Number(e.target.value)) })), /* @__PURE__ */ import_react75.default.createElement("label", null, "连接地址（可选）", /* @__PURE__ */ import_react75.default.createElement("input", { "aria-label": "本机连接地址", value: draft2.endpoint, disabled: locked, placeholder: `http://${draft2.listenAddress}:${draft2.port}`, onChange: (e) => change("endpoint", e.target.value) })), /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-muted" }, "跨网需已有 VPN 或可达地址；必要时放行所选 TCP 端口。配对不提供公网穿透。"), /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-muted" }, "对方可在所选范围内管理其团队 Bot。"), /* @__PURE__ */ import_react75.default.createElement("button", { type: "button", disabled: locked, onClick: () => {
     setFailure(""), load(!0);
   } }, "重新载入设置")), view.revision > 0 && dirty.current && /* @__PURE__ */ import_react75.default.createElement("p", { className: "bp-sharing-warning", role: "note" }, "保存更改将撤销现有配对，需要重新邀请。"), /* @__PURE__ */ import_react75.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react75.default.createElement("button", { type: "button", className: "bp-button-primary", disabled: locked, onClick: () => save(!0) }, pending === "save" ? "正在开启…" : "保存并开启远程访问"), /* @__PURE__ */ import_react75.default.createElement("button", { type: "button", disabled: locked, onClick: () => save(!1) }, "仅保存，不开启")))), view?.config && !connected && !dirty.current && /* @__PURE__ */ import_react75.default.createElement("button", { type: "button", className: "bp-button-primary", disabled: locked, onClick: () => {
     run2("start", "machine.host.start", { expectedRevision: view.revision });
@@ -45189,7 +45189,9 @@ function SubscriptionQuota({ productApi }) {
   let [revision, setRevision] = (0, import_react77.useState)(0), [state, setState] = (0, import_react77.useState)({ api: productApi, value: null, loading: !0, error: !1 });
   (0, import_react77.useEffect)(() => {
     let controller = new AbortController();
-    return setState((previous) => ({ api: productApi, value: previous.api === productApi ? previous.value : null, loading: !0, error: !1 })), productApi.dispatch("usage.subscriptionQuota", {}, controller.signal).then((value2) => {
+    setState((previous) => ({ api: productApi, value: previous.api === productApi ? previous.value : null, loading: !0, error: !1 }));
+    let payload = revision > 0 ? { refreshAccounts: !0 } : {};
+    return productApi.dispatch("usage.subscriptionQuota", payload, controller.signal).then((value2) => {
       controller.signal.aborted || setState({ api: productApi, value: value2, loading: !1, error: !1 });
     }).catch(() => {
       controller.signal.aborted || setState((previous) => ({ ...previous, loading: !1, error: !0 }));
@@ -45203,7 +45205,7 @@ function SubscriptionQuota({ productApi }) {
       value: Math.min(window2.used, window2.limit),
       max: window2.limit
     }
-  ), /* @__PURE__ */ import_react77.default.createElement("small", { className: "bp-muted" }, window2.used === null ? "占用未知" : `已占用 ${calls(window2.used)} 次`, " · 上限 ", calls(window2.limit), " 次"), /* @__PURE__ */ import_react77.default.createElement("small", { className: "bp-muted" }, "重置于 ", time(window2.resetAt, value.timezone))))))), value.accountQuotas.length > 0 && /* @__PURE__ */ import_react77.default.createElement("h3", null, "Codex 账号额度"), value.accountQuotas.map(({ id: id3, name, reading }) => /* @__PURE__ */ import_react77.default.createElement("article", { key: id3, className: "bp-quota-entry" }, /* @__PURE__ */ import_react77.default.createElement("div", { className: "bp-quota-balance" }, /* @__PURE__ */ import_react77.default.createElement("strong", null, name), /* @__PURE__ */ import_react77.default.createElement("small", { className: "bp-muted" }, reading ? `报告于 ${time(reading.observedAt, value.timezone)}` : "当前宿主会话尚未收到额度")), reading && /* @__PURE__ */ import_react77.default.createElement("div", { className: "bp-quota-windows" }, reading.windows.map((window2) => /* @__PURE__ */ import_react77.default.createElement("div", { key: window2.id, className: "bp-quota-window" }, /* @__PURE__ */ import_react77.default.createElement("div", { className: "bp-quota-balance" }, /* @__PURE__ */ import_react77.default.createElement("span", null, windowLabel(window2)), /* @__PURE__ */ import_react77.default.createElement("strong", null, "上次剩余 ", window2.remainingPercent, "%")), /* @__PURE__ */ import_react77.default.createElement("progress", { "aria-label": `${name} ${windowLabel(window2)}上次剩余额度`, value: window2.remainingPercent, max: 100 }), window2.resetAt !== null && /* @__PURE__ */ import_react77.default.createElement("small", { className: "bp-muted" }, "重置于 ", time(window2.resetAt, value.timezone), window2.resetAt <= value.observedAt && " · 已过重置时间")))))), /* @__PURE__ */ import_react77.default.createElement("h3", null, "订阅通道限额"), value.channelLimits.length === 0 && /* @__PURE__ */ import_react77.default.createElement("p", { className: "bp-muted" }, "暂无仍生效的额度用尽或限流记录。"), value.channelLimits.map((channel) => /* @__PURE__ */ import_react77.default.createElement("div", { key: channel.id, className: "bp-quota-entry" }, /* @__PURE__ */ import_react77.default.createElement("div", { className: "bp-quota-balance" }, /* @__PURE__ */ import_react77.default.createElement("strong", null, channel.label), /* @__PURE__ */ import_react77.default.createElement("span", null, channel.kind === "quota" ? "额度已用尽" : "通道限流")), /* @__PURE__ */ import_react77.default.createElement("small", { className: "bp-muted" }, channel.resetReported ? "服务方报告的重置时间" : "宿主可重试时间", " ", time(channel.until, value.timezone))))));
+  ), /* @__PURE__ */ import_react77.default.createElement("small", { className: "bp-muted" }, window2.used === null ? "占用未知" : `已占用 ${calls(window2.used)} 次`, " · 上限 ", calls(window2.limit), " 次"), /* @__PURE__ */ import_react77.default.createElement("small", { className: "bp-muted" }, "重置于 ", time(window2.resetAt, value.timezone))))))), value.accountQuotas.length > 0 && /* @__PURE__ */ import_react77.default.createElement("h3", null, "Codex 账号额度"), value.accountQuotas.map(({ id: id3, name, reading }) => /* @__PURE__ */ import_react77.default.createElement("article", { key: id3, className: "bp-quota-entry" }, /* @__PURE__ */ import_react77.default.createElement("div", { className: "bp-quota-balance" }, /* @__PURE__ */ import_react77.default.createElement("strong", null, name), /* @__PURE__ */ import_react77.default.createElement("small", { className: "bp-muted" }, reading ? `报告于 ${time(reading.observedAt, value.timezone)}` : "尚未取得额度数据")), reading && /* @__PURE__ */ import_react77.default.createElement("div", { className: "bp-quota-windows" }, reading.windows.map((window2) => /* @__PURE__ */ import_react77.default.createElement("div", { key: window2.id, className: "bp-quota-window" }, /* @__PURE__ */ import_react77.default.createElement("div", { className: "bp-quota-balance" }, /* @__PURE__ */ import_react77.default.createElement("span", null, windowLabel(window2)), /* @__PURE__ */ import_react77.default.createElement("strong", null, "上次剩余 ", window2.remainingPercent, "%")), /* @__PURE__ */ import_react77.default.createElement("progress", { "aria-label": `${name} ${windowLabel(window2)}上次剩余额度`, value: window2.remainingPercent, max: 100 }), window2.resetAt !== null && /* @__PURE__ */ import_react77.default.createElement("small", { className: "bp-muted" }, "重置于 ", time(window2.resetAt, value.timezone), window2.resetAt <= value.observedAt && " · 已过重置时间")))))), /* @__PURE__ */ import_react77.default.createElement("h3", null, "订阅通道限额"), value.channelLimits.length === 0 && /* @__PURE__ */ import_react77.default.createElement("p", { className: "bp-muted" }, "暂无仍生效的额度用尽或限流记录。"), value.channelLimits.map((channel) => /* @__PURE__ */ import_react77.default.createElement("div", { key: channel.id, className: "bp-quota-entry" }, /* @__PURE__ */ import_react77.default.createElement("div", { className: "bp-quota-balance" }, /* @__PURE__ */ import_react77.default.createElement("strong", null, channel.label), /* @__PURE__ */ import_react77.default.createElement("span", null, channel.kind === "quota" ? "额度已用尽" : "通道限流")), /* @__PURE__ */ import_react77.default.createElement("small", { className: "bp-muted" }, channel.resetReported ? "服务方报告的重置时间" : "宿主可重试时间", " ", time(channel.until, value.timezone))))));
 }
 
 // apps/integration-client/desktop-pane.jsx
@@ -45288,8 +45290,8 @@ function connectDesktopStream({
   socket.binaryType = "arraybuffer";
   let closed2 = !1, mode = "watch", desiredMode = ticket.mode === "control" ? "control" : "watch", nextId = 0, lastError = "", reportError = (error, extra = {}) => {
     lastError ||= error, onState?.({ status: "error", mode, error: lastError, ...extra });
-  }, frameMetadata, pending = /* @__PURE__ */ new Map(), send = (value) => closed2 || socket.readyState !== 1 ? !1 : (socket.send(JSON.stringify(value)), !0), failed = (row, failure3) => {
-    pending.delete(row.id) && (clearTimeout(row.timer), row.event ? onInputFailure?.(row.event, { ...row.meta, failure: failure3 }) : onReleaseFailure?.({ ...row.meta, failure: failure3 }), row.reject(Object.assign(new Error(failure3.code), failure3)));
+  }, frameMetadata, pending = /* @__PURE__ */ new Map(), send = (value) => closed2 || socket.readyState !== 1 ? !1 : (socket.send(JSON.stringify(value)), !0), failed = (row, failure4) => {
+    pending.delete(row.id) && (clearTimeout(row.timer), row.event ? onInputFailure?.(row.event, { ...row.meta, failure: failure4 }) : onReleaseFailure?.({ ...row.meta, failure: failure4 }), row.reject(Object.assign(new Error(failure4.code), failure4)));
   }, failPending = (code) => {
     for (let row of [...pending.values()]) failed(row, { code, possiblyApplied: !0 });
   }, enqueue = (type, event) => {
@@ -45598,15 +45600,15 @@ function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } = {}) {
 
 // apps/integration-client/routines-panel.jsx
 var import_react78 = __toESM(require("react"), 1);
-var message = (failure3) => String(failure3?.message ?? failure3), rootOf = (machine) => typeof machine?.roots?.[0] == "string" ? machine.roots[0] : machine?.rootId ?? machine?.roots?.[0]?.rootId ?? machine?.roots?.[0]?.id ?? "", STATUS = { running: "正在执行", succeeded: "全部动作已确认", failed: "执行失败，已停止", cancelled: "已取消", unknown: "结果未知，需要检查电脑", cancel_pending: "正在请求停止" };
+var message = (failure4) => String(failure4?.message ?? failure4), rootOf = (machine) => typeof machine?.roots?.[0] == "string" ? machine.roots[0] : machine?.rootId ?? machine?.roots?.[0]?.rootId ?? machine?.roots?.[0]?.id ?? "", STATUS = { running: "正在执行", succeeded: "全部动作已确认", failed: "执行失败，已停止", cancelled: "已取消", unknown: "结果未知，需要检查电脑", cancel_pending: "正在请求停止" };
 function RoutineCaptureControls({ recorder, sessionId, metadata, mode, connected, drainInputs, releaseInput, saveRoutine }) {
   let [capture, setCapture] = (0, import_react78.useState)(recorder.snapshot), [name, setName] = (0, import_react78.useState)(""), [busy, setBusy] = (0, import_react78.useState)(!1), [error, setError] = (0, import_react78.useState)(""), [saved, setSaved] = (0, import_react78.useState)(null), [draft2, setDraft] = (0, import_react78.useState)(null);
   (0, import_react78.useEffect)(() => (setCapture(recorder.snapshot), recorder.subscribe(setCapture)), [recorder]);
   let start = () => {
     try {
       setError(""), setSaved(null), setDraft(null), recorder.start({ sessionId, metadata, mode });
-    } catch (failure3) {
-      setError(message(failure3));
+    } catch (failure4) {
+      setError(message(failure4));
     }
   }, finish = async () => {
     setBusy(!0), setError("");
@@ -45625,8 +45627,8 @@ function RoutineCaptureControls({ recorder, sessionId, metadata, mode, connected
       }
       if (!confirmed) throw Object.assign(new Error("保存尚未确认，草稿已保留。请刷新例行任务列表检查结果。"), { code: "ROUTINE_SAVE_UNCONFIRMED" });
       setSaved(value), setDraft(null), recorder.reset();
-    } catch (failure3) {
-      setError(message(failure3));
+    } catch (failure4) {
+      setError(message(failure4));
     } finally {
       setBusy(!1);
     }
@@ -45654,8 +45656,8 @@ function RoutinesPanel({ snapshot, dispatch, busy = !1, onOpenMachines }) {
       try {
         let [saved, history] = await Promise.all([call2("routine.list", { botId }), call2("routine.history", { botId })]);
         setRows(Array.isArray(saved) ? saved : []), setRuns(Array.isArray(history) ? history : []);
-      } catch (failure3) {
-        setError(message(failure3));
+      } catch (failure4) {
+        setError(message(failure4));
       }
   };
   (0, import_react78.useEffect)(() => {
@@ -45672,22 +45674,22 @@ function RoutinesPanel({ snapshot, dispatch, busy = !1, onOpenMachines }) {
     try {
       let machine = machines.find((row) => (row.id ?? row.machineId) === machineId);
       setResult(await call2("routine.run", { botId, routineId, machineId, rootId: rootOf(machine) }));
-    } catch (failure3) {
-      setError(message(failure3));
+    } catch (failure4) {
+      setError(message(failure4));
     } finally {
       setRunning(!1), await refresh();
     }
   }, stop = async (runId) => {
     try {
       await call2("routine.cancel", { botId, runId }), await refresh();
-    } catch (failure3) {
-      setError(message(failure3));
+    } catch (failure4) {
+      setError(message(failure4));
     }
   }, resolve2 = async (runId) => {
     try {
       await call2("routine.resolve", { botId, runId, note: notes[runId] ?? "" }), await refresh();
-    } catch (failure3) {
-      setError(message(failure3));
+    } catch (failure4) {
+      setError(message(failure4));
     }
   };
   return bots.length ? /* @__PURE__ */ import_react78.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react78.default.createElement("h2", null, "例行任务"), /* @__PURE__ */ import_react78.default.createElement("p", { className: "bp-muted" }, "在远程电脑中演示并保存动作，再选择电脑回放。每一步都等待确认；失败会停止，结果未知时需检查电脑后再运行。"), /* @__PURE__ */ import_react78.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react78.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react78.default.createElement("select", { disabled: running, value: botId, onChange: (event) => {
@@ -45854,8 +45856,8 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
           bitmap.close();
         }
       }
-    } catch (failure3) {
-      setState((before) => ({ ...before, error: `画面解码失败：${failure3.message}` }));
+    } catch (failure4) {
+      setState((before) => ({ ...before, error: `画面解码失败：${failure4.message}` }));
     } finally {
       drawing.current = !1;
     }
@@ -45901,14 +45903,14 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
               if (!(active2 !== generation.current || !ticketRef.current))
                 try {
                   ticketRef.current = await renewSession(botId, ticket.sessionId), renew();
-                } catch (failure3) {
-                  recorder.invalidate("ROUTINE_DESKTOP_DISCONNECTED"), streamRef.current?.close(), setState({ status: "error", mode: "watch", error: `桌面授权续期失败：${failure3.message}` });
+                } catch (failure4) {
+                  recorder.invalidate("ROUTINE_DESKTOP_DISCONNECTED"), streamRef.current?.close(), setState({ status: "error", mode: "watch", error: `桌面授权续期失败：${failure4.message}` });
                 }
             }, Math.max(1e3, (ticketRef.current?.expiresAt ?? Date.now() + 6e4) - Date.now() - 15e3));
           };
           renew();
-        } catch (failure3) {
-          active2 === generation.current && setState({ status: "error", mode: "watch", error: String(failure3?.message ?? failure3) });
+        } catch (failure4) {
+          active2 === generation.current && setState({ status: "error", mode: "watch", error: String(failure4?.message ?? failure4) });
         }
       } finally {
         connecting.current = !1;
@@ -45999,8 +46001,8 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
     let current = () => active2 === generation.current && stream === streamRef.current && stateRef.current.mode === "control";
     try {
       await work(stream, current);
-    } catch (failure3) {
-      active2 === generation.current && setKeyboardError(`远端尚未确认这次输入：${failure3.message}。请检查电脑，不会自动重发。`);
+    } catch (failure4) {
+      active2 === generation.current && setKeyboardError(`远端尚未确认这次输入：${failure4.message}。请检查电脑，不会自动重发。`);
     } finally {
       active2 === generation.current && (keyboardPending.current = !1, setKeyboardBusy(!1));
     }
@@ -46017,8 +46019,8 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
       if (active2 !== generation.current) return;
       if (value.length > 8192) throw new Error("本机文字超过 8192 字，请分段粘贴。");
       setText(value), setKeyboardError("");
-    } catch (failure3) {
-      active2 === generation.current && setKeyboardError(`无法读取本机剪贴板：${failure3.message}`);
+    } catch (failure4) {
+      active2 === generation.current && setKeyboardError(`无法读取本机剪贴板：${failure4.message}`);
     }
   }, closeTools = () => {
     setToolsOpen(!1), toolsButton.current?.focus();
@@ -46122,8 +46124,8 @@ function DesktopPane2({ bot }) {
     let active2 = !0;
     return Promise.resolve(api?.machines?.(bot.id)).then((rows2) => {
       active2 && setMachines(rows2 ?? []);
-    }, (failure3) => {
-      active2 && setError(failure3.message);
+    }, (failure4) => {
+      active2 && setError(failure4.message);
     }), () => {
       active2 = !1;
     };
@@ -46323,8 +46325,8 @@ function DataPanel({ snapshot, dispatch, busy, focus, transport, scope, requestT
   (0, import_react83.useEffect)(() => {
     if (dropInflight(), setCatalog(null), setResult(null), setCard(null), setChartSource(null), setChartColumns([]), !botId) return;
     let token = sequence.current;
-    refresh(token).catch((failure3) => {
-      token === sequence.current && setError(String(failure3?.message ?? failure3));
+    refresh(token).catch((failure4) => {
+      token === sequence.current && setError(String(failure4?.message ?? failure4));
     });
   }, [botId, call2, dropInflight, refresh]), (0, import_react83.useEffect)(() => () => {
     dropInflight();
@@ -46342,8 +46344,8 @@ function DataPanel({ snapshot, dispatch, busy, focus, transport, scope, requestT
     setWorking(!0), setError(""), setStatus("");
     try {
       await work(token);
-    } catch (failure3) {
-      token === sequence.current && setError(String(failure3?.message ?? failure3));
+    } catch (failure4) {
+      token === sequence.current && setError(String(failure4?.message ?? failure4));
     } finally {
       token === sequence.current && setWorking(!1);
     }
@@ -46353,8 +46355,8 @@ function DataPanel({ snapshot, dispatch, busy, focus, transport, scope, requestT
     (async () => {
       try {
         await call2("data.cancel", { botId }, { timeoutMs: CANCEL_TIMEOUT_MS }), token === sequence.current && setStatus("已请求取消：宿主会中止正在执行的语句。取消请求不等于取消确认。");
-      } catch (failure3) {
-        token === sequence.current && setError(String(failure3?.message ?? failure3));
+      } catch (failure4) {
+        token === sequence.current && setError(String(failure4?.message ?? failure4));
       }
     })();
   }, disabled = busy || working || !botId, tables = catalog?.tables ?? [], cards = catalog?.cards ?? [], beginChart = (columns2, source) => {
@@ -47037,13 +47039,8 @@ var subscription_accounts_default = `.bp-subscriptions{display:flex;flex-directi
 .bp-subscriptions .bp-ai-section-head{align-items:flex-start;margin:0}
 .bp-subscriptions .bp-ai-section-head .bp-ai-hint{margin:6px 0 0}
 .bp-sub-service{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px;border:1px solid var(--bp-border);border-radius:14px;background:var(--bp-surface)}
-.bp-sub-service p,.bp-sub-login p{margin:6px 0;color:var(--bp-muted);font-size:13px;line-height:1.6}
+.bp-sub-login p{margin:6px 0;color:var(--bp-muted);font-size:13px;line-height:1.6}
 .bp-sub-service button{flex-shrink:0}
-.bp-sub-options{color:var(--bp-muted);font-size:12px}
-.bp-sub-options summary{cursor:pointer}
-.bp-sub-options label{display:flex;flex-direction:column;gap:6px;max-width:420px;margin-top:12px}
-.bp-sub-options input{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid var(--bp-border);border-radius:9px;background:var(--bp-surface);color:var(--bp-ink)}
-.bp-sub-options p{line-height:1.6}
 .bp-sub-login{display:flex;flex-direction:column;gap:8px;padding:16px;border:1px solid var(--bp-border);border-radius:14px;background:var(--bp-surface)}
 .bp-sub-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .bp-sub-actions a{display:inline-flex;align-items:center;gap:6px;padding:9px 13px;border-radius:9px;text-decoration:none}
@@ -47062,40 +47059,43 @@ var subscription_accounts_default = `.bp-subscriptions{display:flex;flex-directi
 `;
 
 // apps/integration-client/subscription-accounts.jsx
-var phases = { disabled: "订阅连接已暂停", installing: "正在校验并准备订阅组件…", starting: "正在启动订阅连接…", ready: "订阅连接已就绪", stopping: "正在停止订阅连接…", error: "订阅连接未完成", unsupported: "当前系统尚不支持订阅登录" }, accountStates = { disabled: "已停用", offline: "订阅连接未就绪", "needs-login": "账户需要检查", "needs-models": "尚未发现可用模型", ready: "已验证对话", configured: "已登录 · 待验证对话" }, componentErrors = {
-  SUBSCRIPTION_COMPONENT_HASH: "下载的登录组件未通过校验，请重试。",
-  SUBSCRIPTION_COMPONENT_ARCHIVE: "订阅组件包无效。请检查 DS Bot 的安装包。",
-  SUBSCRIPTION_COMPONENT_DOWNLOAD: "订阅组件下载未完成。请检查网络，再次选择提供方重试。",
-  SUBSCRIPTION_COMPONENT_INSTALL: "订阅组件未能安装。请检查本机存储权限后重试。",
-  SUBSCRIPTION_PRIVATE_STATE_INVALID: "本机登录资料无效，请检查插件数据备份。",
-  SUBSCRIPTION_STOP_UNCONFIRMED: "订阅组件尚未确认停止。请在连接选项中重试停止。"
-};
-function SubscriptionAccounts({ productApi, onOpenBindings }) {
-  let [view, setView] = (0, import_react87.useState)(null), [busy, setBusy] = (0, import_react87.useState)(""), [error, setError] = (0, import_react87.useState)(""), [notice, setNotice] = (0, import_react87.useState)(""), [login, setLogin] = (0, import_react87.useState)(null), [proxyUrl, setProxyUrl] = (0, import_react87.useState)(null), [callbackUrl, setCallbackUrl] = (0, import_react87.useState)(""), scope = (0, import_react87.useRef)({ live: !1, requests: /* @__PURE__ */ new Set(), busy: !1, epoch: 0 }), call2 = async (action, payload = {}) => {
-    let current = scope.current, controller = new AbortController();
+var accountStates = {
+  legacy: "旧版账户 · 请重新授权",
+  "needs-login": "账户需要重新授权",
+  "needs-models": "尚未发现可用模型",
+  ready: "已验证对话",
+  configured: "已授权 · 待验证对话"
+}, failure = (error, fallback = "操作未完成，请重试。") => ({ message: error?.message || fallback, code: error?.code });
+function SubscriptionAccounts({ productApi, onOpenBindings, onOpenTools }) {
+  let [view, setView] = (0, import_react87.useState)(null), [busy, setBusy] = (0, import_react87.useState)(""), [error, setError] = (0, import_react87.useState)(null), [notice, setNotice] = (0, import_react87.useState)(""), [login, setLogin] = (0, import_react87.useState)(null), [pollRevision, setPollRevision] = (0, import_react87.useState)(0), scope = (0, import_react87.useRef)({ live: !1, requests: /* @__PURE__ */ new Set(), busy: !1 }), call2 = async (action, payload = {}) => {
+    let controller = new AbortController(), current = scope.current;
     current.requests.add(controller);
     let rejectAbort, aborted = new Promise((_done, reject) => {
       rejectAbort = () => reject(new Error("请求已取消或超时，请重试。")), controller.signal.addEventListener("abort", rejectAbort, { once: !0 });
-    }), timeout = setTimeout(() => controller.abort(), action === "subscriptions.login" ? 5e4 : 3e4);
+    }), timeout = setTimeout(() => controller.abort(), 5e4);
     try {
-      return await Promise.race([Promise.resolve().then(() => (controller.signal.throwIfAborted(), productApi.dispatch(action, payload, controller.signal))), aborted]);
+      return await Promise.race([
+        Promise.resolve().then(() => (controller.signal.throwIfAborted(), productApi.dispatch(action, payload, controller.signal))),
+        aborted
+      ]);
     } finally {
-      clearTimeout(timeout), current.requests.delete(controller), controller.signal.removeEventListener("abort", rejectAbort);
+      clearTimeout(timeout), controller.signal.removeEventListener("abort", rejectAbort), current.requests.delete(controller);
     }
   }, load = async () => {
-    let current = scope.current, epoch = ++current.epoch, result = await call2("subscriptions.list");
-    if (!(!current.live || current.epoch !== epoch)) {
-      if (result?.schemaVersion !== 1 || !Array.isArray(result.accounts) || !Array.isArray(result.providers)) throw new Error("请更新完整 Bot 插件以使用订阅账户。");
-      setView(result), setLogin((previous) => previous ? previous.preparing ? result.pendingLogins?.find((item) => item.loginId === previous.loginId) ?? previous : previous : result.pendingLogins?.[0] ?? null);
+    let result = await call2("subscriptions.list");
+    if (scope.current.live) {
+      if (result?.schemaVersion !== 1 || !Array.isArray(result.accounts) || !Array.isArray(result.providers))
+        throw new Error("请更新完整 Bot 插件以使用订阅账户。");
+      setView(result), setLogin(result.pendingLogins?.[0] ?? null);
     }
   }, run2 = async (id3, operation) => {
     let current = scope.current;
     if (!current.busy) {
-      current.busy = !0, current.epoch++, setBusy(id3), setError(""), setNotice("");
+      current.busy = !0, setBusy(id3), setError(null), setNotice("");
       try {
         await operation();
-      } catch (failure3) {
-        current.live && setError(failure3?.message || "操作未完成，请重试。");
+      } catch (cause) {
+        current.live && setError(failure(cause));
       } finally {
         current.busy = !1, current.live && setBusy("");
       }
@@ -47105,85 +47105,68 @@ function SubscriptionAccounts({ productApi, onOpenBindings }) {
     let current = scope.current;
     current.live = !0;
     let style = document.createElement("style");
-    return style.dataset.subscriptionAccounts = "1", style.textContent = subscription_accounts_default, document.head.append(style), load().catch((failure3) => {
-      current.live && setError(failure3.message);
+    return style.dataset.subscriptionAccounts = "1", style.textContent = subscription_accounts_default, document.head.append(style), load().catch((cause) => {
+      current.live && setError(failure(cause));
     }), () => {
-      current.live = !1, current.epoch++;
+      current.live = !1;
       for (let controller of current.requests) controller.abort();
       style.remove();
     };
   }, [productApi]);
-  let phase = view?.service?.phase, ready = phase === "ready", installing = ["installing", "starting", "stopping"].includes(phase);
-  (0, import_react87.useEffect)(() => setCallbackUrl(""), [login?.loginId]), (0, import_react87.useEffect)(() => {
-    if (!installing || login?.preparing) return;
-    let live = !0, timer, tick = async () => {
-      try {
-        live && await load();
-      } catch (failure3) {
-        live && scope.current.live && setError(failure3.message);
-      } finally {
-        live && (timer = setTimeout(tick, 1500));
-      }
-    };
-    return timer = setTimeout(tick, 600), () => {
-      live = !1, clearTimeout(timer);
-    };
-  }, [installing, login?.preparing]), (0, import_react87.useEffect)(() => {
-    if (!login) return;
+  let cancelling = busy === "cancel";
+  (0, import_react87.useEffect)(() => {
+    if (!login || cancelling) return;
     let live = !0, timer, tick = async () => {
       try {
         let result = await call2("subscriptions.loginStatus", { loginId: login.loginId });
         if (!live || !scope.current.live) return;
         if (result.status === "complete") {
-          scope.current.epoch++, setView(result.view), setLogin(null), setNotice("账户已登录，模型已同步。可以为 Bot 选择模型和订阅额度。");
+          setView(result.view), setLogin(null), setNotice("账户已授权，模型目录已同步。");
           return;
         }
         if (result.status === "error") {
-          scope.current.epoch++, setLogin(null), setError(componentErrors[result.code] || result.message || "授权未完成，请重新登录。"), load().catch(() => {
-          });
+          setLogin(null), setError(failure(result, "授权未完成，请重试。"));
           return;
         }
-        result.service && setView((previous) => previous && { ...previous, service: result.service }), result.login && setLogin(result.login);
-      } catch (failure3) {
-        live && scope.current.live && (setLogin(null), setError(failure3.message));
+        result.login && setLogin(result.login);
+      } catch (cause) {
+        live && scope.current.live && setError(failure(cause));
         return;
       }
-      live && (timer = setTimeout(tick, 2e3));
+      live && (timer = setTimeout(tick, 1500));
     };
-    return timer = setTimeout(tick, 1e3), () => {
+    return timer = setTimeout(tick, 600), () => {
       live = !1, clearTimeout(timer);
     };
-  }, [login?.loginId]);
-  let refresh = () => run2("refresh", async () => {
+  }, [login?.loginId, cancelling, pollRevision, productApi]);
+  let reload = () => run2("load", async () => {
+    await load(), scope.current.live && setPollRevision((value) => value + 1);
+  }), refresh = () => run2("refresh", async () => {
     let result = await call2("subscriptions.refresh");
-    scope.current.live && (setView(result), setNotice("账户与模型目录已同步。"));
-  }), proxyOverride = proxyUrl === null ? {} : { proxyUrl: proxyUrl.trim() }, enable = () => run2("enable", async () => {
-    await call2("subscriptions.enable", proxyOverride), await load();
-  }), stop = () => run2("stop", async () => {
-    let result = await call2("subscriptions.stop");
-    scope.current.live && (setView(result), setLogin(null));
-  }), startLogin = (provider) => run2(provider, async () => {
-    let result = await call2("subscriptions.login", { provider, ...proxyOverride });
-    scope.current.live && (setLogin(result), result.preparing && await load());
+    scope.current.live && (setView(result), setNotice("账户与模型目录已更新。"));
+  }), connect = (provider) => run2(provider, async () => {
+    let result = await call2("subscriptions.login", { provider });
+    scope.current.live && setLogin(result);
   }), cancel = () => run2("cancel", async () => {
-    try {
-      await call2("subscriptions.cancelLogin", { loginId: login.loginId });
-    } finally {
-      scope.current.live && setLogin(null);
-    }
-  }), submitCallback = () => run2("callback", async () => {
-    let url = callbackUrl.trim();
-    setCallbackUrl(""), await call2("subscriptions.callback", { loginId: login.loginId, callbackUrl: url }), scope.current.live && setNotice("授权结果已提交，正在同步账户…");
+    await call2("subscriptions.cancelLogin", { loginId: login.loginId }), scope.current.live && setLogin(null);
   }), remove = (account) => run2(account.id, async () => {
-    await call2("subscriptions.remove", { id: account.id, expectedRevision: account.revision }), await load(), scope.current.live && setNotice("此账户已从本机退出。");
-  });
-  return /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-subscriptions", "aria-label": "订阅账户" }, /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-section-head" }, /* @__PURE__ */ import_react87.default.createElement("div", null, /* @__PURE__ */ import_react87.default.createElement("h3", null, "登录套餐账户"), /* @__PURE__ */ import_react87.default.createElement("p", { className: "bp-ai-hint" }, "选择提供方。DS Bot 会准备订阅连接，并在授权后同步可用模型。")), /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !ready || !!busy || !!login, onClick: refresh }, /* @__PURE__ */ import_react87.default.createElement(UiIcon, { name: "refresh", size: 15 }), busy === "refresh" ? "同步中…" : "同步模型")), error && /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-alert", role: "alert" }, error, /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy, onClick: () => {
-    run2("load", load);
-  } }, "刷新")), notice && /* @__PURE__ */ import_react87.default.createElement("p", { className: "bp-ai-notice", role: "status" }, notice), !view && !error && /* @__PURE__ */ import_react87.default.createElement("p", { role: "status" }, "正在读取订阅账户…"), view && /* @__PURE__ */ import_react87.default.createElement(import_react87.default.Fragment, null, /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-sub-providers" }, view.providers.map((provider) => /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", key: provider.id, disabled: phase === "unsupported" || phase === "stopping" || !!busy || !!login || provider.available === !1, onClick: () => {
-    startLogin(provider.id);
-  } }, /* @__PURE__ */ import_react87.default.createElement(UiIcon, { name: "bot", size: 18 }), /* @__PURE__ */ import_react87.default.createElement("span", null, provider.name, /* @__PURE__ */ import_react87.default.createElement("small", null, provider.available === !1 ? provider.reason : busy === provider.id || login?.preparing && login.provider === provider.id ? "正在准备授权…" : "连接账户"))))), login?.preparing && /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-sub-service", role: "region", "aria-label": "正在准备账户授权" }, /* @__PURE__ */ import_react87.default.createElement("strong", { role: "status" }, installing ? phases[phase] : "正在准备授权链接…"), /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy, onClick: cancel }, "取消登录")), login?.url && /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-sub-login", role: "region", "aria-label": "账户授权" }, /* @__PURE__ */ import_react87.default.createElement("strong", null, "完成账户授权"), /* @__PURE__ */ import_react87.default.createElement("p", null, "在提供方页面确认登录。完成后，这里会自动同步账户与模型。"), login.userCode && /* @__PURE__ */ import_react87.default.createElement("p", null, "授权码：", /* @__PURE__ */ import_react87.default.createElement("code", null, login.userCode)), /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-sub-actions" }, /* @__PURE__ */ import_react87.default.createElement("a", { className: "bp-ai-primary", href: login.url, target: "_blank", rel: "noopener noreferrer" }, "打开授权页面", /* @__PURE__ */ import_react87.default.createElement(UiIcon, { name: "arrow", size: 14 })), /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy, onClick: cancel }, "取消登录")), /* @__PURE__ */ import_react87.default.createElement("small", null, "等待授权完成…"), login.supportsCallback && /* @__PURE__ */ import_react87.default.createElement("details", { className: "bp-sub-options" }, /* @__PURE__ */ import_react87.default.createElement("summary", null, "授权后无法自动返回？"), /* @__PURE__ */ import_react87.default.createElement("p", null, "如果在其他设备授权，或授权后 localhost 页面打不开，请复制地址栏中的完整回调地址并粘贴到这里。"), /* @__PURE__ */ import_react87.default.createElement("label", null, "回调地址", /* @__PURE__ */ import_react87.default.createElement("input", { type: "password", autoComplete: "off", "aria-label": "授权回调地址", value: callbackUrl, onChange: (event) => setCallbackUrl(event.target.value), placeholder: "http://localhost:…/callback?code=…&state=…", disabled: !!busy })), /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy || !callbackUrl.trim(), onClick: submitCallback }, "提交授权结果"))), !error && view.service.errorCode && /* @__PURE__ */ import_react87.default.createElement("p", { className: "bp-ai-alert", role: "alert" }, phase === "unsupported" ? phases[phase] : componentErrors[view.service.errorCode] || "订阅连接未能就绪，请重试。"), !login && installing && /* @__PURE__ */ import_react87.default.createElement("p", { className: "bp-ai-hint", role: "status" }, phases[phase]), !login && !ready && !installing && phase !== "unsupported" && view.accounts.length > 0 && /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy || view.service.canStop, onClick: enable }, "恢复已连接账户"), phase !== "unsupported" && /* @__PURE__ */ import_react87.default.createElement("details", { className: "bp-sub-options" }, /* @__PURE__ */ import_react87.default.createElement("summary", null, "连接选项"), /* @__PURE__ */ import_react87.default.createElement("p", null, "CLIProxyAPI ", view.service.version, " · ", phases[phase] ?? "状态未知"), /* @__PURE__ */ import_react87.default.createElement("label", null, "网络代理（可选）", /* @__PURE__ */ import_react87.default.createElement("input", { "aria-label": "订阅网络代理", value: proxyUrl ?? "", disabled: ready || installing || !!busy || !!login, onChange: (event) => setProxyUrl(event.target.value), placeholder: view.service.proxyConfigured ? "使用已保存的代理" : "自动使用本机网络设置" })), view.service.proxyConfigured && !ready && !installing && /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy || !!login || proxyUrl === "", onClick: () => setProxyUrl("") }, "恢复自动网络"), (ready || installing || view.service.canStop) && phase !== "stopping" && /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy, onClick: stop }, "暂停订阅连接")), /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-section-head" }, /* @__PURE__ */ import_react87.default.createElement("h3", null, "已登录账户 ", /* @__PURE__ */ import_react87.default.createElement("span", null, view.accounts.length))), /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-provider-list" }, view.accounts.map((account) => /* @__PURE__ */ import_react87.default.createElement("article", { className: "bp-ai-provider bp-sub-account", key: account.id, "data-subscription-account": account.id }, /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-mark", "aria-hidden": "true" }, /* @__PURE__ */ import_react87.default.createElement(UiIcon, { name: "bot", size: 20 })), /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-copy" }, /* @__PURE__ */ import_react87.default.createElement("h4", null, account.name), account.email && /* @__PURE__ */ import_react87.default.createElement("small", null, account.email), /* @__PURE__ */ import_react87.default.createElement("p", { className: "bp-ai-state", "data-state": account.state === "ready" ? "ready" : "configured" }, /* @__PURE__ */ import_react87.default.createElement("span", null), accountStates[account.state] ?? "状态待检查", " · ", account.models.length, " 个可用模型"), account.models.length > 0 && /* @__PURE__ */ import_react87.default.createElement("details", null, /* @__PURE__ */ import_react87.default.createElement("summary", null, "查看模型"), /* @__PURE__ */ import_react87.default.createElement("ul", null, account.models.map((model) => /* @__PURE__ */ import_react87.default.createElement("li", { key: model.id }, model.name)))), account.missingModels.length > 0 && /* @__PURE__ */ import_react87.default.createElement("small", null, "另有 ", account.missingModels.length, " 个模型尚未提供容量信息，暂未加入选择列表。"), account.usedBy.length > 0 && /* @__PURE__ */ import_react87.default.createElement("small", null, "使用中：", account.usedBy.map((bot) => bot.name).join("、"), "。切换这些 Bot 的模型后可退出账户。")), /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !ready || !!busy || account.usedBy.length > 0, onClick: () => {
+    await call2("subscriptions.remove", { id: account.id, expectedRevision: account.revision }), scope.current.live && (await load(), setNotice("此账户已从 DS Bot 退出。"));
+  }), ready = view?.service?.phase === "ready";
+  return /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-subscriptions", "aria-label": "订阅账户" }, /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-section-head" }, /* @__PURE__ */ import_react87.default.createElement("div", null, /* @__PURE__ */ import_react87.default.createElement("h3", null, "登录套餐账户"), /* @__PURE__ */ import_react87.default.createElement("p", { className: "bp-ai-hint" }, "完成厂商授权后，可为 Bot 使用这个账户的模型。")), /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !ready || !view.accounts.some((account) => account.state !== "legacy") || !!busy || !!login, onClick: refresh }, /* @__PURE__ */ import_react87.default.createElement(UiIcon, { name: "refresh", size: 15 }), busy === "refresh" ? "同步中…" : "同步模型")), error && /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-alert", role: "alert" }, error.message, error.code === "SUBSCRIPTION_CODEX_REQUIRED" && onOpenTools ? /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy, onClick: onOpenTools }, "打开官方工具") : /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy, onClick: reload }, "刷新")), notice && /* @__PURE__ */ import_react87.default.createElement("p", { className: "bp-ai-notice", role: "status" }, notice), !view && !error && /* @__PURE__ */ import_react87.default.createElement("p", { role: "status" }, "正在读取订阅账户…"), view && /* @__PURE__ */ import_react87.default.createElement(import_react87.default.Fragment, null, !ready && /* @__PURE__ */ import_react87.default.createElement("p", { role: "status" }, "当前宿主尚未支持 ChatGPT／Codex 订阅授权。"), /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-sub-providers" }, view.providers.map((provider) => /* @__PURE__ */ import_react87.default.createElement(
+    "button",
+    {
+      type: "button",
+      key: provider.id,
+      disabled: !ready || !!busy || !!login || provider.available === !1,
+      onClick: () => {
+        connect(provider.id);
+      }
+    },
+    /* @__PURE__ */ import_react87.default.createElement(UiIcon, { name: "bot", size: 18 }),
+    /* @__PURE__ */ import_react87.default.createElement("span", null, provider.name, /* @__PURE__ */ import_react87.default.createElement("small", null, "连接账户"))
+  ))), login?.preparing && /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-sub-service", role: "region", "aria-label": "正在准备账户授权" }, /* @__PURE__ */ import_react87.default.createElement("strong", { role: "status" }, "正在准备 Codex 授权…"), /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy, onClick: cancel }, "取消登录")), login?.url && /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-sub-login", role: "region", "aria-label": "账户授权" }, /* @__PURE__ */ import_react87.default.createElement("strong", null, "完成账户授权"), /* @__PURE__ */ import_react87.default.createElement("p", null, "在厂商页面确认登录，完成后回到 DS Bot。"), /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-sub-actions" }, /* @__PURE__ */ import_react87.default.createElement("a", { className: "bp-ai-primary", href: login.url, target: "_blank", rel: "noopener noreferrer" }, "打开授权页面", /* @__PURE__ */ import_react87.default.createElement(UiIcon, { name: "arrow", size: 14 })), /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy, onClick: cancel }, "取消登录")), /* @__PURE__ */ import_react87.default.createElement("small", null, "等待授权完成…")), /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-section-head" }, /* @__PURE__ */ import_react87.default.createElement("h3", null, "订阅账户 ", /* @__PURE__ */ import_react87.default.createElement("span", null, view.accounts.length))), /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-provider-list" }, view.accounts.map((account) => /* @__PURE__ */ import_react87.default.createElement("article", { className: "bp-ai-provider bp-sub-account", key: account.id, "data-subscription-account": account.id }, /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-mark", "aria-hidden": "true" }, /* @__PURE__ */ import_react87.default.createElement(UiIcon, { name: "bot", size: 20 })), /* @__PURE__ */ import_react87.default.createElement("div", { className: "bp-ai-copy" }, /* @__PURE__ */ import_react87.default.createElement("h4", null, account.name), (account.email || account.plan) && /* @__PURE__ */ import_react87.default.createElement("small", null, [account.email, account.plan].filter(Boolean).join(" · ")), /* @__PURE__ */ import_react87.default.createElement("p", { className: "bp-ai-state", "data-state": account.state === "ready" ? "ready" : "configured" }, /* @__PURE__ */ import_react87.default.createElement("span", null), accountStates[account.state] ?? "状态待检查", account.enabled && " · " + account.models.length + " 个可用模型"), account.state === "legacy" && /* @__PURE__ */ import_react87.default.createElement("small", null, "请在上方重新授权账户，并为相关 Bot 选择新的订阅模型。"), account.models.length > 0 && /* @__PURE__ */ import_react87.default.createElement("details", null, /* @__PURE__ */ import_react87.default.createElement("summary", null, "查看模型"), /* @__PURE__ */ import_react87.default.createElement("ul", null, account.models.map((model) => /* @__PURE__ */ import_react87.default.createElement("li", { key: model.id }, model.name)))), account.usedBy.length > 0 && /* @__PURE__ */ import_react87.default.createElement("small", null, "使用中：", account.usedBy.map((bot) => bot.name).join("、"), "。")), account.state !== "legacy" && /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", disabled: !!busy || !!login || account.usedBy.length > 0, onClick: () => {
     remove(account);
-  } }, "退出账户"))), !view.accounts.length && /* @__PURE__ */ import_react87.default.createElement("p", { className: "bp-ai-hint" }, "尚未登录套餐账户。授权完成后，账户和模型会显示在这里。")), onOpenBindings && /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", className: "bp-ai-bot-link", onClick: onOpenBindings }, "为 Bot 选择订阅模型", /* @__PURE__ */ import_react87.default.createElement(UiIcon, { name: "chevron", size: 15 }))));
+  } }, "退出账户"))), !view.accounts.length && /* @__PURE__ */ import_react87.default.createElement("p", { className: "bp-ai-hint" }, "授权后的账户和模型会显示在这里。")), onOpenBindings && view.accounts.some((account) => account.enabled && account.models.length) && /* @__PURE__ */ import_react87.default.createElement("button", { type: "button", className: "bp-ai-bot-link", onClick: onOpenBindings }, "为 Bot 选择订阅模型", /* @__PURE__ */ import_react87.default.createElement(UiIcon, { name: "chevron", size: 15 }))));
 }
 
 // apps/integration-client/ai-providers.jsx
@@ -47211,8 +47194,8 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings, onReturnToTask, 
       if (!scope.current.live || epoch !== scope.current.epoch) return;
       if (result?.schemaVersion !== 1 || !Array.isArray(result.providers) || !Array.isArray(result.presets)) throw new Error("此连接尚未支持独立 AI 配置，请更新完整插件。");
       setView(result), setError("");
-    } catch (failure3) {
-      scope.current.live && epoch === scope.current.epoch && setError(failure3.message);
+    } catch (failure4) {
+      scope.current.live && epoch === scope.current.epoch && setError(failure4.message);
     }
   }, refreshCli = async () => {
     let epoch = ++cliEpoch.current;
@@ -47243,8 +47226,8 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings, onReturnToTask, 
       scope.current.busy = !0, setBusy(id3), setError(""), setNotice("");
       try {
         await operation();
-      } catch (failure3) {
-        scope.current.live && setError(failure3.message || "操作失败，请重试。");
+      } catch (failure4) {
+        scope.current.live && setError(failure4.message || "操作失败，请重试。");
       } finally {
         scope.current.busy = !1, scope.current.live && setBusy("");
       }
@@ -47287,7 +47270,7 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings, onReturnToTask, 
     load();
   } }, "刷新")), notice && /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-notice", role: "status" }, notice), !view && !error && /* @__PURE__ */ import_react88.default.createElement("p", { role: "status" }, "正在读取独立 AI 配置…"), draft2 ? /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-editor" }, /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-editor-head" }, /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: editingBusy, onClick: () => {
     draftVersion.current++, setDraft(null), setSuggestions([]), setError("");
-  } }, /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "chevron", size: 15 }), "返回提供方"), /* @__PURE__ */ import_react88.default.createElement("h3", null, draft2.id ? "管理连接" : "添加连接")), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-fields" }, /* @__PURE__ */ import_react88.default.createElement("label", null, "连接名称", /* @__PURE__ */ import_react88.default.createElement("input", { "aria-label": "连接名称", value: draft2.name, maxLength: 100, disabled: editingBusy, onChange: (event) => change({ name: event.target.value }) })), /* @__PURE__ */ import_react88.default.createElement("label", null, "接口协议", /* @__PURE__ */ import_react88.default.createElement("select", { "aria-label": "接口协议", value: draft2.protocol, disabled: editingBusy, onChange: (event) => change({ protocol: event.target.value }) }, view.protocols.map((protocol) => /* @__PURE__ */ import_react88.default.createElement("option", { key: protocol, value: protocol }, protocol)))), /* @__PURE__ */ import_react88.default.createElement("label", { className: "bp-ai-wide" }, "服务地址", /* @__PURE__ */ import_react88.default.createElement("input", { type: "url", "aria-label": "AI 服务地址", value: draft2.baseUrl, disabled: editingBusy, placeholder: "https://api.example.com/v1", onChange: (event) => change({ baseUrl: event.target.value }) })), /* @__PURE__ */ import_react88.default.createElement("label", null, "认证方式", /* @__PURE__ */ import_react88.default.createElement("select", { "aria-label": "认证方式", value: draft2.auth, disabled: editingBusy, onChange: (event) => change({ auth: event.target.value }) }, /* @__PURE__ */ import_react88.default.createElement("option", { value: "key" }, "API Key"), /* @__PURE__ */ import_react88.default.createElement("option", { value: "none" }, "本机服务 · 无密钥"))), draft2.auth === "key" && /* @__PURE__ */ import_react88.default.createElement("label", null, "API Key", /* @__PURE__ */ import_react88.default.createElement("input", { type: "password", "aria-label": "此连接的 API Key", autoComplete: "new-password", spellCheck: !1, value: draft2.apiKey, disabled: editingBusy, placeholder: draft2.keyConfigured ? "留空保留已保存的密钥" : "请输入此连接的密钥", onChange: (event) => change({ apiKey: event.target.value, clearApiKey: !1 }) }))), draft2.keyConfigured && /* @__PURE__ */ import_react88.default.createElement("label", { className: "bp-ai-check" }, /* @__PURE__ */ import_react88.default.createElement("input", { type: "checkbox", checked: draft2.clearApiKey, disabled: editingBusy, onChange: (event) => change({ clearApiKey: event.target.checked, apiKey: "" }) }), "清除此连接已保存的 API Key"), /* @__PURE__ */ import_react88.default.createElement("label", { className: "bp-ai-check" }, /* @__PURE__ */ import_react88.default.createElement("input", { type: "checkbox", checked: draft2.enabled, disabled: editingBusy, onChange: (event) => change({ enabled: event.target.checked }) }), "启用此连接"), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-model-heading" }, /* @__PURE__ */ import_react88.default.createElement("h3", null, "可用模型 ", /* @__PURE__ */ import_react88.default.createElement("span", null, draft2.models.length)), /* @__PURE__ */ import_react88.default.createElement("div", null, /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: !!busy, onClick: chooseModels }, "从内置目录选择"), /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: editingBusy, onClick: () => change({ models: [...draft2.models, newModel()] }) }, /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "plus", size: 14 }), "添加模型"))), /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-hint" }, "上下文容量使用模型的实际规格；输出上限必须小于上下文。配置会用于所有选择此模型的 Bot。"), suggestions.length > 0 && /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-suggestions" }, /* @__PURE__ */ import_react88.default.createElement("label", null, "搜索目录模型", /* @__PURE__ */ import_react88.default.createElement("input", { "aria-label": "搜索目录模型", value: search, onChange: (event) => setSearch(event.target.value) })), /* @__PURE__ */ import_react88.default.createElement("ul", null, suggestions.filter((model) => `${model.name} ${model.id}`.toLowerCase().includes(search.toLowerCase())).map((model) => /* @__PURE__ */ import_react88.default.createElement("li", { key: model.id }, /* @__PURE__ */ import_react88.default.createElement("span", null, model.name, /* @__PURE__ */ import_react88.default.createElement("small", null, model.id, " · ", model.contextWindow ? `上下文 ${model.contextWindow.toLocaleString()}` : "添加后请填写准确容量")), /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: draft2.models.some((item) => item.id === model.id), onClick: () => addSuggested(model) }, draft2.models.some((item) => item.id === model.id) ? "已添加" : "添加"))))), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-models" }, draft2.models.map((model, index) => /* @__PURE__ */ import_react88.default.createElement("fieldset", { key: index }, /* @__PURE__ */ import_react88.default.createElement("legend", null, "模型 ", index + 1), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-fields" }, [["id", "模型 ID"], ["name", "显示名称"], ["contextWindow", "上下文容量"], ["maxTokens", "默认输出上限"]].map(([key, label]) => /* @__PURE__ */ import_react88.default.createElement("label", { key }, label, /* @__PURE__ */ import_react88.default.createElement("input", { "aria-label": `模型 ${index + 1} ${label}`, type: ["contextWindow", "maxTokens"].includes(key) ? "number" : "text", min: "1", value: model[key], disabled: editingBusy, onChange: (event) => change({ models: draft2.models.map((item, at2) => at2 === index ? { ...item, [key]: event.target.value } : item) }) })))), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-model-footer" }, /* @__PURE__ */ import_react88.default.createElement("label", { className: "bp-ai-check" }, /* @__PURE__ */ import_react88.default.createElement("input", { type: "checkbox", checked: model.reasoning, disabled: editingBusy, onChange: (event) => change({ models: draft2.models.map((item, at2) => at2 === index ? { ...item, reasoning: event.target.checked } : item) }) }), "支持思考强度设置"), /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: editingBusy, onClick: () => change({ models: draft2.models.filter((_item, at2) => at2 !== index) }) }, "移除模型"))))), draft2.usedBy?.length > 0 && /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-hint" }, "正在使用：", draft2.usedBy.map((bot) => bot.name).join("、"), "。删除前请先切换这些 Bot 的模型。"), /* @__PURE__ */ import_react88.default.createElement("footer", { className: "bp-ai-save" }, draft2.id && /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", className: "bp-ai-danger", disabled: !!busy || draft2.usedBy?.length > 0, onClick: remove }, "删除连接"), /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", className: "bp-ai-primary", disabled: !!busy, onClick: save }, busy === "save" ? "正在保存…" : "保存连接"))) : view && /* @__PURE__ */ import_react88.default.createElement(import_react88.default.Fragment, null, /* @__PURE__ */ import_react88.default.createElement("div", { hidden: section !== "api" }, /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-section-head" }, /* @__PURE__ */ import_react88.default.createElement("h3", null, "我的模型连接"), /* @__PURE__ */ import_react88.default.createElement("span", null, "独立账号与密钥")), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-provider-list" }, view.providers.map((provider) => /* @__PURE__ */ import_react88.default.createElement("article", { className: "bp-ai-provider", key: provider.id, "data-ai-provider": provider.id }, /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-mark", "aria-hidden": "true" }, view.presets.find((preset) => preset.id === provider.preset)?.mark ?? "AI"), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-copy" }, /* @__PURE__ */ import_react88.default.createElement("h4", null, provider.name), /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-state", "data-state": provider.state }, /* @__PURE__ */ import_react88.default.createElement("span", null), labels2[provider.state] ?? "状态未知", " · ", provider.models.length, " 个模型"), healthText(provider) && /* @__PURE__ */ import_react88.default.createElement("small", null, healthText(provider)), /* @__PURE__ */ import_react88.default.createElement("small", null, new URL(provider.baseUrl).host)), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-row-actions" }, /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: !!busy || !provider.enabled || provider.auth === "key" && !provider.keyConfigured, onClick: () => check(provider) }, busy === `check-${provider.id}` ? "检查中…" : "检查"), /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: editingBusy, onClick: () => edit(provider) }, "管理")))), !view.providers.length && /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-empty" }, /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "spark", size: 26 }), /* @__PURE__ */ import_react88.default.createElement("h4", null, "连接你的第一个 AI"), /* @__PURE__ */ import_react88.default.createElement("p", null, "选择下面的提供方，填写自己的账号密钥与模型。"))), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-presets" }, view.presets.map((preset) => /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", key: preset.id, disabled: editingBusy, onClick: () => edit(preset) }, /* @__PURE__ */ import_react88.default.createElement("span", { className: "bp-ai-small-mark", "aria-hidden": "true" }, preset.mark), /* @__PURE__ */ import_react88.default.createElement("span", null, preset.name), /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "plus", size: 14 }))))), /* @__PURE__ */ import_react88.default.createElement("div", { hidden: section !== "subscriptions" }, visitedSubscriptions && /* @__PURE__ */ import_react88.default.createElement(SubscriptionAccounts, { productApi, onOpenBindings })), /* @__PURE__ */ import_react88.default.createElement("div", { hidden: section !== "cli" }, visitedCli && /* @__PURE__ */ import_react88.default.createElement(CliChatProviders, { productApi, onOpenTools, onOpenBindings })), /* @__PURE__ */ import_react88.default.createElement("div", { hidden: section !== "tools" }, /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-section-head" }, /* @__PURE__ */ import_react88.default.createElement("h3", null, "官方 CLI 与应用"), onOpenTools && /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", onClick: onOpenTools }, "安装与登录", /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "arrow", size: 14 }))), checkingCli && /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-hint", role: "status" }, "正在检查本机工具…"), cliNotice && /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-hint", role: "status" }, cliNotice), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-provider-list" }, (cli?.tools ?? []).map((tool) => /* @__PURE__ */ import_react88.default.createElement(import_react88.default.Fragment, { key: tool.toolId ?? tool.id }, /* @__PURE__ */ import_react88.default.createElement("article", { className: "bp-ai-provider" }, /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-mark", "aria-hidden": "true" }, /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "bot", size: 20 })), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-copy" }, /* @__PURE__ */ import_react88.default.createElement("h4", null, tool.label ?? tool.toolId ?? tool.id), /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-state", "data-state": tool.status === "ready" ? "ready" : "configured" }, /* @__PURE__ */ import_react88.default.createElement("span", null), cliLabels[tool.status] ?? "尚未检测"), tool.reason && /* @__PURE__ */ import_react88.default.createElement("small", null, tool.reason)), hasCliSetup(tool.toolId ?? tool.id) ? /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", onClick: () => setSetupTool(tool.toolId ?? tool.id) }, "配置与修复") : onOpenTools && /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", onClick: onOpenTools }, "管理")), setupTool === (tool.toolId ?? tool.id) && /* @__PURE__ */ import_react88.default.createElement(OfficialToolSetup, { productApi, toolId: setupTool, onClose: () => setSetupTool(null), onOpenTools })))), !cli?.tools?.length && /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-hint" }, "点击“重新检查”读取本机 CLI 状态；安装与登录在官方工具面板完成。")), onOpenBindings && section !== "subscriptions" && /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", className: "bp-ai-bot-link", onClick: onOpenBindings }, "为 Bot 选择模型", /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "chevron", size: 15 }))));
+  } }, /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "chevron", size: 15 }), "返回提供方"), /* @__PURE__ */ import_react88.default.createElement("h3", null, draft2.id ? "管理连接" : "添加连接")), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-fields" }, /* @__PURE__ */ import_react88.default.createElement("label", null, "连接名称", /* @__PURE__ */ import_react88.default.createElement("input", { "aria-label": "连接名称", value: draft2.name, maxLength: 100, disabled: editingBusy, onChange: (event) => change({ name: event.target.value }) })), /* @__PURE__ */ import_react88.default.createElement("label", null, "接口协议", /* @__PURE__ */ import_react88.default.createElement("select", { "aria-label": "接口协议", value: draft2.protocol, disabled: editingBusy, onChange: (event) => change({ protocol: event.target.value }) }, view.protocols.map((protocol) => /* @__PURE__ */ import_react88.default.createElement("option", { key: protocol, value: protocol }, protocol)))), /* @__PURE__ */ import_react88.default.createElement("label", { className: "bp-ai-wide" }, "服务地址", /* @__PURE__ */ import_react88.default.createElement("input", { type: "url", "aria-label": "AI 服务地址", value: draft2.baseUrl, disabled: editingBusy, placeholder: "https://api.example.com/v1", onChange: (event) => change({ baseUrl: event.target.value }) })), /* @__PURE__ */ import_react88.default.createElement("label", null, "认证方式", /* @__PURE__ */ import_react88.default.createElement("select", { "aria-label": "认证方式", value: draft2.auth, disabled: editingBusy, onChange: (event) => change({ auth: event.target.value }) }, /* @__PURE__ */ import_react88.default.createElement("option", { value: "key" }, "API Key"), /* @__PURE__ */ import_react88.default.createElement("option", { value: "none" }, "本机服务 · 无密钥"))), draft2.auth === "key" && /* @__PURE__ */ import_react88.default.createElement("label", null, "API Key", /* @__PURE__ */ import_react88.default.createElement("input", { type: "password", "aria-label": "此连接的 API Key", autoComplete: "new-password", spellCheck: !1, value: draft2.apiKey, disabled: editingBusy, placeholder: draft2.keyConfigured ? "留空保留已保存的密钥" : "请输入此连接的密钥", onChange: (event) => change({ apiKey: event.target.value, clearApiKey: !1 }) }))), draft2.keyConfigured && /* @__PURE__ */ import_react88.default.createElement("label", { className: "bp-ai-check" }, /* @__PURE__ */ import_react88.default.createElement("input", { type: "checkbox", checked: draft2.clearApiKey, disabled: editingBusy, onChange: (event) => change({ clearApiKey: event.target.checked, apiKey: "" }) }), "清除此连接已保存的 API Key"), /* @__PURE__ */ import_react88.default.createElement("label", { className: "bp-ai-check" }, /* @__PURE__ */ import_react88.default.createElement("input", { type: "checkbox", checked: draft2.enabled, disabled: editingBusy, onChange: (event) => change({ enabled: event.target.checked }) }), "启用此连接"), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-model-heading" }, /* @__PURE__ */ import_react88.default.createElement("h3", null, "可用模型 ", /* @__PURE__ */ import_react88.default.createElement("span", null, draft2.models.length)), /* @__PURE__ */ import_react88.default.createElement("div", null, /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: !!busy, onClick: chooseModels }, "从内置目录选择"), /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: editingBusy, onClick: () => change({ models: [...draft2.models, newModel()] }) }, /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "plus", size: 14 }), "添加模型"))), /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-hint" }, "上下文容量使用模型的实际规格；输出上限必须小于上下文。配置会用于所有选择此模型的 Bot。"), suggestions.length > 0 && /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-suggestions" }, /* @__PURE__ */ import_react88.default.createElement("label", null, "搜索目录模型", /* @__PURE__ */ import_react88.default.createElement("input", { "aria-label": "搜索目录模型", value: search, onChange: (event) => setSearch(event.target.value) })), /* @__PURE__ */ import_react88.default.createElement("ul", null, suggestions.filter((model) => `${model.name} ${model.id}`.toLowerCase().includes(search.toLowerCase())).map((model) => /* @__PURE__ */ import_react88.default.createElement("li", { key: model.id }, /* @__PURE__ */ import_react88.default.createElement("span", null, model.name, /* @__PURE__ */ import_react88.default.createElement("small", null, model.id, " · ", model.contextWindow ? `上下文 ${model.contextWindow.toLocaleString()}` : "添加后请填写准确容量")), /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: draft2.models.some((item) => item.id === model.id), onClick: () => addSuggested(model) }, draft2.models.some((item) => item.id === model.id) ? "已添加" : "添加"))))), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-models" }, draft2.models.map((model, index) => /* @__PURE__ */ import_react88.default.createElement("fieldset", { key: index }, /* @__PURE__ */ import_react88.default.createElement("legend", null, "模型 ", index + 1), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-fields" }, [["id", "模型 ID"], ["name", "显示名称"], ["contextWindow", "上下文容量"], ["maxTokens", "默认输出上限"]].map(([key, label]) => /* @__PURE__ */ import_react88.default.createElement("label", { key }, label, /* @__PURE__ */ import_react88.default.createElement("input", { "aria-label": `模型 ${index + 1} ${label}`, type: ["contextWindow", "maxTokens"].includes(key) ? "number" : "text", min: "1", value: model[key], disabled: editingBusy, onChange: (event) => change({ models: draft2.models.map((item, at2) => at2 === index ? { ...item, [key]: event.target.value } : item) }) })))), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-model-footer" }, /* @__PURE__ */ import_react88.default.createElement("label", { className: "bp-ai-check" }, /* @__PURE__ */ import_react88.default.createElement("input", { type: "checkbox", checked: model.reasoning, disabled: editingBusy, onChange: (event) => change({ models: draft2.models.map((item, at2) => at2 === index ? { ...item, reasoning: event.target.checked } : item) }) }), "支持思考强度设置"), /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: editingBusy, onClick: () => change({ models: draft2.models.filter((_item, at2) => at2 !== index) }) }, "移除模型"))))), draft2.usedBy?.length > 0 && /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-hint" }, "正在使用：", draft2.usedBy.map((bot) => bot.name).join("、"), "。删除前请先切换这些 Bot 的模型。"), /* @__PURE__ */ import_react88.default.createElement("footer", { className: "bp-ai-save" }, draft2.id && /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", className: "bp-ai-danger", disabled: !!busy || draft2.usedBy?.length > 0, onClick: remove }, "删除连接"), /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", className: "bp-ai-primary", disabled: !!busy, onClick: save }, busy === "save" ? "正在保存…" : "保存连接"))) : view && /* @__PURE__ */ import_react88.default.createElement(import_react88.default.Fragment, null, /* @__PURE__ */ import_react88.default.createElement("div", { hidden: section !== "api" }, /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-section-head" }, /* @__PURE__ */ import_react88.default.createElement("h3", null, "我的模型连接"), /* @__PURE__ */ import_react88.default.createElement("span", null, "独立账号与密钥")), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-provider-list" }, view.providers.map((provider) => /* @__PURE__ */ import_react88.default.createElement("article", { className: "bp-ai-provider", key: provider.id, "data-ai-provider": provider.id }, /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-mark", "aria-hidden": "true" }, view.presets.find((preset) => preset.id === provider.preset)?.mark ?? "AI"), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-copy" }, /* @__PURE__ */ import_react88.default.createElement("h4", null, provider.name), /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-state", "data-state": provider.state }, /* @__PURE__ */ import_react88.default.createElement("span", null), labels2[provider.state] ?? "状态未知", " · ", provider.models.length, " 个模型"), healthText(provider) && /* @__PURE__ */ import_react88.default.createElement("small", null, healthText(provider)), /* @__PURE__ */ import_react88.default.createElement("small", null, new URL(provider.baseUrl).host)), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-row-actions" }, /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: !!busy || !provider.enabled || provider.auth === "key" && !provider.keyConfigured, onClick: () => check(provider) }, busy === `check-${provider.id}` ? "检查中…" : "检查"), /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", disabled: editingBusy, onClick: () => edit(provider) }, "管理")))), !view.providers.length && /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-empty" }, /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "spark", size: 26 }), /* @__PURE__ */ import_react88.default.createElement("h4", null, "连接你的第一个 AI"), /* @__PURE__ */ import_react88.default.createElement("p", null, "选择下面的提供方，填写自己的账号密钥与模型。"))), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-presets" }, view.presets.map((preset) => /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", key: preset.id, disabled: editingBusy, onClick: () => edit(preset) }, /* @__PURE__ */ import_react88.default.createElement("span", { className: "bp-ai-small-mark", "aria-hidden": "true" }, preset.mark), /* @__PURE__ */ import_react88.default.createElement("span", null, preset.name), /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "plus", size: 14 }))))), /* @__PURE__ */ import_react88.default.createElement("div", { hidden: section !== "subscriptions" }, visitedSubscriptions && /* @__PURE__ */ import_react88.default.createElement(SubscriptionAccounts, { productApi, onOpenBindings, onOpenTools })), /* @__PURE__ */ import_react88.default.createElement("div", { hidden: section !== "cli" }, visitedCli && /* @__PURE__ */ import_react88.default.createElement(CliChatProviders, { productApi, onOpenTools, onOpenBindings })), /* @__PURE__ */ import_react88.default.createElement("div", { hidden: section !== "tools" }, /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-section-head" }, /* @__PURE__ */ import_react88.default.createElement("h3", null, "官方 CLI 与应用"), onOpenTools && /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", onClick: onOpenTools }, "安装与登录", /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "arrow", size: 14 }))), checkingCli && /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-hint", role: "status" }, "正在检查本机工具…"), cliNotice && /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-hint", role: "status" }, cliNotice), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-provider-list" }, (cli?.tools ?? []).map((tool) => /* @__PURE__ */ import_react88.default.createElement(import_react88.default.Fragment, { key: tool.toolId ?? tool.id }, /* @__PURE__ */ import_react88.default.createElement("article", { className: "bp-ai-provider" }, /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-mark", "aria-hidden": "true" }, /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "bot", size: 20 })), /* @__PURE__ */ import_react88.default.createElement("div", { className: "bp-ai-copy" }, /* @__PURE__ */ import_react88.default.createElement("h4", null, tool.label ?? tool.toolId ?? tool.id), /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-state", "data-state": tool.status === "ready" ? "ready" : "configured" }, /* @__PURE__ */ import_react88.default.createElement("span", null), cliLabels[tool.status] ?? "尚未检测"), tool.reason && /* @__PURE__ */ import_react88.default.createElement("small", null, tool.reason)), hasCliSetup(tool.toolId ?? tool.id) ? /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", onClick: () => setSetupTool(tool.toolId ?? tool.id) }, "配置与修复") : onOpenTools && /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", onClick: onOpenTools }, "管理")), setupTool === (tool.toolId ?? tool.id) && /* @__PURE__ */ import_react88.default.createElement(OfficialToolSetup, { productApi, toolId: setupTool, onClose: () => setSetupTool(null), onOpenTools })))), !cli?.tools?.length && /* @__PURE__ */ import_react88.default.createElement("p", { className: "bp-ai-hint" }, "点击“重新检查”读取本机 CLI 状态；安装与登录在官方工具面板完成。")), onOpenBindings && section !== "subscriptions" && /* @__PURE__ */ import_react88.default.createElement("button", { type: "button", className: "bp-ai-bot-link", onClick: onOpenBindings }, "为 Bot 选择模型", /* @__PURE__ */ import_react88.default.createElement(UiIcon, { name: "chevron", size: 15 }))));
 }
 
 // apps/integration-client/bot-settings-dialog.jsx
@@ -47855,8 +47838,8 @@ function BotRuntimeRow({ botId, dispatch, busy, onOpenChat }) {
       let row = rows2.find((item) => item.botId === botId), mode = row ? row.mode : "integration";
       if (!["integration", "independent"].includes(mode)) throw new Error("未知运行时，已暂停操作。");
       setState({ runtime: mode, changedAt: row?.changedAt ?? null }), setError("");
-    } catch (failure3) {
-      mine === generation.current && (setState(null), setError(String(failure3?.message ?? failure3)));
+    } catch (failure4) {
+      mine === generation.current && (setState(null), setError(String(failure4?.message ?? failure4)));
     }
   }, [botId, dispatch]);
   import_react92.default.useEffect(() => (load(), () => {
@@ -47866,8 +47849,8 @@ function BotRuntimeRow({ botId, dispatch, busy, onOpenChat }) {
     setWorking(!0);
     try {
       await dispatch("botRuntimeMove", { botId, mode: target }), await load();
-    } catch (failure3) {
-      setError(String(failure3?.message ?? failure3));
+    } catch (failure4) {
+      setError(String(failure4?.message ?? failure4));
     } finally {
       setWorking(!1);
     }
@@ -47906,8 +47889,8 @@ var routingPresetLabel = (preset) => ({ economy: "省钱优先", balanced: "均�
     BOT_MISSING_CAPABILITY: "缺少任务所需能力",
     BOT_ROUTING_WORKER_CEILING_INSUFFICIENT: "保存的电脑权限不足"
   }[code] ?? "不满足本次执行条件";
-}, validRoutingView = (value) => value && typeof value.enabled == "boolean" && ["economy", "balanced", "quality"].includes(value.preset) && Array.isArray(value.candidates) && value.candidates.every((row) => row && typeof row.botId == "string" && row.botId !== ""), submissionFailureMessage = (failure3) => {
-  let code = failure3?.code;
+}, validRoutingView = (value) => value && typeof value.enabled == "boolean" && ["economy", "balanced", "quality"].includes(value.preset) && Array.isArray(value.candidates) && value.candidates.every((row) => row && typeof row.botId == "string" && row.botId !== ""), submissionFailureMessage = (failure4) => {
+  let code = failure4?.code;
   return code === "REMOTE_OWNER_REQUIRED" ? "请重新登录宿主拥有者账号后核对原提交；请保留核对码，不要重新创建任务。" : ["BOT_ROUTING_STATUS_UNAVAILABLE", "PRODUCT_ACTION_UNAVAILABLE"].includes(code) ? "当前宿主尚不支持原提交核对，请更新宿主或在任务记录中核对；请保留核对码。" : ["BOT_ROUTING_SUBMISSION_IDENTITY_MISMATCH", "INVALID_ROUTING_SUBMISSION_STATUS"].includes(code) ? "返回记录与原提交身份不一致，尚不能确认结果。请在原宿主核对任务记录并保留核对码。" : code === "PRODUCT_READ_ONLY" ? "宿主目前处于只读状态，请恢复宿主后核对原提交；请保留核对码，不要重新创建任务。" : "原提交核对尚未完成，请恢复宿主连接后再次核对；请保留核对码，不会重新提交任务。";
 };
 function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, navigation, focus }) {
@@ -47954,8 +47937,8 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
         if (!current(token)) return;
         if (!validRoutingView(next)) throw new Error("宿主未返回完整候选信息，请刷新后重试。");
         setView(next), control.current.ready = !0, setViewReady(!0);
-      } catch (failure3) {
-        current(token) && setError(String(failure3?.message ?? failure3));
+      } catch (failure4) {
+        current(token) && setError(String(failure4?.message ?? failure4));
       } finally {
         finish(token);
       }
@@ -47981,8 +47964,8 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
         if (!current(token)) return;
         if (!validRoutingView(value)) throw new Error("设置保存结果尚未确认，请刷新候选核对。");
         setView(value), control.current.ready = !0, setViewReady(!0);
-      } catch (failure3) {
-        current(token) && setError(String(failure3?.message ?? failure3));
+      } catch (failure4) {
+        current(token) && setError(String(failure4?.message ?? failure4));
       } finally {
         finish(token);
       }
@@ -48011,8 +47994,8 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
       let next = await call2("botRouting.dispatch", request), planId = next?.planId ?? next?.taskId;
       if (next?.accepted !== !0 || typeof planId != "string" || !planId.trim()) throw new Error("未取得有效的任务计划编号。");
       submissions.update(reference2, { state: "confirmed", planId, planState: next.planState }), navigation?.saveGoalDraft(""), current(token) && (state.prepared = null);
-    } catch (failure3) {
-      reference2 && submissions.update(reference2, { state: "unknown" }), current(token) && (invalidate(), staleView(), setError(reference2 ? "提交结果尚未确认，请刷新任务列表或核对原提交，避免重复创建。" : String(failure3?.message ?? failure3)));
+    } catch (failure4) {
+      reference2 && submissions.update(reference2, { state: "unknown" }), current(token) && (invalidate(), staleView(), setError(reference2 ? "提交结果尚未确认，请刷新任务列表或核对原提交，避免重复创建。" : String(failure4?.message ?? failure4)));
     } finally {
       finish(token);
     }
@@ -48025,8 +48008,8 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
         let next = await call2("botRouting.status", { requestKey: reference2.requestKey, requesterBotId: reference2.requesterBotId });
         if (typeof next?.found != "boolean" || next.originBotId !== reference2.requesterBotId || next.found && (next.accepted !== !0 || typeof next.planId != "string" || !next.planId.trim())) throw Object.assign(new Error("宿主未返回有效的原提交记录。"), { code: "INVALID_ROUTING_SUBMISSION_STATUS" });
         submissions.update(reference2, next.found ? { state: "confirmed", planId: next.planId, planState: next.planState } : { state: "not-found" });
-      } catch (failure3) {
-        current(token) && setError(submissionFailureMessage(failure3));
+      } catch (failure4) {
+        current(token) && setError(submissionFailureMessage(failure4));
       } finally {
         finish(token);
       }
@@ -48061,8 +48044,8 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
       if (!current(token) || state.draft !== draft2) return;
       if (!next || !Object.hasOwn(next, "chosen") || !Array.isArray(next.ranked) || !Array.isArray(next.rejected) || next.chosen !== null && typeof next.chosen?.botId != "string") throw new Error("宿主未返回完整预览，请刷新后重试。");
       state.prepared = next.chosen ? { request, draft: draft2, epoch: token.epoch, requestKey: null } : null, setDecision(next);
-    } catch (failure3) {
-      current(token) && state.draft === draft2 && (invalidate(), staleView(), setError(String(failure3?.message ?? failure3)));
+    } catch (failure4) {
+      current(token) && state.draft === draft2 && (invalidate(), staleView(), setError(String(failure4?.message ?? failure4)));
     } finally {
       finish(token);
     }
@@ -48114,8 +48097,8 @@ function DesktopControl({ snapshot, dispatch, busy }) {
     setError("");
     try {
       return await dispatch(action, payload);
-    } catch (failure3) {
-      return setError(String(failure3?.message ?? failure3)), null;
+    } catch (failure4) {
+      return setError(String(failure4?.message ?? failure4)), null;
     }
   }, capture = import_react92.default.useCallback(async () => {
     if (!canView) return;
@@ -48152,8 +48135,8 @@ function DesktopControl({ snapshot, dispatch, busy }) {
     try {
       let point = framePoint({ clientX: event.clientX, clientY: event.clientY, rect: { width: rect.width, height: rect.height }, frame: { width: frame.width, height: frame.height } });
       act({ tool: "click", x: point.x, y: point.y });
-    } catch (failure3) {
-      setError(String(failure3?.message ?? failure3));
+    } catch (failure4) {
+      setError(String(failure4?.message ?? failure4));
     }
   }, keys = ["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
   return /* @__PURE__ */ import_react92.default.createElement("section", { className: "bp-card", "aria-label": "电脑操作" }, /* @__PURE__ */ import_react92.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react92.default.createElement("h2", null, "电脑操作"), /* @__PURE__ */ import_react92.default.createElement("span", { className: "bp-tag" }, `${status}${frame?.screenshotId ? " · 帧 " + frame.screenshotId.slice(-6) : ""}`)), /* @__PURE__ */ import_react92.default.createElement("p", { className: "bp-muted" }, "画面来自已配对电脑的桌面；每个操作只对它下面那一帧生效，帧过期请重新截取。"), /* @__PURE__ */ import_react92.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react92.default.createElement("label", null, "电脑", /* @__PURE__ */ import_react92.default.createElement("select", { value: machineId, onChange: (event) => {
@@ -48180,8 +48163,8 @@ function MachineSetup({ snapshot, dispatch, busy, transport, mode = "connect", o
     if (file)
       try {
         setPaste(await file.text()), setStatus("已读取 " + file.name), setError("");
-      } catch (failure3) {
-        setError(String(failure3?.message ?? failure3));
+      } catch (failure4) {
+        setError(String(failure4?.message ?? failure4));
       }
   }, submit = async () => {
     if (!(!ready || working)) {
@@ -48205,8 +48188,8 @@ function MachineSetup({ snapshot, dispatch, busy, transport, mode = "connect", o
           expectedRevision: existing?.revision ?? 0
         }));
         setStatus(paired.mainBinding?.status === "blocked" ? "电脑已配对；主 Bot 绑定尚未完成：" + paired.mainBinding.code + "。请检查此电脑允许的 Bot ID 与授权状态。" : "已添加 " + (parsed.clientId || parsed.machineId) + "，主 Bot 已绑定；体检会自动刷新状态。"), setPaste("");
-      } catch (failure3) {
-        setError(String(failure3?.message ?? failure3));
+      } catch (failure4) {
+        setError(String(failure4?.message ?? failure4));
       } finally {
         setWorking(!1);
       }
@@ -48294,8 +48277,8 @@ function RoleCatalog({ dispatch, busy }) {
     if (typeof dispatch == "function")
       return dispatch("roles.list", {}).then((value) => {
         live && value && value.ok !== !1 && setRoles(Array.isArray(value) ? value : value?.roles ?? []);
-      }).catch((failure3) => {
-        live && setError(String(failure3?.message ?? failure3));
+      }).catch((failure4) => {
+        live && setError(String(failure4?.message ?? failure4));
       }), () => {
         live = !1;
       };
@@ -48303,8 +48286,8 @@ function RoleCatalog({ dispatch, busy }) {
   let copy2 = async (role) => {
     try {
       await navigator.clipboard?.writeText(`${role.name}: ${role.brief}`), setCopied(role.id);
-    } catch (failure3) {
-      setError(String(failure3?.message ?? failure3));
+    } catch (failure4) {
+      setError(String(failure4?.message ?? failure4));
     }
   };
   return error ? /* @__PURE__ */ import_react92.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react92.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react92.default.createElement("h2", null, "岗位")), /* @__PURE__ */ import_react92.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : roles ? /* @__PURE__ */ import_react92.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react92.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react92.default.createElement("h2", null, "岗位"), /* @__PURE__ */ import_react92.default.createElement(Tag3, null, roles.length)), /* @__PURE__ */ import_react92.default.createElement("p", { className: "bp-muted" }, "这些是给 Bot 的岗位简述。新建 Bot 时把简述粘进描述即可；岗位文本不会授予任何工具或机器权限。"), /* @__PURE__ */ import_react92.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react92.default.createElement("table", null, /* @__PURE__ */ import_react92.default.createElement("thead", null, /* @__PURE__ */ import_react92.default.createElement("tr", null, /* @__PURE__ */ import_react92.default.createElement("th", null, "岗位"), /* @__PURE__ */ import_react92.default.createElement("th", null, "简述"), /* @__PURE__ */ import_react92.default.createElement("th", null, "需要的能力"), /* @__PURE__ */ import_react92.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react92.default.createElement("tbody", null, roles.map((role) => /* @__PURE__ */ import_react92.default.createElement("tr", { key: role.id }, /* @__PURE__ */ import_react92.default.createElement("td", null, role.name, /* @__PURE__ */ import_react92.default.createElement("small", null, role.id)), /* @__PURE__ */ import_react92.default.createElement("td", null, role.brief), /* @__PURE__ */ import_react92.default.createElement("td", { className: "bp-code" }, role.tools.join("、")), /* @__PURE__ */ import_react92.default.createElement("td", null, /* @__PURE__ */ import_react92.default.createElement("button", { type: "button", disabled: busy, onClick: () => {
@@ -51002,7 +50985,7 @@ html body[data-bot-product-ui] .bp-na-card .bp-na-row { grid-template-columns: 2
 `;
 
 // apps/integration-client/native-activity.mjs
-var failure = (code, message2 = code) => Object.assign(new Error(message2), { code }), BOT = /^[-A-Za-z0-9_.]{1,128}$/, ID2 = /^[^\s\u0000-\u001f\u007f]{1,128}$/, KEY2 = /^[^\s\u0000-\u001f\u007f]{1,256}$/, CONTROL2 = /[\u0000-\u001f\u007f]/, OUTCOMES = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled", "unknown", "refused", "host-closed", "host-lost"]), NATIVE_ACTIVITY_ACTION = "nativeActivity.list", NATIVE_ACTIVITY_LIMIT_MAX = 50, NATIVE_ACTIVITY_LIMIT_DEFAULT = 20, LOADED_MAX = 200, REQUEST_MS3 = 8e3, NATIVE_ACTIVITY_STATES = Object.freeze(["running", "cli-ok", "cli-error", "turn-unconfirmed"]), NATIVE_ACTIVITY_LABELS = Object.freeze({
+var failure2 = (code, message2 = code) => Object.assign(new Error(message2), { code }), BOT = /^[-A-Za-z0-9_.]{1,128}$/, ID2 = /^[^\s\u0000-\u001f\u007f]{1,128}$/, KEY2 = /^[^\s\u0000-\u001f\u007f]{1,256}$/, CONTROL2 = /[\u0000-\u001f\u007f]/, OUTCOMES = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled", "unknown", "refused", "host-closed", "host-lost"]), NATIVE_ACTIVITY_ACTION = "nativeActivity.list", NATIVE_ACTIVITY_LIMIT_MAX = 50, NATIVE_ACTIVITY_LIMIT_DEFAULT = 20, LOADED_MAX = 200, REQUEST_MS3 = 8e3, NATIVE_ACTIVITY_STATES = Object.freeze(["running", "cli-ok", "cli-error", "turn-unconfirmed"]), NATIVE_ACTIVITY_LABELS = Object.freeze({
   running: "进行中",
   "cli-ok": "已返回",
   "cli-error": "返回错误",
@@ -51052,14 +51035,14 @@ function nativeActivityState(record3 = {}) {
 function nativeActivityScope({ botId, mode, sessionId, contextId } = {}) {
   let hasSession = typeof sessionId == "string" && sessionId !== "", hasContext = typeof contextId == "string" && contextId !== "";
   if (mode === "integration") {
-    if (!BOT.test(botId ?? "") || !hasSession || !KEY2.test(sessionId) || hasContext) throw failure("NATIVE_ACTIVITY_SCOPE_INVALID", "集成会话缺少有效的 Bot 或会话标识。");
+    if (!BOT.test(botId ?? "") || !hasSession || !KEY2.test(sessionId) || hasContext) throw failure2("NATIVE_ACTIVITY_SCOPE_INVALID", "集成会话缺少有效的 Bot 或会话标识。");
     return { botId, mode: "integration", sessionId, contextId: null };
   }
   if (mode === "independent") {
-    if (!BOT.test(botId ?? "") || !hasContext || !ID2.test(contextId) || hasSession) throw failure("NATIVE_ACTIVITY_SCOPE_INVALID", "独立会话缺少有效的 Bot 或对话标识。");
+    if (!BOT.test(botId ?? "") || !hasContext || !ID2.test(contextId) || hasSession) throw failure2("NATIVE_ACTIVITY_SCOPE_INVALID", "独立会话缺少有效的 Bot 或对话标识。");
     return { botId, mode: "independent", sessionId: null, contextId };
   }
-  throw failure("NATIVE_ACTIVITY_SCOPE_INVALID", "工具记录读取模式无效。");
+  throw failure2("NATIVE_ACTIVITY_SCOPE_INVALID", "工具记录读取模式无效。");
 }
 function nativeActivityScopeKey({ botId, mode, sessionId, contextId } = {}) {
   let scope = nativeActivityScope({ botId, mode, sessionId, contextId });
@@ -51076,7 +51059,7 @@ function readRecord(value, scope) {
   if (!value || typeof value != "object" || Array.isArray(value) || value.schemaVersion !== 1) return null;
   let callKey = text7(value.callKey, 128), callId = text7(value.callId, 256);
   if (callKey === null || !KEY2.test(callKey) || callId === null || !KEY2.test(callId) || text7(value.turnId, 128) === null || text7(value.processGeneration, 128) === null || !NATIVE_ACTIVITY_STATES.includes(value.state) || count(value.startedAt) === null || count(value.updatedAt) === null || value.endedAt !== null && count(value.endedAt) === null || value.cliOk !== null && typeof value.cliOk != "boolean" || value.turnOutcome !== null && !OUTCOMES.has(value.turnOutcome) || ["toolNameRecorded", "turnSettled", "cancelRequested", "stopConfirmed", "lateCliReturn"].some((key) => typeof value[key] != "boolean") || value.state === "cli-ok" && value.cliOk !== !0 || value.state === "cli-error" && value.cliOk !== !1 || ["running", "turn-unconfirmed"].includes(value.state) && value.cliOk !== null) return null;
-  if (value.botId !== scope.botId || value.mode !== scope.mode || value.conversationId !== scope.conversationId || value.contextId !== scope.contextId) throw failure("NATIVE_ACTIVITY_SCOPE_MISMATCH", "工具记录属于其他会话。");
+  if (value.botId !== scope.botId || value.mode !== scope.mode || value.conversationId !== scope.conversationId || value.contextId !== scope.contextId) throw failure2("NATIVE_ACTIVITY_SCOPE_MISMATCH", "工具记录属于其他会话。");
   return {
     schemaVersion: 1,
     callKey,
@@ -51105,25 +51088,25 @@ function readRecord(value, scope) {
   };
 }
 function readNativeActivityPage(value, scope) {
-  if (!value || typeof value != "object" || value.schemaVersion !== 1) throw failure("NATIVE_ACTIVITY_INVALID", "宿主返回的工具记录格式无效。");
+  if (!value || typeof value != "object" || value.schemaVersion !== 1) throw failure2("NATIVE_ACTIVITY_INVALID", "宿主返回的工具记录格式无效。");
   let reply = value.scope;
-  if (!reply || typeof reply != "object" || reply.botId !== scope.botId || reply.mode !== scope.mode) throw failure("NATIVE_ACTIVITY_SCOPE_MISMATCH", "宿主回答的不是当前会话。");
+  if (!reply || typeof reply != "object" || reply.botId !== scope.botId || reply.mode !== scope.mode) throw failure2("NATIVE_ACTIVITY_SCOPE_MISMATCH", "宿主回答的不是当前会话。");
   if (scope.mode === "integration") {
-    if (reply.sessionId !== scope.sessionId || text7(reply.conversationId, 128) === null || reply.contextId !== null) throw failure("NATIVE_ACTIVITY_SCOPE_MISMATCH", "宿主回答的不是当前集成会话。");
-  } else if (reply.sessionId !== null || reply.contextId !== scope.contextId || reply.conversationId !== scope.contextId) throw failure("NATIVE_ACTIVITY_SCOPE_MISMATCH", "宿主回答的不是当前对话。");
-  if (!Array.isArray(value.items) || value.items.length > NATIVE_ACTIVITY_LIMIT_MAX) throw failure("NATIVE_ACTIVITY_INVALID", "宿主返回的工具记录数量无效。");
+    if (reply.sessionId !== scope.sessionId || text7(reply.conversationId, 128) === null || reply.contextId !== null) throw failure2("NATIVE_ACTIVITY_SCOPE_MISMATCH", "宿主回答的不是当前集成会话。");
+  } else if (reply.sessionId !== null || reply.contextId !== scope.contextId || reply.conversationId !== scope.contextId) throw failure2("NATIVE_ACTIVITY_SCOPE_MISMATCH", "宿主回答的不是当前对话。");
+  if (!Array.isArray(value.items) || value.items.length > NATIVE_ACTIVITY_LIMIT_MAX) throw failure2("NATIVE_ACTIVITY_INVALID", "宿主返回的工具记录数量无效。");
   let items = [];
   for (let row of value.items) {
     let record3 = readRecord(row, reply);
-    if (record3 === null) throw failure("NATIVE_ACTIVITY_INVALID", "宿主返回的工具记录缺少稳定编号。");
+    if (record3 === null) throw failure2("NATIVE_ACTIVITY_INVALID", "宿主返回的工具记录缺少稳定编号。");
     items.push(record3);
   }
-  if (new Set(items.map((row) => row.callKey)).size !== items.length) throw failure("NATIVE_ACTIVITY_INVALID", "宿主返回的工具记录编号重复。");
-  if (typeof value.nativeRoute != "boolean") throw failure("NATIVE_ACTIVITY_INVALID", "宿主没有说明这一会话是否记录工具活动。");
+  if (new Set(items.map((row) => row.callKey)).size !== items.length) throw failure2("NATIVE_ACTIVITY_INVALID", "宿主返回的工具记录编号重复。");
+  if (typeof value.nativeRoute != "boolean") throw failure2("NATIVE_ACTIVITY_INVALID", "宿主没有说明这一会话是否记录工具活动。");
   let recording = value.recording;
-  if (!recording || typeof recording != "object" || !["ready", "degraded"].includes(recording.status) || count(recording.failures) === null) throw failure("NATIVE_ACTIVITY_INVALID", "宿主没有说明工具记录写入状态。");
+  if (!recording || typeof recording != "object" || !["ready", "degraded"].includes(recording.status) || count(recording.failures) === null) throw failure2("NATIVE_ACTIVITY_INVALID", "宿主没有说明工具记录写入状态。");
   let nextCursor = value.nextCursor === null ? null : text7(value.nextCursor, 4096);
-  if (value.nextCursor !== null && nextCursor === null) throw failure("NATIVE_ACTIVITY_INVALID", "宿主返回的记录页码无效。");
+  if (value.nextCursor !== null && nextCursor === null) throw failure2("NATIVE_ACTIVITY_INVALID", "宿主返回的记录页码无效。");
   return {
     conversationId: text7(reply.conversationId, 128),
     contextId: scope.mode === "independent" ? scope.contextId : null,
@@ -51135,7 +51118,7 @@ function readNativeActivityPage(value, scope) {
 }
 var compareRecords = (a, b2) => (b2.startedAt ?? 0) - (a.startedAt ?? 0) || (a.callKey < b2.callKey ? 1 : a.callKey > b2.callKey ? -1 : 0), mergeRecord = (held, next) => {
   for (let key of ["botId", "mode", "conversationId", "contextId", "processGeneration", "turnId", "callId", "startedAt"])
-    if (held[key] !== next[key]) throw failure("NATIVE_ACTIVITY_SCOPE_MISMATCH", "工具记录的原始身份发生变化。");
+    if (held[key] !== next[key]) throw failure2("NATIVE_ACTIVITY_SCOPE_MISMATCH", "工具记录的原始身份发生变化。");
   return {
     ...next,
     state: held.state === "running" ? next.state : held.state,
@@ -51209,7 +51192,7 @@ function createNativeActivityController({
   timeoutMs = REQUEST_MS3
 } = {}) {
   let scope = nativeActivityScope({ botId, mode, sessionId, contextId }), readLimit = Number.isSafeInteger(limit) ? Math.min(Math.max(1, limit), NATIVE_ACTIVITY_LIMIT_MAX) : NATIVE_ACTIVITY_LIMIT_DEFAULT;
-  if (typeof api?.dispatch != "function") throw failure("NATIVE_ACTIVITY_UNAVAILABLE", "宿主没有提供只读工具记录接口。");
+  if (typeof api?.dispatch != "function") throw failure2("NATIVE_ACTIVITY_UNAVAILABLE", "宿主没有提供只读工具记录接口。");
   let listeners3 = /* @__PURE__ */ new Set(), inflight = /* @__PURE__ */ new Set(), live = !1, retired = !1, fenced = !1, reading = !1, paging = !1, timer, pollEpoch = 0, pageEpoch = 0, pagingStarted = !1, state = {
     scope,
     conversationId: null,
@@ -51232,7 +51215,7 @@ function createNativeActivityController({
     }
   }, list2 = async (cursor, signal) => {
     let cancel, interrupted = new Promise((_resolve, reject) => {
-      cancel = () => reject(failure("NATIVE_ACTIVITY_ABORTED", "读取已中断。")), signal.addEventListener("abort", cancel, { once: !0 }), signal.aborted && cancel();
+      cancel = () => reject(failure2("NATIVE_ACTIVITY_ABORTED", "读取已中断。")), signal.addEventListener("abort", cancel, { once: !0 }), signal.aborted && cancel();
     });
     try {
       return await Promise.race([Promise.resolve().then(() => api.dispatch(NATIVE_ACTIVITY_ACTION, payloadOf(scope, cursor, readLimit), signal)), interrupted]);
@@ -51249,7 +51232,7 @@ function createNativeActivityController({
     });
   }, applyPage = (page, olderPage = !1) => {
     if (state.conversationId !== null && page.conversationId !== state.conversationId) {
-      fenced = !0, fail6(failure("NATIVE_ACTIVITY_SCOPE_MISMATCH"));
+      fenced = !0, fail6(failure2("NATIVE_ACTIVITY_SCOPE_MISMATCH"));
       return;
     }
     let merged = mergeRecords(state.items, page.items), truncated = state.truncated || merged.truncated;
@@ -51763,23 +51746,23 @@ function installDesktopBridge(api, renderPane) {
 var import_react104 = __toESM(require("react"), 1);
 
 // apps/integration-client/independent-chat-controller.mjs
-var failure2 = (code, message2 = code) => Object.assign(new Error(message2), { code }), BOT2 = /^[-A-Za-z0-9_.]{1,128}$/, HOST = /^host-[0-9a-f]{16}$/, KEY3 = /^[-A-Za-z0-9_]{16,128}$/, STATES2 = /* @__PURE__ */ new Set(["accepted", "running", "succeeded", "unknown", "refused", "cancelled"]), withoutProgress = (status) => {
+var failure3 = (code, message2 = code) => Object.assign(new Error(message2), { code }), BOT2 = /^[-A-Za-z0-9_.]{1,128}$/, HOST = /^host-[0-9a-f]{16}$/, KEY3 = /^[-A-Za-z0-9_]{16,128}$/, STATES2 = /* @__PURE__ */ new Set(["accepted", "running", "succeeded", "unknown", "refused", "cancelled"]), withoutProgress = (status) => {
   if (!status) return status;
   let { progress, ...stored } = status;
   return stored;
 }, independentChatStorageKey = (hostId, botId) => `bot-product:independent-chat:1:${hostId}:${botId}`, independentChatNonce = () => {
-  if (typeof globalThis.crypto?.randomUUID != "function") throw failure2("CHAT_NONCE_UNAVAILABLE", "浏览器无法生成安全请求编号。");
+  if (typeof globalThis.crypto?.randomUUID != "function") throw failure3("CHAT_NONCE_UNAVAILABLE", "浏览器无法生成安全请求编号。");
   return globalThis.crypto.randomUUID();
 };
 function validateChatRequest(value, botId, requestKey) {
-  if (value?.schemaVersion !== 1 || value.botId !== botId || !KEY3.test(value.requestKey ?? "") || requestKey && value.requestKey !== requestKey || !STATES2.has(value.state) || typeof value.pending != "boolean" || typeof value.finished != "boolean" || value.stopConfirmed !== !1) throw failure2("CHAT_IDENTITY_MISMATCH", "宿主返回的请求身份或状态无效，请保留原编号核对。");
+  if (value?.schemaVersion !== 1 || value.botId !== botId || !KEY3.test(value.requestKey ?? "") || requestKey && value.requestKey !== requestKey || !STATES2.has(value.state) || typeof value.pending != "boolean" || typeof value.finished != "boolean" || value.stopConfirmed !== !1) throw failure3("CHAT_IDENTITY_MISMATCH", "宿主返回的请求身份或状态无效，请保留原编号核对。");
   let progress = value.progress;
-  if (value.operationKind !== void 0 && !["send", "new-conversation"].includes(value.operationKind)) throw failure2("CHAT_IDENTITY_MISMATCH");
-  if (progress != null && (value.operationKind === "new-conversation" || !value.pending || !["accepted", "running"].includes(value.state) || !Number.isSafeInteger(progress.step) || progress.step < 1 || progress.step > 64 || !Number.isSafeInteger(progress.sequence) || progress.sequence < 1 || typeof progress.text != "string" || progress.text.length > 64e3 || typeof progress.truncated != "boolean")) throw failure2("CHAT_PROGRESS_INVALID", "宿主返回的生成预览格式无效。");
+  if (value.operationKind !== void 0 && !["send", "new-conversation"].includes(value.operationKind)) throw failure3("CHAT_IDENTITY_MISMATCH");
+  if (progress != null && (value.operationKind === "new-conversation" || !value.pending || !["accepted", "running"].includes(value.state) || !Number.isSafeInteger(progress.step) || progress.step < 1 || progress.step > 64 || !Number.isSafeInteger(progress.sequence) || progress.sequence < 1 || typeof progress.text != "string" || progress.text.length > 64e3 || typeof progress.truncated != "boolean")) throw failure3("CHAT_PROGRESS_INVALID", "宿主返回的生成预览格式无效。");
   return value;
 }
 function validateChatPage(value, botId) {
-  if (value?.schemaVersion !== 1 || value.botId !== botId || !Array.isArray(value.items) || value.items.length > 100 || value.nextCursor !== null && typeof value.nextCursor != "string" || value.items.some((row) => !row || typeof row.messageId != "string" || !row.messageId || typeof row.content != "string" || !["user", "assistant", "tool", "system"].includes(row.role) || row.contextId !== void 0 && (typeof row.contextId != "string" || !row.contextId || row.contextId.length > 128)) || new Set(value.items.map((row) => row.messageId)).size !== value.items.length) throw failure2("CHAT_PAGE_INVALID", "会话页缺少稳定消息编号，已拒绝显示可能错位的内容。");
+  if (value?.schemaVersion !== 1 || value.botId !== botId || !Array.isArray(value.items) || value.items.length > 100 || value.nextCursor !== null && typeof value.nextCursor != "string" || value.items.some((row) => !row || typeof row.messageId != "string" || !row.messageId || typeof row.content != "string" || !["user", "assistant", "tool", "system"].includes(row.role) || row.contextId !== void 0 && (typeof row.contextId != "string" || !row.contextId || row.contextId.length > 128)) || new Set(value.items.map((row) => row.messageId)).size !== value.items.length) throw failure3("CHAT_PAGE_INVALID", "会话页缺少稳定消息编号，已拒绝显示可能错位的内容。");
   return value;
 }
 function createIndependentChatController({
@@ -51792,9 +51775,9 @@ function createIndependentChatController({
   nonce = independentChatNonce,
   onHostChanged
 } = {}) {
-  if (!HOST.test(hostId ?? "") || !BOT2.test(botId ?? "") || typeof api?.dispatch != "function") throw failure2("CHAT_SCOPE_INVALID");
+  if (!HOST.test(hostId ?? "") || !BOT2.test(botId ?? "") || typeof api?.dispatch != "function") throw failure3("CHAT_SCOPE_INVALID");
   let key = independentChatStorageKey(hostId, botId), listeners3 = /* @__PURE__ */ new Set(), calls2 = /* @__PURE__ */ new Set(), live = !1, retired = !1, timer, polling = !1, lock = !1, pageLock = !1, revision = 0, pageLoaded = !1, exhausted = !1, nextNonce = nonce();
-  if (!KEY3.test(nextNonce ?? "")) throw failure2("CHAT_NONCE_INVALID");
+  if (!KEY3.test(nextNonce ?? "")) throw failure3("CHAT_NONCE_INVALID");
   let state = {
     hostId,
     botId,
@@ -51837,7 +51820,7 @@ function createIndependentChatController({
     let controller = new AbortController();
     calls2.add(controller);
     let alarm, abort, stopped = new Promise((_2, reject) => {
-      abort = () => reject(failure2("CHAT_TRANSPORT_UNKNOWN", "连接中断，发送结果尚未确认；只核对原请求，不会自动重发。")), controller.signal.addEventListener("abort", abort, { once: !0 }), alarm = setTimeout(() => controller.abort(), timeoutMs);
+      abort = () => reject(failure3("CHAT_TRANSPORT_UNKNOWN", "连接中断，发送结果尚未确认；只核对原请求，不会自动重发。")), controller.signal.addEventListener("abort", abort, { once: !0 }), alarm = setTimeout(() => controller.abort(), timeoutMs);
     });
     try {
       return await Promise.race([Promise.resolve().then(() => api.dispatch(action, payload, controller.signal)), stopped]);
@@ -51846,18 +51829,18 @@ function createIndependentChatController({
     }
   }, assertHost = async () => {
     let namespace = await call2("ui.namespace", {});
-    if (!live) throw failure2("CHAT_SCOPE_RETIRED");
-    if (namespace?.schemaVersion !== 1 || !HOST.test(namespace.hostId ?? "")) throw failure2("CHAT_SCOPE_INVALID", "宿主没有确认界面存储标识。");
+    if (!live) throw failure3("CHAT_SCOPE_RETIRED");
+    if (namespace?.schemaVersion !== 1 || !HOST.test(namespace.hostId ?? "")) throw failure3("CHAT_SCOPE_INVALID", "宿主没有确认界面存储标识。");
     if (namespace.hostId !== hostId) {
       publish2({ view: null, error: "宿主连接已切换，正在重新读取联系人与草稿。" }), live = !1, revision++, clearTimeout(timer);
       for (let controller of calls2) controller.abort();
-      throw onHostChanged?.(), failure2("CHAT_SCOPE_RETIRED");
+      throw onHostChanged?.(), failure3("CHAT_SCOPE_RETIRED");
     }
   }, applyRequest = (value, requestKey) => {
     let request = validateChatRequest(value, botId, requestKey), held = state.pending;
     if (held && held.requestKey !== request.requestKey) return;
     let operationKind = request.operationKind ?? held?.operationKind ?? "send";
-    if (held?.operationKind && held.operationKind !== operationKind) throw failure2("CHAT_IDENTITY_MISMATCH");
+    if (held?.operationKind && held.operationKind !== operationKind) throw failure3("CHAT_IDENTITY_MISMATCH");
     let pending = request.state === "succeeded" ? null : {
       requestKey: request.requestKey,
       operationKind,
@@ -51887,7 +51870,7 @@ function createIndependentChatController({
       if (await assertHost(), !live || mine !== revision) return;
       let view = await call2("independentChat.view", { botId });
       if (!live || mine !== revision) return;
-      if (view?.schemaVersion !== 1 || view.botId !== botId || !["independent", "integration", null].includes(view.mode) || typeof view.available != "boolean") throw failure2("CHAT_VIEW_INVALID", "宿主聊天状态无效。");
+      if (view?.schemaVersion !== 1 || view.botId !== botId || !["independent", "integration", null].includes(view.mode) || typeof view.available != "boolean") throw failure3("CHAT_VIEW_INVALID", "宿主聊天状态无效。");
       if (publish2({ view, error: "" }), state.pending) {
         let requestKey = state.pending.requestKey;
         try {
@@ -51931,7 +51914,7 @@ function createIndependentChatController({
       let requestKey;
       try {
         if (await assertHost(), !live) return;
-        if (requestKey = nextNonce, !KEY3.test(requestKey)) throw failure2("CHAT_NONCE_INVALID");
+        if (requestKey = nextNonce, !KEY3.test(requestKey)) throw failure3("CHAT_NONCE_INVALID");
         let pending = { requestKey, input: state.draft, accepted: !1, status: null };
         if (!persist({ pending, sending: !0, error: "" })) return;
         let value = await call2("independentChat.send", { botId, requestKey, input: pending.input });
@@ -51962,7 +51945,7 @@ function createIndependentChatController({
         try {
           if (await assertHost(), !live) return;
           let requestKey = nextNonce;
-          if (!KEY3.test(requestKey)) throw failure2("CHAT_NONCE_INVALID");
+          if (!KEY3.test(requestKey)) throw failure3("CHAT_NONCE_INVALID");
           if (!persist({ pending: { requestKey, input: "", operationKind: "new-conversation", accepted: !1, status: null }, sending: !0, error: "" })) return;
           let value = await call2("independentChat.newConversation", { botId, requestKey });
           live && applyRequest(value, requestKey);

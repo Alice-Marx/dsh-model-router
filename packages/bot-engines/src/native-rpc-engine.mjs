@@ -147,7 +147,15 @@ export async function createNativeRpcEngine(options, protocol) {
       const allowedEnv = protocol.allowedCredentialEnvNames ?? []
       for (const [key, value] of Object.entries(environment)) {
         if (!allowedEnv.includes(key) || typeof value !== 'string' || value.includes('\0') || value.length > 128_000) throw fail('NATIVE_CHAT_CREDENTIAL_ENV_INVALID')
-        if (/(?:_DIR|_HOME)$/.test(key) && (!isAbsolute(value) || relative(home, value).split(/[\\/]/).includes('..'))) throw fail('NATIVE_CHAT_CREDENTIAL_ROOT_INVALID')
+        if (/(?:_DIR|_HOME)$/.test(key)) {
+          // The Host revalidates this Codex account home against the active
+          // subscription grant. Reusing it lets the vendor persist token refreshes.
+          const managedCodexHome = protocol.id === 'codex' && options.managedAccount === true && key === 'CODEX_HOME'
+          const relativeHome = relative(home, value)
+          if (!isAbsolute(value) || (!managedCodexHome && (isAbsolute(relativeHome) || relativeHome.split(/[\\/]/).includes('..')))) {
+            throw fail('NATIVE_CHAT_CREDENTIAL_ROOT_INVALID')
+          }
+        }
       }
       assertAuthorized()
       await protocol.prepareHome?.({ home, workspace: cwd, options: ctx.options }); assertAuthorized()

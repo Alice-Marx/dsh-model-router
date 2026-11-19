@@ -1,11 +1,10 @@
-// Actual Harness + actual pinned CLIProxyAPI, in a fresh isolated home.
+// Actual Harness + official Codex App Server, in a fresh isolated home.
 // Generates and cancels real PKCE authorization; never opens a vendor login or authenticates an account.
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { chromium } from 'playwright'
-import { CLI_PROXY_VERSION } from '../packages/orchestration/src/cli-proxy-release.mjs'
 const root = resolve(import.meta.dirname, '..')
 const base = process.argv[2] ? resolve(process.argv[2]) : join(root, 'tmp/integration/actual-harness-ui')
 const current = JSON.parse(await readFile(join(base, 'current.json'), 'utf8'))
@@ -13,9 +12,7 @@ const { run, home, source, packageVersion, harnessVersion } = current
 const connection = JSON.parse(await readFile(join(run, 'connection.private.json'), 'utf8'))
 assert.equal(new URL(connection.origin).hostname, '127.0.0.1')
 const output = join(base, 'subscriptions-verified'); await mkdir(output, { recursive: true })
-const componentHome = join(home, 'model-router/subscription-proxy')
-const cache = join(componentHome, 'bin', CLI_PROXY_VERSION, 'verified.json')
-const initiallyInstalled = await readFile(cache).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error })
+const accountHome = join(home, 'model-router/subscription-accounts')
 const expected = await readFile(join(source, '.dsh-plugin/client.js')), hash = value => createHash('sha256').update(value).digest('hex')
 const browser = await chromium.launch({ headless: true }), page = await browser.newPage({ viewport: { width: 1360, height: 1000 } })
 const images = [], errors = [], served = [], checks = []
@@ -53,59 +50,45 @@ try {
   const codex = page.getByRole('button', { name: /ChatGPT \/ Codex/ })
   await codex.waitFor()
   assert.equal(await page.locator('[data-subscription-account]').count(), 0)
-  assert.equal(await page.locator('.bp-sub-providers button:enabled').count(), 8)
+  assert.equal(await page.locator('.bp-sub-providers button:enabled').count(), 1)
   await noOverflow(); await capture('subscriptions-before-connect')
   await codex.click()
   const preparing = page.getByRole('region', { name: '正在准备账户授权', exact: true })
   const authorization = page.getByRole('region', { name: '账户授权', exact: true })
   await preparing.or(authorization).first().waitFor()
-  if (await preparing.isVisible()) {
-    await capture('subscriptions-preparing')
-    await page.reload(); await page.locator('.bp-workspace-shortcuts').waitFor({ state: 'attached' }); await dismiss(); await openAccounts()
-  }
+  if (await preparing.isVisible()) await capture('subscriptions-preparing')
   const failure = page.locator('.bp-subscriptions [role="alert"]').first()
-  await authorization.or(failure).first().waitFor({ timeout: 265_000 })
+  await authorization.or(failure).first().waitFor({ timeout: 60_000 })
   assert.ok(await authorization.isVisible(), await failure.textContent({ timeout: 1000 }).catch(() => 'authorization unavailable'))
   assert.equal(await page.locator('[data-subscription-account]').count(), 0)
-  assert.equal(JSON.parse(await readFile(cache, 'utf8')).version, CLI_PROXY_VERSION)
-  const config = JSON.parse(await readFile(join(componentHome, 'config.json'), 'utf8'))
-  assert.equal(config.host, '127.0.0.1')
-  assert.equal(config['remote-management']['allow-remote'], false)
-  assert.ok(Number.isInteger(config.port) && config.port > 0)
-  checks.push('one provider click prepares the pinned component and reaches authorization after a reload without a separate setup action')
   const authorizationUrl = await page.getByRole('link', { name: '打开授权页面', exact: true }).getAttribute('href')
   const auth = new URL(authorizationUrl)
   assert.equal(auth.hostname, 'auth.openai.com'); assert.equal(auth.protocol, 'https:'); assert.ok(auth.searchParams.get('state')); assert.ok(auth.searchParams.get('code_challenge'))
   await capture('subscriptions-authorization')
-  await page.getByText('授权后无法自动返回？', { exact: true }).click()
-  await page.getByLabel('授权回调地址', { exact: true }).fill('http://localhost:1455/auth/callback?code=offline-invalid-code&state=wrong-session')
-  await page.getByRole('button', { name: '提交授权结果', exact: true }).click()
-  await page.getByRole('alert').filter({ hasText: '请粘贴本次授权返回的完整地址，包含 code 和 state。' }).waitFor()
-  assert.equal(await page.getByLabel('授权回调地址', { exact: true }).inputValue(), '')
-  checks.push('manual callback rejects a mismatched OAuth state locally and clears the pasted one-time code')
   await page.reload(); await page.locator('.bp-workspace-shortcuts').waitFor({ state: 'attached' }); await dismiss(); await openAccounts()
   await page.getByRole('region', { name: '账户授权', exact: true }).waitFor()
   assert.equal(await page.getByRole('link', { name: '打开授权页面', exact: true }).getAttribute('href'), authorizationUrl)
   await page.getByRole('button', { name: '取消登录', exact: true }).click()
   await page.getByRole('region', { name: '账户授权', exact: true }).waitFor({ state: 'hidden' })
-  checks.push('the actual upstream produces a PKCE authorization URL, a browser reload resumes its Host-owned session, and Cancel reaches the real management endpoint')
+  checks.push('the official Codex process issues a PKCE link, the page resumes the Host-owned session after reload, and cancel closes that session')
   const appearance = page.locator('.bp-appearance').first()
   await appearance.locator('summary').click(); await appearance.getByRole('button', { name: '深色', exact: true }).click(); await appearance.locator('summary').click()
   await noOverflow(); await capture('subscriptions-dark')
   await page.setViewportSize({ width: 390, height: 844 }); await noOverflow(); await capture('subscriptions-phone')
   checks.push('the actual product page fits light, dark and a 390px viewport')
-  const local = JSON.parse(await readFile(join(componentHome, 'private.json'), 'utf8'))
-  const html = await page.content()
-  assert.ok(!html.includes(local.apiKey) && !html.includes(local.managementKey))
-  assert.equal((await readdir(join(componentHome, 'accounts'))).filter(name => name.endsWith('.json')).length, 0)
-  await page.locator('.bp-sub-options summary').click()
-  await page.getByRole('button', { name: '暂停订阅连接', exact: true }).click()
-  await page.getByText(/订阅连接已暂停/).waitFor()
-  assert.equal(await page.locator('.bp-sub-providers button:enabled').count(), 8)
-  checks.push('private component credentials stay outside the page; pausing the service leaves provider actions available to reconnect')
+  const accounts = await readdir(accountHome)
+  assert.equal(accounts.length, 1)
+  assert.ok(!(await readdir(join(accountHome, accounts[0]))).includes('auth.json'))
+  await page.getByRole('button', { name: '查看订阅额度', exact: true }).click()
+  const quota = page.getByRole('region', { name: '订阅额度', exact: true })
+  await quota.getByText('Bot 调用上限', { exact: true }).waitFor()
+  await quota.getByRole('button', { name: '刷新额度', exact: true }).click()
+  await quota.getByRole('button', { name: '刷新额度', exact: true }).waitFor()
+  await capture('subscriptions-quota')
+  checks.push('the quota panel refreshes in the actual local Host without a signed-in account')
   assert.ok(served.includes(hash(expected)), 'the Host must serve the exact client bundled for this release')
   assert.deepEqual(errors, [])
-  const report = { status: 'passed', buildLabel: 'local managed subscription verification', packageVersion, harnessVersion, actualHarnessRuntime: true, actualCliProxyRuntime: true, cliProxyVersion: CLI_PROXY_VERSION, initiallyInstalled,
+  const report = { status: 'passed', buildLabel: 'local native subscription verification', packageVersion, harnessVersion, actualHarnessRuntime: true, officialCodexAppServer: true,
     apiMocks: false, syntheticUiShell: false, isolatedUserHome: true, liveUserProfileModified: false, nativeDesktopWindowVerified: false,
     realSubscriptionAuthenticated: false, paidModelCalls: 0, authorizationUrlGenerated: true, authorizationCancelled: true,
     client: { bytes: expected.length, sha256: hash(expected), exactServedBytes: true }, checks, images, pageErrors: errors }

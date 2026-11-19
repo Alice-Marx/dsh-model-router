@@ -18,8 +18,37 @@ async function handle(frame) {
   if (frame.error) return
   if (method === 'initialize') { response(frame, {}); return }
   if (method === 'initialized') return
+  if (codex && method === 'account/login/start') {
+    response(frame, { type: 'chatgpt', loginId: 'fixture-login', authUrl: 'https://auth.openai.com/authorize?state=fixture&code_challenge=fixture' }); return
+  }
+  if (codex && method === 'account/login/cancel') {
+    response(frame, { status: 'canceled' })
+    notification('account/login/completed', { loginId: frame.params.loginId, success: false })
+    return
+  }
+  if (codex && method === 'account/read') {
+    const authorized = await readFile(join(process.env.CODEX_HOME, 'auth.json'), 'utf8').then(value => value.includes('private-oauth-token'), () => false)
+    response(frame, { account: authorized ? { type: 'chatgpt', email: 'fixture@example.invalid', planType: 'plus', secret: 'private-oauth-token' } : null, requiresOpenaiAuth: true })
+    return
+  }
+  if (codex && method === 'model/list') {
+    response(frame, frame.params.cursor
+      ? { data: [{ id: 'gpt-second', displayName: 'Second model', inputModalities: ['text', 'image'] }], nextCursor: null }
+      : { data: [{ id: 'gpt-fixture', model: 'gpt-fixture', displayName: 'Fixture Codex', inputModalities: ['text'] },
+        { id: 'hidden-model', hidden: true, inputModalities: ['text'] },
+        { id: 'image-model', inputModalities: ['image'] }], nextCursor: 'fixture-cursor' })
+    return
+  }
+  if (codex && method === 'account/rateLimits/read') {
+    response(frame, { rateLimits: { primary: { usedPercent: 90 } }, rateLimitsByLimitId: { codex: {
+      primary: { usedPercent: 35, windowDurationMins: 300, resetsAt: 1900000000 },
+      secondary: { usedPercent: 200 },
+    } } }); return
+  }
   if (method === 'config/read') {
-    const parsedModel = /^model = (.+)$/m.exec(config)?.[1]; model = parsedModel ? JSON.parse(parsedModel) : model
+    const override = process.argv.find(value => value.startsWith('model='))
+    const parsedModel = override?.slice('model='.length) ?? /^model = (.+)$/m.exec(config)?.[1]
+    model = parsedModel ? JSON.parse(parsedModel) : model
     response(frame, { config: { model, model_provider: 'openai', approval_policy: 'never', sandbox_mode: 'read-only', web_search: 'disabled',
       features: { shell_tool: false, multi_agent: false, memories: false }, mcp_servers: {} } }); return
   }

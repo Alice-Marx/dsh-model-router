@@ -35,7 +35,14 @@ export function normalizeConversationEngines(value = []) {
     if (item.driver === 'antigravityAgent' ? (!isAbsolute(entry.harness ?? '') || !hash(entry.harnessSha256) || Boolean(entry.script))
       : entry.harness !== undefined || entry.harnessSha256 !== undefined) fail('CONVERSATION_ENGINE_ENTRY_INVALID')
     if (item.driver === 'deepseekAgent') { deepseekWireModel(item.model); if (!entry.script || entry.version !== '0.2.2-rc.2') fail('DEEPSEEK_NODE_ENTRY_REQUIRED') }
-    if (typeof item.credentialRef !== 'string' || !/^(?:ds-secret|cli-secret)\/[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(item.credentialRef)) fail('CONVERSATION_ENGINE_CREDENTIAL_REF_INVALID')
+    const managedAccount = /^subscription-home\/([a-f0-9]{32})$/.exec(item.credentialRef ?? '')?.[1]
+    if (managedAccount) {
+      if (item.driver !== 'codex' || item.hostTools || !item.revision || !item.provider.startsWith('bot-sub-' + managedAccount + '-')) {
+        fail('CONVERSATION_ENGINE_CREDENTIAL_REF_INVALID')
+      }
+    } else if (typeof item.credentialRef !== 'string' || !/^(?:ds-secret|cli-secret)\/[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(item.credentialRef)) {
+      fail('CONVERSATION_ENGINE_CREDENTIAL_REF_INVALID')
+    }
     const deadlineMs = item.deadlineMs ?? 1_800_000
     if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1000 || deadlineMs > 7_200_000) fail('CONVERSATION_ENGINE_DEADLINE_INVALID')
     if (item.name !== undefined && (typeof item.name !== 'string' || !item.name.trim() || item.name.length > 128)) fail('CONVERSATION_ENGINE_CONFIG_INVALID')
@@ -94,12 +101,13 @@ export async function mountConversationEngines({ llm, profiles = [], runtimeRoot
       const createEngine = profile.driver === 'claude' ? createClaudeEngine : profile.driver === 'codex' ? createCodexEngine : profile.driver === 'pi' ? createPiEngine
         : profile.driver === 'stepAgent' ? createStepEngine
         : profile.driver === 'museCode' ? createMuseEngine : options => createAcpChatEngine(profile, options)
+      const managedAccount = profile.credentialRef.startsWith('subscription-home/')
       let subscriptionQuota = null
       const onSubscriptionQuota = windows => {
         subscriptionQuota = windows.length ? { observedAt: now(), windows } : null
       }
       const engineFactory = async options => {
-        const engine = await createEngine(profile.driver === 'codex' ? { ...options, onSubscriptionQuota } : options)
+        const engine = await createEngine(profile.driver === 'codex' ? { ...options, onSubscriptionQuota, managedAccount } : options)
         return Object.freeze({ ...engine, get closed() { return engine.closed }, get busy() { return engine.busy },
           async submitTurn(input) {
             try { const result = await engine.submitTurn(input); onResult?.(profile, { kind: result.ok && result.outcome === 'succeeded' ? 'verified' : 'error' }); return result }
@@ -116,7 +124,11 @@ export async function mountConversationEngines({ llm, profiles = [], runtimeRoot
         ...(requestFor ? { requestFor: (request, identity) => requestFor(profile, request, identity) } : {}),
         ...(profile.hostTools ? { toolsFor: identity => toolsFor(profile, identity) } : {}),
         ...(onActivity ? { onActivity: event => onActivity(profile, event) } : {}),
-        provisionCredentials: (home, identity) => (profile.driver === 'claude' && profile.credentialRef.startsWith('ds-secret/') ? provisionClaudeProfile : provisionCliCredential)(home, profile, (ref, current) => resolveSecret(ref, current, identity)),
+        provisionCredentials: async (home, identity) => {
+          if (managedAccount) return { env: { CODEX_HOME: await resolveSecret(profile.credentialRef, profile, identity) } }
+          const provision = profile.driver === 'claude' && profile.credentialRef.startsWith('ds-secret/') ? provisionClaudeProfile : provisionCliCredential
+          return provision(home, profile, (ref, current) => resolveSecret(ref, current, identity))
+        },
         engineFactory,
         tools: [], handlers: [], permissionMode: 'default' })
       await mkdir(join(runtimeRoot, profile.id, 'workspace'), { recursive: true, mode: 0o700 })
@@ -142,7 +154,7 @@ export async function mountConversationEngines({ llm, profiles = [], runtimeRoot
   }
   return Object.freeze({ close, reconcile,
     activityHealth: () => ({ failures: registrations.reduce((total, item) => total + (item.adapter.snapshot().activityObserverFailures ?? 0), 0) }),
-    subscriptionQuota: () => registrations.filter(item => item.profile.driver === 'codex').map(item => ({
+    subscriptionQuota: () => registrations.filter(item => item.profile.driver === 'codex' && !item.profile.credentialRef.startsWith('subscription-home/')).map(item => ({
       id: item.profileId, name: item.profile.name, reading: item.subscriptionQuota(),
     })),
     invalidateBot: (profileId, botId, reason) => registrations.find(item => item.profileId === profileId)?.adapter.invalidateBot(botId, reason),

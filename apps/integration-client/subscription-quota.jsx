@@ -18,7 +18,8 @@ export function SubscriptionQuota({ productApi }) {
   useEffect(() => {
     const controller = new AbortController()
     setState(previous => ({ api: productApi, value: previous.api === productApi ? previous.value : null, loading: true, error: false }))
-    void productApi.dispatch('usage.subscriptionQuota', {}, controller.signal).then(value => {
+    const payload = revision > 0 ? { refreshAccounts: true } : {}
+    void productApi.dispatch('usage.subscriptionQuota', payload, controller.signal).then(value => {
       if (!controller.signal.aborted) setState({ api: productApi, value, loading: false, error: false })
     }).catch(() => {
       if (!controller.signal.aborted) setState(previous => ({ ...previous, loading: false, error: true }))
@@ -57,7 +58,7 @@ export function SubscriptionQuota({ productApi }) {
       {value.accountQuotas.map(({ id, name, reading }) => <article key={id} className="bp-quota-entry">
         <div className="bp-quota-balance">
           <strong>{name}</strong>
-          <small className="bp-muted">{reading ? `报告于 ${time(reading.observedAt, value.timezone)}` : '当前宿主会话尚未收到额度'}</small>
+          <small className="bp-muted">{reading ? `报告于 ${time(reading.observedAt, value.timezone)}` : '尚未取得额度数据'}</small>
         </div>
         {reading && <div className="bp-quota-windows">{reading.windows.map(window => <div key={window.id} className="bp-quota-window">
           <div className="bp-quota-balance"><span>{windowLabel(window)}</span><strong>上次剩余 {window.remainingPercent}%</strong></div>

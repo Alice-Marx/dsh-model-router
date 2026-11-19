@@ -6,7 +6,7 @@ const bad = code => { throw Object.assign(new Error(code), { code }) }
 const number = value => Number.isSafeInteger(value) && value >= 0
 const modelOf = ctx => ctx.options.requestedModel
 
-function subscriptionWindows(snapshot) {
+export function codexSubscriptionWindows(snapshot) {
   return ['primary', 'secondary'].flatMap(id => {
     const window = snapshot?.[id]
     if (!Number.isFinite(window?.usedPercent) || window.usedPercent < 0 || window.usedPercent > 100) return []
@@ -15,6 +15,12 @@ function subscriptionWindows(snapshot) {
       durationMinutes: number(window.windowDurationMins) && window.windowDurationMins > 0 ? window.windowDurationMins : null,
       resetAt: Number.isFinite(new Date(resetAt).getTime()) ? resetAt : null }]
   })
+}
+
+export function codexProfileConfig(model) {
+  return [...(model ? ['model = ' + JSON.stringify(model)] : []), 'model_provider = "openai"', 'approval_policy = "never"',
+    'sandbox_mode = "read-only"', 'web_search = "disabled"', 'cli_auth_credentials_store = "file"', '[features]',
+    'shell_tool = false', 'multi_agent = false', 'memories = false', '[analytics]', 'enabled = false', '[mcp_servers]'].join('\n') + '\n'
 }
 
 /** The actual Codex App Server wire, retaining one thread in one native process.
@@ -49,12 +55,10 @@ export function createCodexProtocol() {
     }
   }
   return Object.freeze({ id: 'codex', allowedCredentialEnvNames: ['CODEX_HOME'],
-    args: () => ['app-server', '--listen', 'stdio://'],
+    args: options => [...(options.managedAccount ? ['-c', 'model=' + JSON.stringify(options.requestedModel)] : []),
+      'app-server', '--listen', 'stdio://'],
     async prepareHome({ home, options }) {
-      const config = [`model = ${JSON.stringify(options.requestedModel)}`, 'model_provider = "openai"', 'approval_policy = "never"', 'sandbox_mode = "read-only"',
-        'web_search = "disabled"', 'cli_auth_credentials_store = "file"', '[features]', 'shell_tool = false', 'multi_agent = false', 'memories = false',
-        '[analytics]', 'enabled = false', '[mcp_servers]'].join('\n') + '\n'
-      await writeFile(join(home, 'config.toml'), config, { flag: 'wx', mode: 0o600 })
+      if (!options.managedAccount) await writeFile(join(home, 'config.toml'), codexProfileConfig(options.requestedModel), { flag: 'wx', mode: 0o600 })
     },
     response: frame => frame.id !== undefined && frame.method === undefined ? { id: frame.id, result: frame.result, error: frame.error } : null,
     async start(ctx) {
@@ -64,6 +68,10 @@ export function createCodexProtocol() {
       if (!config || config.model !== modelOf(ctx) || config.model_provider !== 'openai' || config.approval_policy !== 'never' || config.sandbox_mode !== 'read-only'
         || config.web_search !== 'disabled' || config.features?.shell_tool !== false || config.features?.multi_agent !== false || config.features?.memories !== false
         || Object.keys(config.mcp_servers ?? {}).length) bad('CODEX_CHAT_EFFECTIVE_PROFILE_MISMATCH')
+      if (ctx.options.managedAccount) {
+        const { account } = await ctx.request('account/read', { refreshToken: false })
+        if (account?.type !== 'chatgpt') bad('SUBSCRIPTION_AUTH_REQUIRED')
+      }
       const opened = await ctx.request('thread/start', { model: modelOf(ctx), modelProvider: 'openai', allowProviderModelFallback: false, cwd: ctx.workspace,
         approvalPolicy: 'never', sandbox: 'read-only', ephemeral: true,
         ...(ctx.options.systemPrompt ? { developerInstructions: ctx.options.systemPrompt } : {}) })
@@ -86,7 +94,7 @@ export function createCodexProtocol() {
       if (frame.method === 'account/rateLimits/updated') {
         const snapshot = frame.params?.rateLimits
         if (snapshot && (snapshot.limitId == null || snapshot.limitId === 'codex')) {
-          ctx.options.onSubscriptionQuota?.(subscriptionWindows(snapshot))
+          ctx.options.onSubscriptionQuota?.(codexSubscriptionWindows(snapshot))
         }
         return
       }

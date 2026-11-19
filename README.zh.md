@@ -14,7 +14,7 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.79.0 · Windows Remote Agent：0.1.3**
+**当前正式版：0.80.0 · Windows Remote Agent：0.1.3**
 
 以 Bot 联系人和聊天为主要入口，集中使用独立 AI 连接、多模型路线、团队委派、私有资料库、数据分析与自有 Windows 电脑。任务、通知和执行记录保存在工作空间中，Main Bot 可在已保存的多条模型路线之间调度。
 
@@ -63,11 +63,11 @@
 | 连接类型 | 配置方式 | 用途 |
 | --- | --- | --- |
 | API 模型 | 添加提供商或兼容 API 连接，填写端点、独立凭据及模型容量。 | 支持 OpenAI、Anthropic、Google Gemini 协议及 Ollama；按 API 资金配置计费。 |
-| 订阅账户 | 在 **AI 连接 → 订阅账户** 选择提供方，并授权自己的 ChatGPT/Codex、Claude、Google Antigravity、Kimi Code、Grok Build、Muse Code 或 Devin 账户。 | 同步账户模型目录，使用订阅资金。在聊天前为 Bot 设置订阅调用额度。 |
+| 订阅账户 | 在 Windows 宿主的 **AI 连接 → 订阅账户** 中授权自己的 ChatGPT / Codex 账户。 | 同步账户的文本模型。在聊天前为 Bot 设置订阅调用额度。 |
 | 原生 CLI 聊天 | 选择聊天驱动，核验可执行文件、版本和可选入口脚本，保存该连接自己的账号资料与模型 ID。 | 保留 CLI 原生会话，按 Bot 已保存路线与资金配置调用。 |
 | 官方执行工具 | 在 Bot 设置中选择“安装与登录”，完成厂商登录、重新检测并保存工具绑定。 | 为 Bot 授予受支持的文件、命令或其他执行能力，可搭配不同提供商的聊天模型。 |
 
-首次连接订阅账户时，DS Bot 自动准备并校验固定版本的 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)。完整 Bot 包内置 Windows x64 组件。其他支持的平台由 DS Bot 在首次使用时自动下载。宿主管理回环服务、端口与配置文件。完成厂商授权后，DS Bot 同步该账户可用的模型。已启用的连接会随宿主重启恢复。模型访问与额度由厂商决定，授权资料保存在本机私有目录。模型选择器列出已有容量数据的模型，账户状态显示对话是否通过验证。不支持 OAuth 登录的 Coding Plan，可使用厂商提供的 API 接入信息或可用的原生 CLI 驱动。
+DS Bot 通过官方 [Codex App Server](https://learn.chatgpt.com/docs/app-server) 管理订阅账户。按提示可在应用内的“官方工具”页安装或修复 Codex。在官方登录页完成授权后，可到 Bot 的“模型与工具”中选择账户模型。DS Bot 将各账户的授权资料保存在受保护的本机目录，并显示对话验证状态。旧版订阅记录会提示重新授权并选择新的模型路线。
 
 CLI 聊天驱动包括 Claude Code、Codex、Pi、Step Code、Muse Code、Antigravity、Grok、Gemini、Kimi Code、Droid、Cursor、OpenCode、Qwen、Hermes、Cline、Copilot、Command Code、DeepSeek ACP 和自定义 ACP。实际可用性取决于本机安装、账号权限和模型访问；连接页面分别显示已配置、需要处理和已验证对话等状态。
 
@@ -80,8 +80,8 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.79.0`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.79.0`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.80.0`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.80.0`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 完整版本进入 Bot 工作区，在 **设置 → AI** 添加独立模型连接，再为 Bot 选择模型。纯路由版本从侧栏打开 **模型路由**，使用 Harness 已配置路线。
 
@@ -89,10 +89,10 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.79.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.80.0
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.79.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.80.0
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -279,7 +279,7 @@ Main Bot 也可调用 `bot_route_task` 或同义工具 `bot_dispatch`；两者�
 - **本地规划。** 路线比较和执行预检不调用模型；确认执行会将所选任务/上下文发送给供应商或 CLI，并可能产生费用。
 - **API 预算。** 单次估算与日/月限额共同检查已记录支出和其他预占。有限预算下，未知价格或金额需相应确认；估算用于规划控制，实际账单以供应商为准。
 - **订阅单独核对。** 调用次数和已报告的输入/输出/缓存 token 与 API 金额分别记账。缺失用量保持未知，不视为零，也不据此推算厂商剩余总额度。
-- **查看订阅额度。** 在完整 Bot 版打开 **AI 连接 → 查看订阅额度**，可查看每日和每月的调用上限、剩余次数及按宿主时区计算的重置时间。面板也显示 Codex 原生会话最近报告的账号额度，以及宿主记录的限流和额度用尽状态。
+- **查看订阅额度。** 在完整 Bot 版打开 **AI 连接 → 查看订阅额度**，可查看 Bot 调用上限、剩余次数及按宿主时区计算的重置时间，也可刷新已连接 Codex 账户报告的额度窗口。面板还显示宿主记录的限流和额度用尽状态。
 - **选择回退策略。** 可优先订阅、仅订阅或仅 API；订阅转 API 需重新估算、预算准入及必要确认。托管可编辑/单工具/团队运行不会自动在 API 上重试。
 - **依据记录恢复。** 保留执行尝试、收据、预占和未知影响证据；中断后先核对再重试，经过时间或发出停止请求不能证明远程操作已停止。
 - **有依据地优化选择。** 可选更强模型复核会增加调用。显式评分只调整有界偏好，不提高客观质量分或绕过质量下限；可禁用学习、撤回评分或重置学习起点。

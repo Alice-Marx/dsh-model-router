@@ -25,7 +25,7 @@
       "tests/remote-agent-build.test.mjs",
       "tests/bot-runtime-ui.test.mjs",
       "tests/model-avatar-picker.test.mjs",
-      "tests/subscription-proxy.test.mjs",
+      "tests/subscription-accounts.test.mjs",
       "tests/product-subscriptions.test.mjs",
       "tests/subscription-runtime.test.mjs",
       "tests/subscription-accounts-ui.test.mjs"

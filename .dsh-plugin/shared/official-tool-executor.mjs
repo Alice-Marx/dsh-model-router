@@ -822,6 +822,17 @@ export async function officialToolReadiness(toolId, workspace = process.cwd(), s
   }
 }
 
+/** Discover the signed Codex App Server executable for an isolated account home. */
+export async function signedCodexAccountExecutable(workspace) {
+  if (!IS_WINDOWS) return null
+  const directory = await checkedWorkspace(workspace)
+  const spec = await launchSpec('codex', directory, 'read-only', null)
+  if (spec.file) return spec.file
+  const selection = officialToolEntrySelection('codex')
+  if (selection.configured) return null
+  return (await findSignedNativeExecutable('codex', directory, CODEX_SIGNER, selection))?.entry ?? null
+}
+
 function tail(current, addition) {
   const next = current + addition
   return next.length > OUTPUT_TAIL_CHARS ? next.slice(-OUTPUT_TAIL_CHARS) : next

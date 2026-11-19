@@ -138,7 +138,7 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings, onReturnToTask, 
         <div className="bp-ai-row-actions"><button type="button" disabled={Boolean(busy) || !provider.enabled || provider.auth === 'key' && !provider.keyConfigured} onClick={() => check(provider)}>{busy === `check-${provider.id}` ? '检查中…' : '检查'}</button><button type="button" disabled={editingBusy} onClick={() => edit(provider)}>管理</button></div>
       </article>)}{!view.providers.length && <div className="bp-ai-empty"><UiIcon name="spark" size={26}/><h4>连接你的第一个 AI</h4><p>选择下面的提供方，填写自己的账号密钥与模型。</p></div>}</div>
       <div className="bp-ai-presets">{view.presets.map(preset => <button type="button" key={preset.id} disabled={editingBusy} onClick={() => edit(preset)}><span className="bp-ai-small-mark" aria-hidden="true">{preset.mark}</span><span>{preset.name}</span><UiIcon name="plus" size={14}/></button>)}</div>
-      </div><div hidden={section !== 'subscriptions'}>{visitedSubscriptions && <SubscriptionAccounts productApi={productApi} onOpenBindings={onOpenBindings}/>}</div>
+      </div><div hidden={section !== 'subscriptions'}>{visitedSubscriptions && <SubscriptionAccounts productApi={productApi} onOpenBindings={onOpenBindings} onOpenTools={onOpenTools}/>}</div>
       <div hidden={section !== 'cli'}>{visitedCli && <CliChatProviders productApi={productApi} onOpenTools={onOpenTools} onOpenBindings={onOpenBindings}/>}</div>
       <div hidden={section !== 'tools'}>
       <div className="bp-ai-section-head"><h3>官方 CLI 与应用</h3>{onOpenTools && <button type="button" onClick={onOpenTools}>安装与登录<UiIcon name="arrow" size={14}/></button>}</div>

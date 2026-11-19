@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.79.0 · Windows Remote Agent: 0.1.3**
+**Current stable version: 0.80.0 · Windows Remote Agent: 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -63,11 +63,11 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 | Connection | Configuration | Purpose |
 | --- | --- | --- |
 | API models | Add a provider or compatible API connection with its endpoint, separate credentials and model capacities. | OpenAI, Anthropic and Google Gemini protocols, plus Ollama; uses API funding settings. |
-| Subscription accounts | Choose a provider in **AI connections → Subscription accounts** and authorize your own ChatGPT/Codex, Claude, Google Antigravity, Kimi Code, Grok Build, Muse Code or Devin account. | Uses the account model catalog and subscription funding. Set the Bot subscription call allowance before chatting. |
+| Subscription accounts | On a Windows Host, go to **AI connections → Subscription accounts** and authorize your ChatGPT / Codex account. | Syncs the account's text models for subscription-funded chat. Set the Bot's call allowance before chatting. |
 | Native CLI chat | Select a driver, verify its executable/version and optional entry script, then save the connection's own account and model ID. | Retains a native CLI session under the Bot's saved route and funding configuration. |
 | Official execution tools | Choose **Install and sign in** in Bot settings, complete the vendor login, recheck readiness and save the tool binding. | Grants supported file, command and other execution capabilities alongside a chat model from another provider. |
 
-DS Bot prepares and verifies the pinned [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) component when you first connect a subscription account. The full Bot package includes the Windows x64 component. On other supported platforms, DS Bot downloads the component at first use. It manages the loopback service, port and configuration in the Host profile. After provider authorization, DS Bot syncs the models available to the account. Enabled connections resume when the Host restarts. The provider determines model access and limits, and authorization data stays in the private local directory. The model picker lists models with capacity metadata. The account state shows whether a conversation has been verified. Coding plans without supported OAuth login can use their vendor-provided API connection or an available native CLI driver.
+DS Bot manages subscription accounts through the official [Codex App Server](https://learn.chatgpt.com/docs/app-server). Use **Official tools** in the app to install or repair Codex if prompted. Complete authorization on the official sign-in page, then select an account model under the Bot's **Models & tools** settings. DS Bot stores each account's credentials in a protected local directory and shows when a conversation has been verified. Older subscription records indicate where to reauthorize and select a new model route.
 
 CLI chat drivers include Claude Code, Codex, Pi, Step Code, Muse Code, Antigravity, Grok, Gemini, Kimi Code, Droid, Cursor, OpenCode, Qwen, Hermes, Cline, Copilot, Command Code, DeepSeek ACP and custom ACP. Availability depends on the local installation, account and model access. Connection states distinguish configuration, required attention and a verified conversation.
 
@@ -80,8 +80,8 @@ Edit the Bot's name, role and standing instructions under **Identity & personali
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.79.0`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.79.0`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.80.0`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.80.0`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -89,10 +89,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.79.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.80.0
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.79.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.80.0
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -279,7 +279,7 @@ Binary transfers preserve the original bytes, with a **16 MiB per-file limit**; 
 - **Plan locally.** Route comparison and execution preflight do not call models. Confirmed execution sends the selected task/context to a provider or CLI and may incur charges.
 - **Control API spending.** Per-task estimates and daily/monthly limits check recorded spend plus active reservations. Unknown prices or amounts require the relevant confirmation under a finite budget. Estimates are planning controls; provider bills remain authoritative.
 - **Track subscriptions separately.** Subscription calls and reported input/output/cache tokens are recorded independently of API money. Missing usage remains unknown and does not imply zero usage or prove a vendor's remaining quota.
-- **Check subscription quota.** In the full Bot edition, **AI Connections → View subscription quota** shows configured daily and monthly call limits, remaining calls, and reset times in the Host time zone. It also displays the latest account quota reported during a configured native Codex conversation and active limits recorded by the Host.
+- **Check subscription quota.** In the full Bot edition, **AI Connections → View subscription quota** shows Bot call allowances, remaining calls and reset times in the Host time zone. You can refresh the connected Codex account's reported usage windows there. The panel also displays active throttling and quota limits recorded by the Host.
 - **Choose fallback behavior.** Billing preferences can favor subscription, require subscription, or use API only. A subscription-to-API change requires fresh API estimation, budget admission, and any required confirmation. Managed editable/single-tool/team runs do not automatically retry on API.
 - **Recover from evidence.** Execution records retain attempts, receipts, reservations, and unknown effects. Review interrupted work before retrying; elapsed time or a stop request does not prove that a remote action stopped.
 - **Refine routing deliberately.** Optional stronger-model reviews may add calls. Explicit ratings adjust a bounded preference term; they do not raise measured quality or bypass quality floors. Learning can be disabled, ratings withdrawn, and the learning baseline reset.
