@@ -27,7 +27,7 @@ export function codexAuthorizationUrl(raw) {
 }
 
 export async function resolveCodexSubscriptionEntry(home, signal) {
-  const executable = await signedCodexAccountExecutable(home)
+  const executable = await signedCodexAccountExecutable(home, signal)
   if (!executable) throw fail('SUBSCRIPTION_CODEX_REQUIRED', '请先在 DS Bot 的官方工具页安装或修复 Codex。')
   const { stdout } = await execute(executable, ['--version'], { cwd: home, env: privateEnvironment(home), signal,
     timeout: 10_000, maxBuffer: 4096, windowsHide: true })
@@ -116,14 +116,14 @@ export function createCodexSubscriptionBackend({ root, resolveEntry = resolveCod
     })
     const request = async (method, params, requestSignal = signal, timeoutMs = 12_000) => {
       requestSignal?.throwIfAborted()
-      try { return await rpc.request(method, params, { signal: requestSignal, timeoutMs }) }
+      try { return await rpc.request(method, params, { signal: requestSignal, timeoutMs, idleMs: timeoutMs }) }
       catch {
         requestSignal?.throwIfAborted()
         throw fail('SUBSCRIPTION_CODEX_REQUEST', 'Codex 账户服务请求未完成，请重试。')
       }
     }
     try {
-      await request('initialize', { clientInfo: { name: 'dsh_bot_accounts', title: 'DSH Bot Accounts', version: '1.0.0' } })
+      await request('initialize', { clientInfo: { name: 'dsh_bot_accounts', title: 'DSH Bot Accounts', version: '1.0.0' } }, signal, 20_000)
       rpc.notify('initialized', {})
     } catch (error) { await close().catch(() => {}); throw error }
     const readAccount = async requestSignal => {
@@ -143,7 +143,7 @@ export function createCodexSubscriptionBackend({ root, resolveEntry = resolveCod
     return Object.freeze({
       entry,
       async login() {
-        const result = await request('account/login/start', { type: 'chatgpt' })
+        const result = await request('account/login/start', { type: 'chatgpt' }, signal, 20_000)
         if (result.type !== 'chatgpt' || !/^[A-Za-z0-9-]{1,128}$/.test(result.loginId ?? '')) {
           throw fail('SUBSCRIPTION_AUTH_URL', 'Codex 未返回有效的授权会话。')
         }

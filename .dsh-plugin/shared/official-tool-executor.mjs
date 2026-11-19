@@ -349,7 +349,7 @@ async function attestNativeNpmEntry(found, tool, selectionOptions) {
   }
 }
 
-async function findSignedNativeExecutable(toolId, workspace, signer, selection = officialToolEntrySelection(toolId)) {
+async function findSignedNativeExecutable(toolId, workspace, signer, selection = officialToolEntrySelection(toolId), verifySignature = hasOfficialWindowsSignature) {
   if (!selection.preferred) await ensureNpmPrefixOnPath()
   const command = toolId === 'claude-code' ? 'claude' : toolId
   const filename = IS_WINDOWS ? `${command}.exe` : command
@@ -360,7 +360,7 @@ async function findSignedNativeExecutable(toolId, workspace, signer, selection =
       const entry = await realpath(join(directory, filename))
       if (inside(workspace, entry) || !(await stat(entry)).isFile()) continue
       await access(entry, IS_WINDOWS ? constants.F_OK : constants.X_OK)
-      if (IS_WINDOWS && !(await hasOfficialWindowsSignature(entry, signer))) continue
+      if (IS_WINDOWS && !(await verifySignature(entry, signer))) continue
       return { entry, source: IS_WINDOWS ? 'signed-native-executable' : 'path-native-executable' }
     } catch { /* try the next PATH entry */ }
   }
@@ -469,17 +469,23 @@ export const OFFICIAL_SIGNERS = Object.freeze({ codex: CODEX_SIGNER, 'claude-cod
 
 /** PATH or package metadata alone is insufficient: verify the Windows EXE publisher. */
 const signatureCache=new Map(),signaturePending=new Map()
-async function hasOfficialWindowsSignature(entry,expectedSigner){
+async function hasOfficialWindowsSignature(entry,expectedSigner,{timeoutMs=8_000,signal}={}){
+  if(signal?.aborted)return false
   let stamp
   try{const info=await stat(entry);stamp=`${info.size}:${info.mtimeMs}:${info.ctimeMs}`}catch{return false}
   const key=entry+'\0'+expectedSigner,known=signatureCache.get(key)
   if(known?.stamp===stamp)return true
-  const previous=signaturePending.get(key)
+  const verify=()=>verifyOfficialWindowsSignature(entry,expectedSigner,timeoutMs,signal)
+    .then(valid=>{if(valid)signatureCache.set(key,{stamp});return valid})
+  if(signal)return verify()
+  const pendingKey=key+'\0'+timeoutMs
+  const previous=signaturePending.get(pendingKey)
   if(previous?.stamp===stamp)return previous.promise
-  const promise=verifyOfficialWindowsSignature(entry,expectedSigner).then(valid=>{if(valid)signatureCache.set(key,{stamp});return valid}).finally(()=>{if(signaturePending.get(key)?.promise===promise)signaturePending.delete(key)})
-  signaturePending.set(key,{stamp,promise});return promise
+  const promise=verify().finally(()=>{if(signaturePending.get(pendingKey)?.promise===promise)signaturePending.delete(pendingKey)})
+  signaturePending.set(pendingKey,{stamp,promise});return promise
 }
-function verifyOfficialWindowsSignature(entry, expectedSigner) {
+function verifyOfficialWindowsSignature(entry, expectedSigner, timeoutMs, signal) {
+  if (signal?.aborted) return Promise.resolve(false)
   // Some launch environments inherit a PowerShell module path where the
   // built-in Security module does not autoload. Import its fixed system path
   // explicitly, and fail closed if that import or the signature check fails.
@@ -507,9 +513,12 @@ function verifyOfficialWindowsSignature(entry, expectedSigner) {
       if (done) return
       done = true
       clearTimeout(timer)
+      signal?.removeEventListener('abort', stop)
       resolveSignature(valid)
     }
-    const timer = setTimeout(() => { child.kill('SIGTERM'); settle(false) }, 8_000)
+    const stop = () => { child.kill('SIGTERM'); settle(false) }
+    const timer = setTimeout(stop, timeoutMs)
+    signal?.addEventListener('abort', stop, { once: true })
     child.stdout.on('data', bytes => { output = tail(output, String(bytes)).slice(-4_096) })
     child.on('error', () => settle(false))
     child.on('close', code => {
@@ -522,7 +531,7 @@ function verifyOfficialWindowsSignature(entry, expectedSigner) {
   })
 }
 
-async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readiness.', selectionOptions = {}) {
+async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readiness.', selectionOptions = {}, verifyCodexSignature = hasOfficialWindowsSignature) {
   if(toolId==='qwen-code'||toolId==='codebuddy-code'){
     const {resolvePortableToolLaunch}=await import('./task-executors.mjs')
     const entry=await resolvePortableToolLaunch({id:toolId},workspace,{selection:officialToolEntrySelection(toolId,selectionOptions)})
@@ -582,11 +591,11 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
     let found = null
     for (const entry of packages) {
       found = await findSignedPackagedCodex(entry.packageRoot, workspace,
-        { installDir: selection.plan.installDir, manager: selection.plan.manager, moduleRoots })
+        { installDir: selection.plan.installDir, manager: selection.plan.manager, moduleRoots, verifySignature: verifyCodexSignature })
       if (found) break
     }
     if (!found && selection.plan.kind === 'script') {
-      found = await findSignedNativeExecutable(toolId, workspace, CODEX_SIGNER, selection)
+      found = await findSignedNativeExecutable(toolId, workspace, CODEX_SIGNER, selection, verifyCodexSignature)
     }
     if (!found) return { unsupported: '未找到具有 OpenAI 有效签名的 codex.exe。' }
     return {
@@ -823,14 +832,20 @@ export async function officialToolReadiness(toolId, workspace = process.cwd(), s
 }
 
 /** Discover the signed Codex App Server executable for an isolated account home. */
-export async function signedCodexAccountExecutable(workspace) {
+export async function signedCodexAccountExecutable(workspace, signal) {
   if (!IS_WINDOWS) return null
   const directory = await checkedWorkspace(workspace)
-  const spec = await launchSpec('codex', directory, 'read-only', null)
+  // This verification runs in the background while the account page reports
+  // preparation. Allow a cold Windows trust check to finish and honor Cancel.
+  const verifySignature = (entry, signer) => hasOfficialWindowsSignature(entry, signer, { timeoutMs: 25_000, signal })
+  const spec = await launchSpec('codex', directory, 'read-only', null, undefined, {}, verifySignature)
+  signal?.throwIfAborted()
   if (spec.file) return spec.file
   const selection = officialToolEntrySelection('codex')
   if (selection.configured) return null
-  return (await findSignedNativeExecutable('codex', directory, CODEX_SIGNER, selection))?.entry ?? null
+  const native = await findSignedNativeExecutable('codex', directory, CODEX_SIGNER, selection, verifySignature)
+  signal?.throwIfAborted()
+  return native?.entry ?? null
 }
 
 function tail(current, addition) {
