@@ -32,7 +32,7 @@ test('actual AgentLoop retains the native process then explicitly switches Main 
       }
       await send('first actual native loop turn')
       assert.equal(readRows('router_model_calls').length, 1, JSON.stringify({ errors,
-        tools: handle.agent.ctx.tools.wireSchemas(scopeOf(handle.agent.ctx)).schemas.map(tool => tool.name),
+        tools: handle.agent.ctx.tools.schemas(scopeOf(handle.agent.ctx)).map(tool => tool.name),
         hasScope: Boolean(scopeOf(handle.agent.ctx)), sameTools: handle.agent.ctx.get('tools') === handle.agent.ctx.tools,
         lifecycle: product.lifecycle.status(), model: product.lifecycle.committedBot('a')?.model }))
       assert.ok(handle.agent.session.deriveMessages().some(message => message.role === 'assistant' && JSON.stringify(message.content).includes('echo: first actual native loop turn')),

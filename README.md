@@ -295,7 +295,7 @@ Credentials for independent plugin AI connections are saved through the Host cre
 
 | Component | Current scope |
 | --- | --- |
-| Harness integration | Declared Host versions are listed in [package.json](package.json); the current compatibility baseline is Harness SDK **0.2.2-rc.3**, Cordis **4.1** and schemastery **3.19**. |
+| Harness integration | Declared Host versions are listed in [package.json](package.json); the current compatibility baseline is Harness SDK **0.2.2-rc.5**, Cordis **4.1** and schemastery **3.19**. |
 | Bot foundation | Pinned [DS Bot](https://github.com/Fei2411/DS-Bot) **0.2.7**, with project-specific integration and product overlays. |
 | Remote desktop | Embedded plugin access or Windows x64 Agent **0.1.3**, with an available signed-in interactive desktop. |
 | Tool execution | Availability depends on the local platform, installed CLI, account, exact model, and supported execution adapter shown by the workbench. |

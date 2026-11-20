@@ -295,7 +295,7 @@ Host 管理已提交的模型、工具、电脑、资金及操作身份。Bot �
 
 | 组件 | 当前范围 |
 | --- | --- |
-| Harness 集成 | 声明的宿主版本见 [package.json](package.json)；当前兼容基线为 Harness SDK **0.2.2-rc.3**、Cordis **4.1** 与 schemastery **3.19**。 |
+| Harness 集成 | 声明的宿主版本见 [package.json](package.json)；当前兼容基线为 Harness SDK **0.2.2-rc.5**、Cordis **4.1** 与 schemastery **3.19**。 |
 | Bot 基础 | 固定 [DS Bot](https://github.com/Fei2411/DS-Bot) **0.2.7**，叠加本项目集成与产品扩展。 |
 | 远程桌面 | Windows x64 Agent **0.1.3**，需要可用且已登录的交互桌面。 |
 | 工具执行 | 以工作台显示的本机平台、CLI 安装、账户、准确模型与执行适配器支持情况为准。 |

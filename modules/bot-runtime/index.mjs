@@ -59,6 +59,7 @@ export function createBotProduct(ctx, options = {}) {
   // look idle to a move.
   const releaseServingRuntime = typeof serving.bindRuntime === 'function' ? serving.bindRuntime(rt) : null
 
+  const toolPresentation = new WeakMap()
   const lifecycle = attachDsLifecycle({ runtime: rt, directory, grantFor, onBind: (agent, grant) => {
     const scoped = agent.ctx.get('tools')
     let signature, release = () => {}
@@ -75,14 +76,32 @@ export function createBotProduct(ctx, options = {}) {
       const at = ref.indexOf('/')
       return at > 0 && options.isTextOnlyModel({ provider: ref.slice(0, at), model: ref.slice(at + 1) }) === true
     }
+    // rc.5 takes tool declarations from the selected executor, outside the
+    // prompt waterfall. Keep the Host executor for tool-capable routes.
+    let presentation = toolPresentation.get(agent)
+    if (!presentation && options.isTextOnlyModel && agent.model?.current && scoped?.selectExecutor && scoped?.setExecutor) {
+      const executor = scoped.selectExecutor(agent)
+      presentation = { isTextOnly: null }
+      const textOnly = () => presentation.isTextOnly?.(agent.model.current()) === true
+      scoped.setExecutor({
+        describe: tools => textOnly() ? { schemas: [] } : executor.describe(tools),
+        execute: input => executor.execute(input),
+        sections: executor.sections?.map(section => ({
+          ...section,
+          text: tools => textOnly() ? '' : typeof section.text === 'function' ? section.text(tools) : section.text,
+        })),
+      })
+      toolPresentation.set(agent, presentation)
+    }
+    if (presentation) presentation.isTextOnly = isTextOnly
     // The SDK's restrict() masks inherited tools only; DS Bot's team tools are
     // registered in the Agent's own scope. Negotiate the actual assembled request
     // through the public scoped prompt waterfall as well. The adapter still
     // independently refuses a nonempty tool request before accounting.
-    const offAssembly = typeof agent.ctx.on === 'function' ? agent.ctx.on('system-prompt/assemble', async (_assembly, _context, next) => {
+    const offAssembly = typeof agent.ctx.on === 'function' ? agent.ctx.on('system-prompt/assemble', async (_assembly, context, next) => {
       refresh()
       const formed = await next()
-      return isTextOnly(formed.variables) ? { ...formed, tools: [] } : formed
+      return isTextOnly(context?.modelSelection ?? formed.variables) ? { ...formed, tools: [] } : formed
     }, { prepend: true }) : () => {}
     const offRequest = typeof agent.ctx.on === 'function' && typeof options.prepareLoopFunding === 'function' ? agent.ctx.on('agent/request', async (position, next) => {
       const config = await next()
@@ -107,7 +126,10 @@ export function createBotProduct(ctx, options = {}) {
     const off = ctx.on('tools/change', refresh)
     let extra
     try { refresh(); extra = onBind?.(agent, grant) } catch (error) { off(); offAssembly(); offRequest(); release(); throw error }
-    return () => { off(); offAssembly(); offRequest(); release(); extra?.() }
+    return () => {
+      if (presentation?.isTextOnly === isTextOnly) presentation.isTextOnly = null
+      off(); offAssembly(); offRequest(); release(); extra?.()
+    }
   } })
   // Creation may select a model before the owner has committed its binding.
   // A greeting is an automatic model call, so it waits for the same committed

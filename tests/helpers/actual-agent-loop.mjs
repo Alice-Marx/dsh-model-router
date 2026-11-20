@@ -51,17 +51,15 @@ export async function attachActualAgentLoop(host) {
   })
   const names = ['agents', 'sessions', 'sessionProjections', 'tools', 'systemPrompt']
   const previous = Object.fromEntries(names.map(name => [name, host[name]]))
-  const selections = new Map()
   context.on('agent/created', ({ agent }) => {
-    const selection = { current: undefined, assembled: undefined }
-    selections.set(agent.id, selection)
-    agent.ctx.effect(() => installModelSelection(agent.ctx, selection))
+    agent.ctx.effect(() => installModelSelection(agent.ctx))
   })
   previous.sessionController = host.sessionController
   for (const name of names) { host[name] = context[name]; host.provide(name, context[name]) }
   host.sessionController = { ...host.sessionController, selectModel: async input => {
-    const selection = selections.get(input.sessionId)
-    if (selection) selection.current = { provider: input.provider, model: input.model, ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}) }
+    const agent = context.agents.get(input.sessionId)
+    agent?.model.select({ provider: input.provider, model: input.model,
+      ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}) })
     return {}
   }, resolveAgent: async sessionId => {
     const agent = context.agents.get(sessionId)
