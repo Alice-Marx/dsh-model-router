@@ -45,6 +45,8 @@ test('product tasks include new records after 128 old successes and prioritize a
   }
   const current = j.submit(f, 'bot-b', 'request-new', 'hash-new', payload, 50_000, 400)
   j.submit(f, 'deleted-bot', 'hidden', 'hidden', payload, 50_000, 401)
+  assert.equal(j.pendingTaskCount('bot-a'), 0)
+  assert.equal(j.pendingTaskCount('bot-b'), 1)
   const all = j.productList(['bot-a', 'bot-b', 'bot-a'])
   assert.equal(all.items.length, 131); assert.equal(all.total, 131); assert.equal(all.truncated, false)
   assert.equal(all.items[0].taskId, current.taskId)

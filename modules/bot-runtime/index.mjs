@@ -231,8 +231,12 @@ export function createBotProduct(ctx, options = {}) {
       const identity = policy.modelIdentity(options)
       await optionsBeforeModelRequest(options, identity)
       // An independent turn is the Bot's own session turn: its own transcript, its own money.
-      const source = independent || (!rt.ownRequest(options) && isAgentLoopRequest(options)) ? 'bot-session' : 'bot-auxiliary'
-      yield* accountStream(options, next, { ...identity, source, ownRequest:Boolean(rt.ownRequest(options)),agentLoop:isAgentLoopRequest(options), runtime: rt })
+      const ownRequest = Boolean(rt.ownRequest(options)), agentLoop = isAgentLoopRequest(options)
+      const source = independent || (!ownRequest && agentLoop) ? 'bot-session' : 'bot-auxiliary'
+      const trigger = !independent && source === 'bot-session' ? options.messages?.findLast(message => message.role === 'user'
+        && ['user', 'user-question-reply', 'schedule', 'bot', 'subagent-settled'].includes(message.source?.kind))?.source.kind : null
+      const interactive = source === 'bot-session' && (independent ? frame.background !== true : !trigger || trigger === 'user' || trigger === 'user-question-reply')
+      yield* accountStream(options, next, { ...identity, source, ownRequest, agentLoop, interactive, runtime: rt })
     }
     // The Bot this call speaks for comes from committed state — the thread record, the live
     // Session (a chat, a group Session or an earlier part of either), or the admitted execution

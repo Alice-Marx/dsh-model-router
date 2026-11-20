@@ -4,7 +4,7 @@ import { createWorkerBindingCommitter } from '../packages/orchestration/src/bot-
 import { workerBinding } from '../packages/orchestration/src/bot-routing-mode.mjs'
 
 const tools = ['machine_ping', 'fs_list', 'fs_read', 'fs_write', 'operation_status', 'operation_cancel', 'artifact_stat', 'artifact_read']
-function fixture({ bindings = [], grants = null, confirmed = true } = {}) {
+function fixture({ bindings = [], grants = null, confirmed = true, targetedRead = false } = {}) {
   const calls = []
   const machine = { id: 'm1', status: 'online', revision: 3, bindings: structuredClone(bindings) }
   const store = { readModel: () => ({ items: [machine] }), bind: async (input, context) => {
@@ -16,6 +16,10 @@ function fixture({ bindings = [], grants = null, confirmed = true } = {}) {
     machine.bindings.push({ ...input, revision: input.expectedRevision + 1, revoked: !confirmed })
     return { revision: input.expectedRevision + 1, remoteRevoked: confirmed }
   } }
+  if (targetedRead) {
+    store.readModel = () => assert.fail('read the entire directory')
+    store.readMachine = id => id === machine.id ? machine : null
+  }
   const commit = createWorkerBindingCommitter({ machines: store, settingsFor: () => ({ enabled: true, status: 'available', workspaceRef: { machineId: 'm1', rootId: 'project' },
     machineGrants: grants ?? [{ machineId: 'm1', rootId: 'project', capabilities: tools, mode: 'workspace-write' }] }), mainBotIds: ['main'] })
   return { commit, calls, machine }
@@ -31,7 +35,7 @@ test('worker binding commit: an existing wider grant is verified without narrowi
 })
 
 test('worker binding commit: only owner or a committed Main may expand, under the exact saved root ceiling', async () => {
-  const f = fixture({ bindings: [{ botId: 'worker', roots: ['project'], tools: ['machine_ping'], mode: 'read-only', revision: 7, revoked: false }] })
+  const f = fixture({ targetedRead: true, bindings: [{ botId: 'worker', roots: ['project'], tools: ['machine_ping'], mode: 'read-only', revision: 7, revoked: false }] })
   await assert.rejects(f.commit(binding(), { grantAllowed: true, requesterBotId: 'other' }), /BOT_ROUTING_GRANT_DENIED/u)
   await assert.rejects(f.commit(binding(), { grantAllowed: false, requesterBotId: 'main' }), /BOT_ROUTING_WORKER_GRANT_REQUIRED/u)
   assert.equal(f.calls.length, 0)

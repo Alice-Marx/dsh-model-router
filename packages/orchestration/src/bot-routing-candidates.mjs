@@ -95,9 +95,9 @@ export function candidateMachineGrant(candidate, machineId = '', rootId = '') {
  *   bots: Array<{ id: string, name?: string, model?: object, main?: boolean }>,
  *   settingsFor: (botId: string) => { enabled?: boolean, model?: object, grant?: { tools?: string[] }, capabilities?: string[], machineGrants?: Array<object> } | null,
  *   machineHealth?: (machineId: string) => { online?: boolean } | null,
- *   qualityFor?: (botId: string) => number | null,
- *   priceFor?: (route: { provider: string, model: string }, botId: string) => number | null,
- *   loadFor?: (botId: string) => number | null,
+ *   qualityFor?: (botId: string, model: object | null) => number | null,
+ *   priceFor?: (route: { provider: string, model: string }, botId: string, settings: object) => number | null,
+ *   loadFor?: (botId: string, settings: object) => number | null,
  *   busyFor?: (botId: string) => boolean,
  * }} source
  */
@@ -110,7 +110,7 @@ export function botRoutingCandidates({ bots = [], settingsFor, machineHealth = (
     // A Bot that is off is not a candidate; it stays out rather than scoring last.
     if (!settings || settings.enabled === false || settings.status && settings.status !== 'available') continue
     const model = settings.model ?? bot.model ?? null
-    const price = model ? priceFor(model, bot.id) : null
+    const price = model ? priceFor(model, bot.id, settings) : null
     // Machine grants name the machine and the tools that machine offers this Bot. Reachability is
     // asked per machine, so a Bot with two grants reports the one the task is about.
     const machineGrants = machineGrantsOf(settings)
@@ -125,8 +125,8 @@ export function botRoutingCandidates({ bots = [], settingsFor, machineHealth = (
       // Unknown price and unknown quality stay null: the router treats them as unknown, not as
       // zero or best, and never as "free".
       pricePerMTokUsd: finite(price),
-      quality: finite(qualityFor(bot.id), 1),
-      load: finite(loadFor(bot.id)) ?? 0,
+      quality: finite(qualityFor(bot.id, model), 1),
+      load: finite(loadFor(bot.id, settings), 1),
       busy: busyFor(bot.id) === true,
       tools: toolsOf(settings),
       capabilities: list(settings.capabilities),

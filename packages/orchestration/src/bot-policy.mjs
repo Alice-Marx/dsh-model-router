@@ -30,7 +30,9 @@ export function createBotPolicy({ authority, directory, machineId, workspaceId, 
     replaceOwnerGrant(grant) { authority.replaceGrant(owner,grant) },
     activeIdentity() {
       const frame=current.getStore()
-      return frame?{subject:frame.subject,botId:authority.describe(frame.subject).botId,owner:frame.owner,independent:frame.independent===true,...(frame.conversationId?{conversationId:frame.conversationId}:{}),...(frame.workThread?{workThread:frame.workThread}:{})}:null
+      return frame?{subject:frame.subject,botId:authority.describe(frame.subject).botId,owner:frame.owner,independent:frame.independent===true,
+        ...(frame.conversationId?{conversationId:frame.conversationId}:{}),...(frame.workThread?{workThread:frame.workThread}:{}),
+        ...(frame.background?{background:true}:{})}:null
     },
     bindFinancialRun(binding) {
       const frame=current.getStore()
@@ -66,7 +68,7 @@ export function createBotPolicy({ authority, directory, machineId, workspaceId, 
      * cancel on every chunk. `botId` is an optional cross-check: a caller that names one Bot and
      * resolves another is refused instead of silently answered for the wrong Bot.
      */
-    modelContext(subject, signal, operation, { botId = null, conversationId = null, workThread = null } = {}) {
+    modelContext(subject, signal, operation, { botId = null, conversationId = null, workThread = null, background = false } = {}) {
       const who = authority.describe(subject)
       if (botId !== null && who.botId !== botId) throw new PolicyError('SUBJECT_MISMATCH')
       // A frame that already speaks for another subject cannot be re-pointed at this one: a nested
@@ -85,7 +87,8 @@ export function createBotPolicy({ authority, directory, machineId, workspaceId, 
       // them, and they confer no authority — the subject above is still the only identity.
       const conversation = typeof conversationId === 'string' && /^[-A-Za-z0-9_.]{1,128}$/.test(conversationId) ? conversationId : null
       const thread = workThread && typeof workThread === 'object' && !Array.isArray(workThread) ? workThread : null
-      return current.run({ subject, owner: false, independent: true, signal: combined, ...(financial ? { financial } : {}), ...(conversation ? { conversationId: conversation } : {}), ...(thread ? { workThread: thread } : {}) }, operation)
+      return current.run({ subject, owner: false, independent: true, signal: combined, background,
+        ...(financial ? { financial } : {}), ...(conversation ? { conversationId: conversation } : {}), ...(thread ? { workThread: thread } : {}) }, operation)
     },
     /**
      * Run an operation OUTSIDE the current model-turn frame. The team dispatch and resume

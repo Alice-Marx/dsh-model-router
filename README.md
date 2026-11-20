@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.80.1 · Windows Remote Agent: 0.1.3**
+**GitHub release 0.81.0 · npm 0.80.1 · Windows Remote Agent 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -74,6 +74,10 @@ CLI chat drivers include Claude Code, Codex, Pi, Step Code, Muse Code, Antigravi
 Antigravity uses its matching official runtime and harness files with separate OAuth credentials. DeepSeek ACP uses the dsh **0.2.2-rc.3** Node entry, its own API key and API funding, with one model request and at most 4096 output tokens per turn. Other subscription CLIs use their respective plan accounts. See the [CLI chat connection guide](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/cli-chat-providers.md) for installation and configuration.
 
 Edit the Bot's name, role and standing instructions under **Identity & personality**, then save to apply them. Chat supports separate threads, text drafts, paged history, Markdown, code and mathematics. Notifications open the relevant Bot and task. Main Bot supports multiple saved model routes; workers use their own models, permissions and funding.
+
+In **Model API**, **Check** reads the connection's model catalog. Expand **Model verification** to see inference results for individual models. Local connections without an API key also have an on-demand inference test that reports time to first text.
+
+Bot calls through saved loopback connections share one running inference per local address and port on the Host. When a slot opens, waiting chat runs before waiting background work. Requests already running finish in their existing order.
 
 <a id="install"></a>
 
@@ -225,7 +229,7 @@ flowchart LR
 
 1. Configure the Main Bot and execution Bots with their actual models, allowed tools, computer/workspace grants, and funding settings.
 2. Open **Tasks → Bot routing**, enable it, select **Economy**, **Balanced**, or **Quality first**, and save the policy.
-3. Enter a task and choose automatic routing or a specific Bot. Select the computer/directory and operation type if required. **Preview route** explains the selection, missing conditions, rejection reasons, and proposed bindings.
+3. Enter a task and choose automatic routing or a specific Bot. Select the computer/directory and operation type if required. **Preview route** shows the selection, eligible Bots' prices and managed task load, matched quality evidence when available, and any binding or rejection reason.
 4. Choose **Create task with this route** to dispatch. Follow the task record and inspect the output. An accepted plan ID means submitted, not completed.
 
 The Main Bot can also call `bot_route_task` or its alias `bot_dispatch`. Both dispatch by default; `preview: true` only previews. `bot_task_plan_status` returns the actual plan/task state. Each execution Bot's model call has its own budget admission and receipt linked to the parent task. Role text does not grant tool or computer permissions.

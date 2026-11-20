@@ -24,6 +24,13 @@ const server = createServer(async (request, response) => {
       const authorized = request.headers.authorization !== 'Bearer bad-fixture-key'
       response.writeHead(authorized ? 200 : 401, { 'content-type': 'application/json' }); response.end(JSON.stringify(authorized ? { data: [{ id: 'browser-chat' }] } : { error: { message: 'invalid fixture' } })); return
     }
+    if (request.url === '/mock/v1/chat/completions') {
+      const chunk = (delta, finish_reason) => JSON.stringify({ id: 'fixture', object: 'chat.completion.chunk', model: 'browser-chat',
+        choices: [{ index: 0, delta, finish_reason }] })
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(`data: ${chunk({ content: 'OK' }, null)}\n\ndata: ${chunk({}, 'stop')}\n\ndata: [DONE]\n\n`)
+      return
+    }
     if (request.url?.endsWith('/api/bot-product')) {
       const index = request.url.startsWith('/alternate/') ? 1 : 0
       let text = ''; for await (const part of request) { text += part; if (text.length > 2_000_000) throw new Error('large fixture input') }
@@ -47,6 +54,8 @@ for (let index = 0; index < 2; index++) {
 }
 await services[0].save({ expectedRevision: 0, preset: 'moonshotai-cn', name: 'Kimi · 合成验收', protocol: 'openai-completions', baseUrl: origin + '/mock/v1', enabled: true, auth: 'key', apiKey: fakeKey,
   models: [{ id: 'browser-chat', name: 'Kimi · 测试模型', contextWindow: 4096, maxTokens: 64, reasoning: false }] }, { kind: 'owner' })
+await services[0].save({ expectedRevision: 0, preset: 'custom', name: '本机推理验收', protocol: 'openai-completions', baseUrl: origin + '/mock/v1', enabled: true, auth: 'none',
+  models: [{ id: 'browser-chat', name: '本机模型', contextWindow: 4096, maxTokens: 64, reasoning: false }] }, { kind: 'owner' })
 const browser = await chromium.launch({ headless: true }), page = await browser.newPage({ viewport: { width: 1280, height: 1000 } })
 page.on('pageerror', error => errors.push(error.message))
 page.on('response', async response => { if (response.url().includes('api/bot-product')) apiResponses.push(await response.text().catch(() => '')) })
@@ -55,6 +64,12 @@ try {
   await page.goto(origin); await page.getByRole('heading', { name: 'Kimi · 合成验收', exact: true }).waitFor()
   assert.equal(await page.getByRole('button', { name: '重新检查', exact: true }).isEnabled(), true)
   assert.equal(await page.locator('.bp-ai-presets button').count(), 9)
+  const local = page.locator('.bp-ai-provider').filter({ has: page.getByRole('heading', { name: '本机推理验收', exact: true }) })
+  await local.getByText('模型验证 · 0/1 通过', { exact: true }).click()
+  await local.getByRole('button', { name: '测试模型 本机模型' }).click()
+  await local.getByText(/推理通过 · 测试首字 \d+ ms/).waitFor()
+  await local.getByText('模型验证 · 1/1 通过', { exact: true }).click()
+  checks.push('a local model can complete an on-demand inference check and display its first text latency')
   await capture('providers-wide'); checks.push('actual provider manager reads owner service and presents independent API connections and separate CLI status')
   await page.getByRole('button', { name: '自定义 / 本地服务', exact: true }).click()
   await page.getByLabel('连接名称', { exact: true }).fill('浏览器独立连接')
@@ -71,7 +86,7 @@ try {
   await page.getByRole('heading', { name: '浏览器独立连接', exact: true }).waitFor()
   const row = page.locator('.bp-ai-provider').filter({ has: page.getByRole('heading', { name: '浏览器独立连接', exact: true }) })
   await row.getByRole('button', { name: '检查', exact: true }).click()
-  await row.getByText('模型目录可访问；实际推理尚未验证。', { exact: true }).waitFor()
+  await row.getByText('模型目录可访问。推理结果见下方模型列表。', { exact: true }).waitFor()
   assert.equal(await row.locator('.bp-ai-state').getAttribute('data-state'), 'configured')
   checks.push('real owner save writes a separate credential, adds a model, and a public catalog response is not mislabeled as successful inference')
   await row.getByRole('button', { name: '管理', exact: true }).click()

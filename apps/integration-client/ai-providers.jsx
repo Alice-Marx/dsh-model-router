@@ -13,7 +13,24 @@ const presetForm = preset => ({ preset: preset.id, name: preset.name, protocol: 
 const healthText = provider => provider.health?.kind === 'error'
   ? provider.health.code === 'AUTH' ? `认证被拒绝${provider.health.status ? `（${provider.health.status}）` : ''}，请更新此连接的密钥。`
     : provider.health.code === 'TIMEOUT' ? '检查超时，可以重试。' : `连接检查失败${provider.health.status ? `（HTTP ${provider.health.status}）` : ''}，请检查服务地址和协议。`
-  : provider.health?.kind === 'catalog' && !provider.health.verifiedAt ? '模型目录可访问；实际推理尚未验证。' : ''
+  : provider.health?.kind === 'catalog' ? '模型目录可访问。推理结果见下方模型列表。' : ''
+
+function ModelChecks({ provider, busy, onTest }) {
+  if (!provider.models.length || !Array.isArray(provider.modelHealth)) return null
+  const byModel = new Map(provider.modelHealth.map(item => [item.modelId, item]))
+  const verified = provider.modelHealth.filter(item => item.state === 'verified').length
+  return <details className="bp-ai-model-checks"><summary>模型验证 · {verified}/{provider.models.length} 通过</summary>
+    <ul>{provider.models.map(model => {
+      const health = byModel.get(model.id), id = `test-${provider.id}-${model.id}`
+      return <li key={model.id}><div><strong>{model.name}</strong><small role="status">
+        {health?.state === 'verified' ? '推理通过' : health?.state === 'error'
+          ? (health.code === 'TIMEOUT' ? '推理超时' : health.code === 'AUTH' ? '认证被拒绝' : '最近推理失败') : '尚未验证'}
+        {health?.state === 'verified' && Number.isFinite(health.firstTokenMs) ? ` · 测试首字 ${health.firstTokenMs} ms` : ''}
+      </small></div>{provider.canTestModel && <button type="button" disabled={Boolean(busy) || !provider.enabled}
+        aria-label={`测试模型 ${model.name}`} onClick={() => onTest(provider, model, id)}>{busy === id ? '测试中…' : '测试推理'}</button>}</li>
+    })}</ul>
+  </details>
+}
 
 let nextScope = 0
 export function AiProvidersPage(props) { const key = useMemo(() => ++nextScope, [props.productApi]); return <AiProviders key={key} {...props}/> }
@@ -26,12 +43,12 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings, onReturnToTask, 
   const [draft, setDraft] = useState(null), [busy, setBusy] = useState(''), [suggestions, setSuggestions] = useState([]), [search, setSearch] = useState('')
   const editingBusy = busy === 'save' || busy === 'remove'
   const scope = useRef({ live: false, requests: new Set(), epoch: 0 }), draftVersion = useRef(0)
-  const call = async (action, payload = {}) => {
+  const call = async (action, payload = {}, timeoutMs = action === 'aiProviders.cliStatus' ? 15000 : 12000) => {
     const controller = new AbortController(), current = scope.current
     current.requests.add(controller)
     let rejectAbort
     const deadline = new Promise((_resolve, reject) => { rejectAbort = () => reject(new Error('连接请求已取消或超时，请重试。')); controller.signal.addEventListener('abort', rejectAbort, { once: true }) })
-    const timer = setTimeout(() => controller.abort(), action === 'aiProviders.cliStatus' ? 15000 : 12000)
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
     try { return await Promise.race([Promise.resolve().then(() => productApi.dispatch(action, payload, controller.signal)), deadline]) }
     finally { clearTimeout(timer); current.requests.delete(controller); controller.signal.removeEventListener('abort', rejectAbort) }
   }
@@ -86,6 +103,10 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings, onReturnToTask, 
   const check = provider => run(`check-${provider.id}`, async () => {
     await call('aiProviders.check', { id: provider.id }); if (scope.current.live) await load()
   })
+  const testModel = (provider, model, id) => run(id, async () => {
+    await call('aiProviders.check', { id: provider.id, expectedRevision: provider.revision, modelId: model.id }, 30_000)
+    if (scope.current.live) await load()
+  })
   const remove = () => run('remove', async () => {
     await call('aiProviders.remove', { id: draft.id, expectedRevision: draft.revision })
     if (scope.current.live) { setDraft(null); setSuggestions([]); setNotice('已删除此独立连接。'); await load() }
@@ -134,7 +155,9 @@ function AiProviders({ productApi, onOpenTools, onOpenBindings, onReturnToTask, 
       <div hidden={section !== 'api'}>
       <div className="bp-ai-section-head"><h3>我的模型连接</h3><span>独立账号与密钥</span></div>
       <div className="bp-ai-provider-list">{view.providers.map(provider => <article className="bp-ai-provider" key={provider.id} data-ai-provider={provider.id}>
-        <div className="bp-ai-mark" aria-hidden="true">{view.presets.find(preset => preset.id === provider.preset)?.mark ?? 'AI'}</div><div className="bp-ai-copy"><h4>{provider.name}</h4><p className="bp-ai-state" data-state={provider.state}><span/>{labels[provider.state] ?? '状态未知'} · {provider.models.length} 个模型</p>{healthText(provider) && <small>{healthText(provider)}</small>}<small>{new URL(provider.baseUrl).host}</small></div>
+        <div className="bp-ai-mark" aria-hidden="true">{view.presets.find(preset => preset.id === provider.preset)?.mark ?? 'AI'}</div><div className="bp-ai-copy"><h4>{provider.name}</h4><p className="bp-ai-state" data-state={provider.state}><span/>{labels[provider.state] ?? '状态未知'} · {provider.models.length} 个模型</p>{healthText(provider) && <small>{healthText(provider)}</small>}<small>{new URL(provider.baseUrl).host}</small>
+          <ModelChecks provider={provider} busy={busy} onTest={testModel}/>
+        </div>
         <div className="bp-ai-row-actions"><button type="button" disabled={Boolean(busy) || !provider.enabled || provider.auth === 'key' && !provider.keyConfigured} onClick={() => check(provider)}>{busy === `check-${provider.id}` ? '检查中…' : '检查'}</button><button type="button" disabled={editingBusy} onClick={() => edit(provider)}>管理</button></div>
       </article>)}{!view.providers.length && <div className="bp-ai-empty"><UiIcon name="spark" size={26}/><h4>连接你的第一个 AI</h4><p>选择下面的提供方，填写自己的账号密钥与模型。</p></div>}</div>
       <div className="bp-ai-presets">{view.presets.map(preset => <button type="button" key={preset.id} disabled={editingBusy} onClick={() => edit(preset)}><span className="bp-ai-small-mark" aria-hidden="true">{preset.mark}</span><span>{preset.name}</span><UiIcon name="plus" size={14}/></button>)}</div>

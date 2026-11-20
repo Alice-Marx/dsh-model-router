@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { AiProviderAdapter } from './ai-provider-adapter.mjs'
-import { AI_PRESETS, AI_PROTOCOLS, aiFail, aiPlain, normalizeAiProvider, aiProviderCredentialRef, aiAbortable } from './ai-provider-config.mjs'
+import { AI_PRESETS, AI_PROTOCOLS, aiFail, aiPlain, aiLoopback, normalizeAiProvider, aiProviderCredentialRef, aiAbortable } from './ai-provider-config.mjs'
+import { createModelEndpointQueue } from './model-endpoint-queue.mjs'
 
 const owner = context => { if (context?.kind !== 'owner') aiFail('REMOTE_OWNER_REQUIRED', '请以已认证的宿主拥有者身份管理 AI 提供方。'); context.signal?.throwIfAborted() }
 const identity = payload => {
@@ -10,6 +11,13 @@ const identity = payload => {
   return payload.id
 }
 const withoutSecret = profile => { const { secretRef: _ref, ...view } = profile; return view }
+const canTestModel = profile => profile.auth === 'none' && aiLoopback(new URL(profile.baseUrl).hostname)
+const localEndpointKey = profile => {
+  const url = new URL(profile.baseUrl)
+  if (!aiLoopback(url.hostname)) return null
+  if (url.hostname === 'localhost') url.hostname = '127.0.0.1'
+  return url.origin
+}
 const decode = row => {
   try {
     const profile = JSON.parse(row.payload), health = row.health ? JSON.parse(row.health) : null
@@ -27,11 +35,17 @@ const decode = row => {
 export function openAiProviders({ Database, file, llm, credentials, onChanged = async () => {}, usedBy = () => [], fetcher = globalThis.fetch, now = Date.now }) {
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true })
   const db = new Database(file), mounted = new Map(), flights = new Set(), ownedRoutes = new Set(), metadata = new Map()
+  const endpointQueue = createModelEndpointQueue(), localEndpoints = new Map()
   let closed = false, queue = Promise.resolve()
   try {
     db.pragma('busy_timeout=5000'); db.pragma('synchronous=FULL')
     if (file !== ':memory:') db.pragma('journal_mode=WAL')
     db.exec('CREATE TABLE IF NOT EXISTS bot_ai_providers(id TEXT PRIMARY KEY, revision INTEGER NOT NULL, payload TEXT NOT NULL, health TEXT)')
+    db.exec(`CREATE TABLE IF NOT EXISTS bot_ai_model_health(
+      provider_id TEXT NOT NULL, revision INTEGER NOT NULL, model_id TEXT NOT NULL,
+      state TEXT NOT NULL, code TEXT, checked_at INTEGER NOT NULL, verified_at INTEGER, first_token_ms INTEGER,
+      PRIMARY KEY (provider_id, revision, model_id)
+    )`)
   } catch (error) { db.close(); throw error }
   const credentialStore = () => typeof credentials === 'function' ? credentials() : credentials
   const rows = () => { if (closed) aiFail('AI_PROVIDERS_CLOSED', 'AI 提供方服务已关闭。'); return db.prepare('SELECT * FROM bot_ai_providers ORDER BY rowid').all().map(decode) }
@@ -43,38 +57,87 @@ export function openAiProviders({ Database, file, llm, credentials, onChanged = 
     const verifiedAt = health.kind === 'verified' ? now() : health.kind === 'catalog' ? current?.health?.verifiedAt : undefined
     db.prepare('UPDATE bot_ai_providers SET health=? WHERE id=? AND revision=?').run(JSON.stringify({ ...health, ...(verifiedAt ? { verifiedAt } : {}), checkedAt: now() }), profile.id, profile.revision)
   }
+  const recordModelResult = (profile, health, modelId) => {
+    if (closed) return
+    const time = now(), verified = health.kind === 'verified'
+    db.prepare(`INSERT INTO bot_ai_model_health
+        (provider_id, revision, model_id, state, code, checked_at, verified_at, first_token_ms)
+        SELECT id, revision, ?, ?, ?, ?, ?, ? FROM bot_ai_providers WHERE id=? AND revision=?
+        ON CONFLICT(provider_id, revision, model_id) DO UPDATE SET
+          state=excluded.state, code=excluded.code, checked_at=excluded.checked_at,
+          verified_at=COALESCE(excluded.verified_at, bot_ai_model_health.verified_at),
+          first_token_ms=COALESCE(excluded.first_token_ms, bot_ai_model_health.first_token_ms)`)
+      .run(modelId, health.kind, health.code ?? null, time, verified ? time : null, health.firstTokenMs ?? null, profile.id, profile.revision)
+  }
+  const track = profile => {
+    const controller = new AbortController(), flight = { id: profile.id, revision: profile.revision, controller }
+    flights.add(flight)
+    return { signal: controller.signal, release: () => flights.delete(flight) }
+  }
   const acquire = async profile => {
     const current = read(profile.id)
     if (!current?.enabled || current.revision !== profile.revision) aiFail('AI_PROVIDER_CHANGED', '此 AI 连接已修改或停用，请重新发送。')
     const key = profile.auth === 'key' && profile.secretRef ? (await credentialStore()?.resolve(profile.secretRef))?.value : ''
     if (profile.auth === 'key' && !key) aiFail('MISSING_CREDENTIAL', '请先在 AI 提供方设置中保存此连接的 API Key。')
     if (read(profile.id)?.revision !== profile.revision) aiFail('AI_PROVIDER_CHANGED', '此 AI 连接已修改，请重新发送。')
-    const controller = new AbortController(), flight = { id: profile.id, revision: profile.revision, controller }
-    flights.add(flight)
-    return { key, signal: controller.signal, release: () => flights.delete(flight) }
+    return { key, ...track(profile) }
+  }
+  const queueFor = route => {
+    const local = localEndpoints.get(route)
+    if (!local) return null
+    return async ({ interactive, signal }) => {
+      const flight = track(local)
+      const combined = signal ? AbortSignal.any([flight.signal, signal]) : flight.signal
+      let release
+      try {
+        release = await endpointQueue.acquire(local.key, { interactive, signal: combined })
+        combined.throwIfAborted()
+        return () => { release(); flight.release() }
+      } catch (error) {
+        release?.()
+        flight.release()
+        throw error
+      }
+    }
   }
   const sync = () => {
     const active = new Set()
     metadata.clear()
+    localEndpoints.clear()
     for (const profile of rows()) {
       ownedRoutes.add(profile.route)
       metadata.set(profile.route, { name: profile.name, id: profile.id, preset: profile.preset, enabled: profile.enabled })
       if (!profile.enabled || !profile.models.length || profile.auth === 'key' && !profile.secretRef) continue
       active.add(profile.id)
+      const key = localEndpointKey(profile)
+      if (key) localEndpoints.set(profile.route, { id: profile.id, revision: profile.revision, key })
       if (mounted.get(profile.id)?.revision === profile.revision) continue
-      const adapter = new AiProviderAdapter({ profile, acquire, onResult: result, fetcher })
+      const adapter = new AiProviderAdapter({ profile, acquire, onResult: recordModelResult, fetcher })
       mounted.get(profile.id)?.release()
       const release = llm.registerAdapter([profile.route], adapter)
       mounted.set(profile.id, { revision: profile.revision, release })
     }
     for (const [id, item] of mounted) if (!active.has(id)) { item.release(); mounted.delete(id) }
-    for (const flight of flights) if (read(flight.id)?.revision !== flight.revision || !read(flight.id)?.enabled) flight.controller.abort()
+    for (const flight of flights) {
+      const current = read(flight.id)
+      if (current?.revision !== flight.revision || !current.enabled) {
+        flight.controller.abort(Object.assign(new Error('此 AI 连接已修改或停用，请重新发送。'), { code: 'AI_PROVIDER_CHANGED' }))
+      }
+    }
   }
   const view = async profile => {
     const keyConfigured = profile.auth === 'key' && Boolean(profile.secretRef && (await credentialStore()?.describe(profile.secretRef))?.configured)
-    return { ...withoutSecret(profile), keyConfigured, usedBy: usedBy(profile.route),
+    const modelHealth = db.prepare(`SELECT model_id AS modelId, state, code,
+      checked_at AS checkedAt, verified_at AS verifiedAt, first_token_ms AS firstTokenMs
+      FROM bot_ai_model_health WHERE provider_id=? AND revision=? ORDER BY model_id`).all(profile.id, profile.revision)
+    // An older connection-level success identifies a model only when there was exactly one.
+    if (modelHealth.length === 0 && profile.models.length === 1 && profile.health?.verifiedAt != null && profile.health.kind !== 'error') {
+      modelHealth.push({ modelId: profile.models[0].id, state: 'verified', verifiedAt: profile.health.verifiedAt, firstTokenMs: null })
+    }
+    return { ...withoutSecret(profile), keyConfigured, usedBy: usedBy(profile.route), modelHealth, canTestModel: canTestModel(profile),
       state: !profile.enabled ? 'disabled' : profile.auth === 'key' && !keyConfigured ? 'needs-key' : !profile.models.length ? 'needs-models'
-        : profile.health?.verifiedAt && profile.health.kind !== 'error' ? 'ready' : profile.health?.kind === 'error' ? 'needs-attention' : 'configured' }
+        : profile.health?.kind === 'error' || modelHealth.some(model => model.state === 'error') ? 'needs-attention'
+          : modelHealth.length === profile.models.length ? 'ready' : 'configured' }
   }
   const presetModels = async preset => {
     if (!preset?.catalog) return []
@@ -107,6 +170,7 @@ export function openAiProviders({ Database, file, llm, credentials, onChanged = 
         if ((read(selected.id)?.revision ?? 0) !== input.expectedRevision) aiFail('AI_PROVIDER_CONFLICT', '连接已在其他窗口修改，请刷新后重试。')
         db.prepare('INSERT INTO bot_ai_providers(id,revision,payload,health) VALUES(?,?,?,NULL) ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,payload=excluded.payload,health=NULL')
           .run(selected.id, input.expectedRevision + 1, JSON.stringify(profile))
+        db.prepare('DELETE FROM bot_ai_model_health WHERE provider_id=?').run(selected.id)
       }).immediate()
     } catch (error) { if (written) await store.unset(written).catch(() => {}); throw error }
     sync(); await onChanged()
@@ -118,13 +182,51 @@ export function openAiProviders({ Database, file, llm, credentials, onChanged = 
     if (!current) aiFail('AI_PROVIDER_NOT_FOUND', '此连接已删除。')
     if (usedBy(current.route).length) aiFail('AI_PROVIDER_IN_USE', '仍有 Bot 使用此连接，请先切换这些 Bot 的模型。')
     if (payload.expectedRevision !== current.revision) aiFail('AI_PROVIDER_CONFLICT', '连接已在其他窗口修改，请刷新后重试。')
-    db.transaction(() => { const outcome = db.prepare('DELETE FROM bot_ai_providers WHERE id=? AND revision=?').run(id, payload.expectedRevision); if (!outcome.changes) aiFail('AI_PROVIDER_CONFLICT', '连接已修改，请刷新。') }).immediate()
+    db.transaction(() => {
+      const outcome = db.prepare('DELETE FROM bot_ai_providers WHERE id=? AND revision=?').run(id, payload.expectedRevision)
+      if (!outcome.changes) aiFail('AI_PROVIDER_CONFLICT', '连接已修改，请刷新。')
+      db.prepare('DELETE FROM bot_ai_model_health WHERE provider_id=?').run(id)
+    }).immediate()
     sync(); await onChanged(); if (current.secretRef) await credentialStore()?.unset(current.secretRef).catch(() => {})
     return { removed: true, id }
   })
+  const testModel = async (profile, model, context) => {
+    if (!canTestModel(profile)) aiFail('AI_PROVIDER_TEST_UNAVAILABLE', '手动测试仅用于本机免密连接。其他连接的模型在正常调用后显示验证结果。')
+    if (!model) aiFail('AI_PROVIDER_MODEL_INVALID', '请选择此连接已保存的模型。')
+    if (!profile.enabled) aiFail('AI_PROVIDER_CHANGED', '请先启用连接。')
+    const adapter = new AiProviderAdapter({ profile, acquire, onResult: () => {}, fetcher })
+    const timeout = AbortSignal.timeout(25_000)
+    const signal = context.signal ? AbortSignal.any([timeout, context.signal]) : timeout
+    const releaseSlot = await queueFor(profile.route)({ interactive: true, signal })
+    const start = performance.now()
+    let firstTokenMs = null, finished = false, code = null
+    try {
+      for await (const event of adapter.stream({
+        provider: profile.route, model: model.id, maxTokens: Math.min(32, model.maxTokens), signal,
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'Reply with the word OK.' }] }],
+      })) {
+        if (event.type === 'text-delta' && event.text.trim() && firstTokenMs === null) firstTokenMs = Math.round(performance.now() - start)
+        if (event.type === 'finish' && ['stop', 'max-tokens'].includes(event.reason.kind)) finished = true
+      }
+    } catch (error) {
+      code = timeout.aborted ? 'TIMEOUT' : error?.code ?? 'PROVIDER_ERROR'
+    } finally { releaseSlot() }
+    context.signal?.throwIfAborted()
+    if (read(profile.id)?.revision !== profile.revision) aiFail('AI_PROVIDER_CHANGED', '测试期间连接已修改，请重新测试。')
+    recordModelResult(profile, !code && finished && firstTokenMs !== null
+      ? { kind: 'verified', firstTokenMs }
+      : { kind: 'error', code: code ?? 'NO_MODEL_OUTPUT' }, model.id)
+    return view(read(profile.id))
+  }
   const probe = async (payload, context) => {
-    owner(context); const id = identity(payload), profile = read(id)
+    owner(context)
+    const { modelId, ...connection } = aiPlain(payload) ? payload : {}
+    const id = identity(connection), profile = read(id)
     if (!profile) aiFail('AI_PROVIDER_NOT_FOUND', '此连接已删除。')
+    if (modelId !== undefined) {
+      if (connection.expectedRevision !== profile.revision) aiFail('AI_PROVIDER_CHANGED', '连接已修改，请刷新后测试。')
+      return testModel(profile, profile.models.find(model => model.id === modelId), context)
+    }
     const lease = await acquire(profile), signal = AbortSignal.any([lease.signal, AbortSignal.timeout(10_000), ...(context.signal ? [context.signal] : [])])
     let health
     try {
@@ -152,11 +254,11 @@ export function openAiProviders({ Database, file, llm, credentials, onChanged = 
     result(profile, health); return view(read(id))
   }
   sync()
-  return Object.freeze({ list, save, remove, probe, sync, acquire,
+  return Object.freeze({ list, save, remove, probe, sync, acquire, queueFor,
     owns: route => ownedRoutes.has(route),
     routes: () => rows().filter(profile => profile.enabled && (profile.auth === 'none' || profile.secretRef)).flatMap(profile => profile.models.map(model => ({ provider: profile.route, model: model.id }))),
     metadata: route => metadata.get(route) ?? null,
     async suggestions(payload, context) { owner(context); const preset = AI_PRESETS.find(item => item.id === payload?.preset); if (!preset || Object.keys(payload).some(key => key !== 'preset')) aiFail('AI_PROVIDER_INVALID', '请选择提供方。'); return { preset: preset.id, models: await presetModels(preset) } },
-    close() { if (closed) return; closed = true; for (const flight of flights) flight.controller.abort(); flights.clear(); for (const entry of mounted.values()) entry.release(); mounted.clear(); db.close() },
+    close() { if (closed) return; closed = true; endpointQueue.close(); for (const flight of flights) flight.controller.abort(); flights.clear(); for (const entry of mounted.values()) entry.release(); mounted.clear(); db.close() },
   })
 }

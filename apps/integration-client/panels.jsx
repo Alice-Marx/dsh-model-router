@@ -400,13 +400,13 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
     {savedSubmissionForm}
     {!viewReady && !working && <p className="bp-muted">候选尚未更新，请刷新候选后再预览。</p>}
     {view.enabled ? <div className="bp-table-wrap"><table className="bp-routing-candidates">
-      <thead><tr><th>Bot</th><th>模型</th><th>机器</th><th>价格/百万</th><th>质量</th><th>状态</th></tr></thead>
+      <thead><tr><th>Bot</th><th>模型</th><th>机器</th><th>价格/百万</th><th>任务负载</th><th>状态</th></tr></thead>
       <tbody>{view.candidates.map(row => <tr key={row.botId}>
         <td>{row.name}{row.main ? <Tag>Main</Tag> : null}<small>{row.botId}</small></td>
         <td>{row.model ? `${row.model.provider}/${row.model.model}` : <em>未绑定</em>}</td>
         <td>{row.machineId ? (row.machineOnline ? '在线' : '未在线') : '无'}</td>
         <td>{row.pricePerMTokUsd === null ? '未知' : `$${row.pricePerMTokUsd}`}</td>
-        <td>{row.quality === null ? '未知' : row.quality}</td>
+        <td>{Number.isFinite(row.load) ? `${Math.round(row.load * 100)}%` : '未知'}</td>
         <td>{row.busy ? '正忙' : '空闲'}</td>
       </tr>)}</tbody></table></div> : null}
     {view.enabled ? <div className="bp-form">
@@ -435,10 +435,12 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
         <p>{decision.grant?.autoGrant === false ? '自动授权已关闭，创建任务时会核对已有授权；权限不足时需先配置。' : '创建任务时才会按已保存的权限上限核对和授权。'}</p></> : null}
       {decision.rejected?.length ? <p>未满足条件：{decision.rejected.map(row => `${nameOf(row.botId)}（${routingRefusalMessage(row.reason)}）`).join('；')}</p> : null}
       {!decision.pinned && decision.ranked?.length > 0 && <details className="bp-technical"><summary>查看比较依据</summary>
-        <p>评分只用于本次候选排序，不代表成功率。未知价格按保守值计算，未知质量按中间值参与比较。</p>
-        <div className="bp-table-wrap"><table className="bp-routing-comparison" aria-label="候选比较"><thead><tr><th>Bot</th><th>综合评分</th><th>价格/百万</th><th>参考质量</th></tr></thead>
+        <p>质量依据是与任务匹配的已记录样本。任务负载随排队和运行中的任务增多而上升，并按 Bot 的并发容量调整。</p>
+        {decision.ranked.some(row => !Number.isFinite(row.quality)) && <p>缺少匹配样本的候选按中间质量值比较，价格和任务负载仍参与排序。</p>}
+        <div className="bp-table-wrap"><table className="bp-routing-comparison" aria-label="候选比较"><thead><tr><th>Bot</th><th>综合评分</th><th>价格/百万</th><th>参考质量</th><th>任务负载</th></tr></thead>
           <tbody>{decision.ranked.map(row => <tr key={row.botId}><td>{nameOf(row.botId)}</td><td>{Number.isFinite(row.score) ? row.score.toFixed(6) : '未知'}</td>
-            <td>{Number.isFinite(row.pricePerMTokUsd) ? `$${row.pricePerMTokUsd}` : '未知'}</td><td>{Number.isFinite(row.quality) ? row.quality : '未知'}</td></tr>)}</tbody></table></div>
+            <td>{Number.isFinite(row.pricePerMTokUsd) ? `$${row.pricePerMTokUsd}` : '未知'}</td><td>{Number.isFinite(row.quality) ? row.quality.toFixed(2) : '未知'}</td>
+            <td>{Number.isFinite(row.load) ? `${Math.round(row.load * 100)}%` : '未知'}</td></tr>)}</tbody></table></div>
       </details>}
       {(decision.binding || decision.rejected?.length > 0) && <details className="bp-technical"><summary>执行条件详情</summary>
         {decision.binding && <p>所需工具：{decision.binding.tools.join('、')}</p>}

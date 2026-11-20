@@ -42,6 +42,8 @@ import { guardMachineSecrets } from './machine-secrets.mjs'
 import { checkMainRouteFunding, openBotSettings } from './bot-settings.mjs'
 import { fundingForMainRoute } from './main-model-routes.mjs'
 import { parseModelProfilesJson } from '../../../.dsh-plugin/shared/model-profiles.mjs'
+import { classifyTask } from '../../../.dsh-plugin/shared/router.mjs'
+import { buildRoutingEvidence, parseRoutingEvidenceJson, predictQuality } from '../../../.dsh-plugin/shared/routing-evidence.mjs'
 import { openFundingAccounts } from './funding-accounts.mjs'
 import { createModelAccounting } from './model-accounting.mjs'
 import { createModelBoundResolver, resolveModelRouteBounds, withRequestOutputDefault } from './model-request-bounds.mjs'
@@ -387,13 +389,17 @@ export function startBotProduct(ctx, options = {}) {
     handoffLedger.held(args.taskId, args.toBotId)
     return { plan, submitted }
   }
-  const routingSettingsFor = botId => {
+  const routingDirectory = () => {
+    try { return machines?.routingDirectory() ?? new Map() } catch { return null }
+  }
+  const routingSettingsFor = (botId, machineSnapshot) => {
       try {
         const row = botSettings?.get(botId, { publishChange: false })
         if(!row)return null
         const main=product?.lifecycle.committedMainBotIds().includes(botId)===true
         const scopes=main?(machines?.scopes(botId)??[]):[]
-        const remoteIds=new Set((machines?.readModel().items??[]).map(machine=>machine.id))
+        const remoteIds=main ? (machineSnapshot === undefined ? routingDirectory() : machineSnapshot) : null
+        if (main && !remoteIds) return null
         const machineGrants=main?[...row.settings.machineGrants.filter(grant=>!remoteIds.has(grant.machineId)),
           ...scopes.flatMap(scope=>scope.roots.map(rootId=>({machineId:scope.machineId,rootId,mode:scope.mode,capabilities:[...scope.tools]})))]:row.settings.machineGrants
         return {...row.settings,machineGrants,grant:main?(product?.lifecycle.committedGrant(botId)??row.grant):row.grant,status:row.status}
@@ -402,12 +408,26 @@ export function startBotProduct(ctx, options = {}) {
   }
   const commitWorkerBinding = createWorkerBindingCommitter({ machines: () => machines, settingsFor: routingSettingsFor,
     mainBotIds: () => product?.lifecycle.committedMainBotIds() ?? [] })
+  let botQualityCache = null
+  const routingQualityFor = (_botId, model, task) => {
+    if (!model?.provider || !model.model || !task.text || cliProviders?.owns(model.provider)
+      || engineProfiles.some(profile => profile.provider === model.provider && profile.model === model.model)) return null
+    const setting = config.routingEvidenceJson
+    const raw = typeof setting?.get === 'function' ? setting.get() : setting
+    if (typeof raw !== 'string' || !raw.trim()) return null
+    const time = now()
+    if (botQualityCache?.raw !== raw || time < botQualityCache.checkedAt || time - botQualityCache.checkedAt >= 60_000) {
+      let evidence = null
+      try { evidence = buildRoutingEvidence({ qualityEvidence: parseRoutingEvidenceJson(raw, { now: time }), now: time }) }
+      catch { /* Missing or invalid evidence is an unknown score. */ }
+      botQualityCache = { raw, checkedAt: time, evidence }
+    }
+    return predictQuality(botQualityCache.evidence, { text: task.text, type: classifyTask(task.text), ...model })?.quality ?? null
+  }
   const botRouting = createBotRoutingService({
-    bots: () => (product?.lifecycle.committedBots() ?? []).map(bot=>({...bot,main:product.lifecycle.committedMainBotIds().includes(bot.id)})),
+    bots: () => product?.lifecycle.committedBots() ?? [],
     settingsFor: routingSettingsFor,
-    machineHealth: machineId => {
-      try { const row = machines?.readModel?.().items?.find(item => item.id === machineId); return { online: row?.status === 'online' } } catch { return null }
-    },
+    routingDirectory,
     routing: () => routingSettings?.get().settings ?? config.botRouting,
     mainBotIds: () => product?.lifecycle.committedMainBotIds() ?? [],
     subjectFor: botId => directory.forBot(botId),
@@ -424,9 +444,13 @@ export function startBotProduct(ctx, options = {}) {
     executionBackendFor: effect => effect === 'read' ? 'bot-turn-read' : 'bot-turn-write',
     onAccepted: report => turnBackends?.watchPlan(report),
     busyFor: botId => product?.rt.live?.get(product.rt.chatOf(botId))?.turn !== undefined,
-    priceFor: (route, botId) => {
+    qualityFor: routingQualityFor,
+    loadFor: (botId, settings) => {
+      const count = journal?.pendingTaskCount(botId)
+      return count === undefined ? null : count / (count + (settings.maxConcurrentTasks ?? 1))
+    },
+    priceFor: (route, _botId, settings) => {
       // Funding prices belong to the Bot binding, even when another Bot uses the same model.
-      const settings = routingSettingsFor(botId)
       if (settings?.model?.provider !== route.provider || settings.model.model !== route.model) return null
       const price = settings.funding?.pricing
       if (!Number.isFinite(price?.input) || price.input < 0 || !Number.isFinite(price?.output) || price.output < 0) return null
@@ -1029,6 +1053,7 @@ export function startBotProduct(ctx, options = {}) {
           }, now })
         const modelBounds = createModelBoundResolver({ llm: () => ctx.llm })
         modelAccounting = createModelAccounting({ store: funding.store, authority,
+          endpointQueueFor: provider => aiProviders?.queueFor(provider),
           pricingFor: bindingFunding,
           fundingRevisionFor: query => bindingFunding(query)?.fundingRevision ?? null,
           preparedFrameFor: async request => {

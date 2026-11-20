@@ -248,7 +248,7 @@ export function createIndependentRuntime({
       if (expectedInput !== null && teamOriginSnapshot(botId, origin) !== expectedInput) throw Object.assign(new Error('TEAM_CONTEXT_CHANGED'), { code: 'TEAM_CONTEXT_CHANGED', started: false, held: true })
       const provider = providerFor(botId)
       if (typeof provider !== 'function') fail('RUNTIME_PROVIDER_UNAVAILABLE')
-      const guarded = request => { checkpoint(); return provider({ ...request, botId, conversationId }) }
+      const guarded = request => { checkpoint(); return provider({ ...request, botId, conversationId, background: true }) }
       const loop = createBotLoop({ store: workThreadId ? workThreadStoreView(transcript, workThreadId) : transcript, provider: guarded,
         tools: consult ? null : toolServiceFor(botId), guard: checkpoint, now, ...(maxSteps ? { maxSteps } : {}) })
       return await loop.run({ botId, input, requestId, conversationId, signal: scope.controller.signal, teamNotice })

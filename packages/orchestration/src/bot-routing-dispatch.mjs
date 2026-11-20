@@ -260,7 +260,9 @@ export function createWorkerBindingCommitter({ machines, settingsFor, mainBotIds
     const grants = (saved.machineGrants ?? []).filter(grant => grant.machineId === binding.machineId)
     const rootId = binding.rootId || grants.find(grant => grant.rootId === saved.workspaceRef?.rootId)?.rootId || grants[0]?.rootId
     if (!rootId) fail('BOT_ROUTING_WORKER_ROOT_REQUIRED')
-    const machine = store.readModel().items.find(item => (item.id ?? item.machineId) === binding.machineId)
+    const readMachine = typeof store.readMachine === 'function' ? () => store.readMachine(binding.machineId)
+      : () => store.readModel().items.find(item => (item.id ?? item.machineId) === binding.machineId)
+    const machine = readMachine()
     if (!machine || machine.status === 'revoked') fail('BOT_ROUTING_WORKER_MACHINE_UNBOUND')
     const old = (machine.bindings ?? []).find(item => item.botId === binding.botId)
     const covers = scope => scope && !scope.revoked && scope.roots?.includes(rootId)
@@ -281,7 +283,8 @@ export function createWorkerBindingCommitter({ machines, settingsFor, mainBotIds
     }
     const result = await store.bind({ machineId: binding.machineId, botId: binding.botId, roots, tools, mode, expectedRevision: old?.revision ?? 0 }, { kind: 'owner', signal: context.signal })
     if (result?.remoteRevoked !== true) fail('BOT_ROUTING_WORKER_GRANT_UNCONFIRMED')
-    const actual = store.readModel().items.find(item => (item.id ?? item.machineId) === binding.machineId)?.bindings?.find(item => item.botId === binding.botId)
+    const updated = readMachine()
+    const actual = updated?.status === 'revoked' ? null : updated?.bindings?.find(item => item.botId === binding.botId)
     if (!covers(actual)) fail('BOT_ROUTING_WORKER_GRANT_UNCONFIRMED')
     if (typeof onChanged === 'function') await onChanged(binding.botId)
     return { confirmed: true, applied: true, binding: { ...binding, rootId }, revision: actual.revision }

@@ -52,8 +52,9 @@ test('binding page reads optional catalog once and stays writable after a snapsh
   try {
     await act(async () => { root.render(React.createElement(ProductPage, { section: 'bindings', productApi: api })); await new Promise(done => setTimeout(done, 20)) })
     await act(async () => { await new Promise(done => setTimeout(done, 20)) })
-    const refresh = element.querySelector('button.bp-refresh')
+    const refresh = element.querySelector('button[aria-label="刷新当前页面"]')
     assert.deepEqual(calls, ['roles.list'])
+    assert.ok(refresh)
     assert.equal(refresh.disabled, false)
     await act(async () => refresh.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })))
     assert.deepEqual(calls, ['roles.list'])

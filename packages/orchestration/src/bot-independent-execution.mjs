@@ -58,7 +58,7 @@ const REPLY_REFUSAL = Object.freeze({
 })
 
 /** The closed request shape: nothing here names a session, a runtime or an identity. `conversationId` is the one trusted Host-supplied work-thread correlation the dispatch boundary injects; it is never a model field. */
-const REQUEST_FIELDS = Object.freeze(['botId', 'provider', 'model', 'messages', 'signal', 'system', 'tools', 'maxTokens', 'reasoningEffort', 'onText', 'conversationId'])
+const REQUEST_FIELDS = Object.freeze(['botId', 'provider', 'model', 'messages', 'signal', 'system', 'tools', 'maxTokens', 'reasoningEffort', 'onText', 'conversationId', 'background'])
 
 /**
  * @param {{
@@ -140,7 +140,7 @@ export function createBotIndependentExecution({ policy, directory, lifecycle, se
      * @returns {Promise<{ text: string, toolCalls: object[], source: object }>}
      */
     async complete(request = {}) {
-      const { botId, provider, model, messages, signal, system, tools, maxTokens, reasoningEffort, onText, conversationId } = request
+      const { botId, provider, model, messages, signal, system, tools, maxTokens, reasoningEffort, onText, conversationId, background } = request
       const extra = Object.keys(request).filter(key => !REQUEST_FIELDS.includes(key))
       if (extra.length) fail('INDEPENDENT_REQUEST_UNKNOWN_FIELD', `本次请求带有不受支持的字段：${extra.join(', ')}`)
       if (onText !== undefined && typeof onText !== 'function') fail('INDEPENDENT_PROGRESS_INVALID')
@@ -189,7 +189,7 @@ export function createBotIndependentExecution({ policy, directory, lifecycle, se
         // The route that produced this answer travels with it, so the next turn's request is a
         // conversation the Host's own model service recognises and can replay.
         return { text: reply.text, toolCalls: reply.toolCalls, source: { kind: 'model', provider, model } }
-      }, { botId, ...(typeof conversationId === 'string' ? { conversationId } : {}) })
+      }, { botId, ...(typeof conversationId === 'string' ? { conversationId } : {}), background: background === true })
     },
   })
 }

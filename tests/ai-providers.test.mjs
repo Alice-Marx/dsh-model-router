@@ -6,11 +6,63 @@ import { resolve, join } from 'node:path'
 import { openAiProviders } from '../packages/orchestration/src/ai-providers.mjs'
 import { aiRequestContext } from '../packages/orchestration/src/ai-provider-adapter.mjs'
 import { attachNativeLlm } from './helpers/product-native-llm.mjs'
+import { createModelEndpointQueue } from '../packages/orchestration/src/model-endpoint-queue.mjs'
 
 const Database = createRequire(import.meta.url)('better-sqlite3')
 const owner = { kind: 'owner' }, key = 'fixture-only-independent-key'
 const model = { id: 'fixture-chat', name: 'Fixture chat', contextWindow: 4096, maxTokens: 64, reasoning: false }
 const input = patch => ({ expectedRevision: 0, preset: 'custom', name: '独立测试', protocol: 'openai-completions', baseUrl: 'http://127.0.0.1:9999/v1', auth: 'key', enabled: true, apiKey: key, models: [model], ...patch })
+
+test('endpoint schedule is non-preemptive, gives chat priority and preserves FIFO and cancellation', async t => {
+  const queue = createModelEndpointQueue({ maxWaiting: 4 }), order = []
+  t.after(() => queue.close())
+  const endpoint = 'loopback:1000', holder = await queue.acquire(endpoint)
+  const otherEndpoint = await queue.acquire('loopback:1001')
+  const add = (id, interactive, signal) => queue.acquire(endpoint, { interactive, signal }).then(release => {
+    order.push(id)
+    return release
+  })
+  const controller = new AbortController()
+  const background = add('background', false)
+  const first = add('first-chat', true)
+  const cancelled = add('cancelled', true, controller.signal)
+  const second = add('second-chat', true)
+  await assert.rejects(add('overflow', true), { code: 'MODEL_ENDPOINT_QUEUE_FULL' })
+  controller.abort()
+  await assert.rejects(cancelled, { name: 'AbortError' })
+  assert.deepEqual(order, [])
+  otherEndpoint()
+  holder()
+  const releaseFirst = await first
+  holder()
+  assert.deepEqual(order, ['first-chat'])
+  releaseFirst()
+  const releaseSecond = await second
+  assert.deepEqual(order, ['first-chat', 'second-chat'])
+  releaseSecond()
+  const releaseBackground = await background
+  assert.deepEqual(order, ['first-chat', 'second-chat', 'background'])
+  const closing = add('closing', false)
+  queue.close()
+  await assert.rejects(closing, { code: 'MODEL_ENDPOINT_QUEUE_CLOSED' })
+  releaseBackground()
+})
+
+test('connection aliases share the local port queue and replacing a queued generation drops its place', async () => {
+  await setup(async ({ service }) => {
+    const original = await service.save(input({ auth: 'none', apiKey: undefined }), owner)
+    const alias = await service.save(input({ baseUrl: 'http://localhost:9999/other/v1', auth: 'none', apiKey: undefined }), owner)
+    const releaseFirst = await service.queueFor(original.route)({})
+    const stale = service.queueFor(alias.route)({})
+    const waiting = assert.rejects(stale, { code: 'AI_PROVIDER_CHANGED' })
+    const edited = await service.save(input({ id: alias.id, expectedRevision: alias.revision,
+      auth: 'none', apiKey: undefined, baseUrl: 'http://localhost:10000/v1' }), owner)
+    await waiting
+    const releaseOther = await service.queueFor(edited.route)({})
+    releaseOther()
+    releaseFirst()
+  })
+})
 export function memoryCredentials() {
   const values = new Map()
   return { values, async describe(ref) { return { configured: values.has(ref), writable: true } }, async set(ref, value) { values.set(ref, value) }, async resolve(ref) { return values.has(ref) ? { value: values.get(ref) } : undefined }, async unset(ref) { values.delete(ref) } }
@@ -99,6 +151,55 @@ test('public model listing is catalog access, not proof of authenticated inferen
     await assert.rejects(pending, { code: 'AI_PROVIDER_CHANGED' })
     assert.equal((await service.list(owner)).providers[0].health, null)
   }, { fetcher: (...args) => reply(...args) })
+})
+
+test('model verification survives a different model failing or being cancelled, and is reset on revision change', async () => {
+  const second = { ...model, id: 'second' }
+  let started, hangSecond = true
+  const entered = new Promise(resolve => { started = resolve })
+  await setup(async ({ service, host }) => {
+    const saved = await service.save(input({ auth: 'none', apiKey: undefined, models: [model, second] }), owner)
+    const probe = modelId => service.probe({ id: saved.id, expectedRevision: saved.revision, modelId }, owner)
+    const tested = await probe(model.id)
+    assert.equal(tested.state, 'configured')
+    assert.equal(tested.modelHealth.length, 1)
+    assert.equal(tested.modelHealth[0].state, 'verified')
+    assert.ok(Number.isFinite(tested.modelHealth[0].firstTokenMs))
+
+    const prepared = await host.llm.prepareCall({ provider: saved.route, model: second.id })
+    const controller = new AbortController()
+    const pending = Array.fromAsync(prepared.stream({ ...prepared.config, messages: [], signal: controller.signal }))
+    await entered
+    controller.abort()
+    assert.equal((await pending).at(-1).reason.kind, 'aborted')
+    assert.deepEqual((await service.list(owner)).providers[0].modelHealth, tested.modelHealth)
+
+    hangSecond = false
+    const failed = await probe(second.id)
+    assert.equal(failed.state, 'needs-attention')
+    assert.deepEqual(failed.modelHealth.map(row => [row.modelId, row.state]), [[model.id, 'verified'], [second.id, 'error']])
+    const edited = await service.save(input({ id: saved.id, expectedRevision: saved.revision, auth: 'none', apiKey: undefined,
+      models: [model, second] }), owner)
+    assert.deepEqual(edited.modelHealth, [])
+    await assert.rejects(probe(model.id), { code: 'AI_PROVIDER_CHANGED' })
+  }, { fetcher: (_url, init) => {
+    const body = JSON.parse(init.body)
+    if (body.model === model.id) {
+      assert.equal(body.max_tokens ?? body.max_completion_tokens, 32)
+      return streamed('OK')
+    }
+    if (hangSecond) { started(); return new Promise(() => {}) }
+    return new Response('unavailable', { status: 503 })
+  } })
+})
+
+test('keyed connections never issue a manual inference probe', async () => {
+  await setup(async ({ service }) => {
+    const saved = await service.save(input(), owner)
+    assert.equal(saved.canTestModel, false)
+    await assert.rejects(service.probe({ id: saved.id, expectedRevision: saved.revision, modelId: model.id }, owner),
+      { code: 'AI_PROVIDER_TEST_UNAVAILABLE' })
+  }, { fetcher: () => assert.fail('unexpected provider request') })
 })
 
 test('owner input cannot put credentials in URLs, bypass capacity, or delete an in-use provider', async () => {

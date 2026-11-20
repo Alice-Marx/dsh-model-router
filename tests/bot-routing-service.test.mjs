@@ -39,6 +39,25 @@ test('service: preview and dispatch use each Bot price for a shared model route'
   assert.equal(submitted[0].plan.packages[0].targetBotId, 'z-cheap')
 })
 
+test('service: task-specific quality and pending load reach both preview and dispatch', async () => {
+  const service = createBotRoutingService({
+    bots, settingsFor: id => settings[id], routing: { enabled: true, preset: 'quality' },
+    priceFor: model => model.model === 'v4' ? 1 : 4,
+    qualityFor: (_id, model, task) => task.text === 'compare benchmark evidence' ? (model.model === 'v4' ? 0.25 : 0.9) : null,
+    loadFor: id => id === 'worker' ? 0 : 0.75,
+    mainBotIds: ['main'], subjectFor: id => ({ id }),
+    submitPlan: (_subject, { plan }) => ({ planId: plan.taskId, state: 'ready',
+      packages: [{ id: 'p1', targetBotId: plan.packages[0].targetBotId,
+        taskId: 'child', attemptId: 'attempt', operationId: 'operation', state: 'ready' }] }),
+  })
+  const request = { text: 'compare benchmark evidence' }
+  const preview = service.decide(request)
+  assert.equal(preview.chosen.botId, 'worker')
+  assert.deepEqual(preview.ranked.map(({ quality, load }) => [quality, load]), [[0.9, 0], [0.25, 0.75]])
+  assert.equal((await service.dispatch(request, { kind: 'owner' })).botId, 'worker')
+  assert.equal(service.decide({ text: 'different task' }).chosen.botId, 'main')
+})
+
 test('service: routing off refuses instead of guessing', () => {
   const service = make({ enabled: false })
   assert.throws(() => service.decide({ text: 'x' }), /BOT_ROUTING_DISABLED/)
@@ -50,6 +69,25 @@ test('service: a machine task picks the Bot that can reach it and returns its bi
   assert.equal(decision.chosen.botId, 'worker')
   assert.equal(decision.binding.machineId, 'm1')
   assert.equal(decision.binding.mode, 'read-only')
+})
+
+test('service: candidates share one device snapshot and the next decision reads fresh health', () => {
+  let reads = 0, online = true
+  const seen = []
+  const service = createBotRoutingService({
+    bots, settingsFor: (id, machines) => { seen.push(machines); return { ...settings.worker, model: settings[id].model } },
+    routing: { enabled: true },
+    routingDirectory: () => { reads++; return new Map([['m1', { online }]]) },
+    machineHealth: () => assert.fail('used the fallback machine reader'),
+  })
+  const task = { text: 'Read project log', requiresMachine: true, machineId: 'm1', requesterBotId: 'main' }
+  assert.ok(service.decide(task).chosen)
+  assert.equal(reads, 1)
+  assert.equal(seen.length, 3)
+  assert.ok(seen.every(snapshot => snapshot === seen[0]))
+  online = false
+  assert.equal(service.decide(task).chosen, null)
+  assert.equal(reads, 2)
 })
 
 test('service: auto-grant off still names the binding, and says it was not applied', () => {

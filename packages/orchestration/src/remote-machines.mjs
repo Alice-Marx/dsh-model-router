@@ -161,13 +161,15 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, m
     return { remoteRevoked: true }
   }
   const compare = (old, expectedRevision) => { if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || (old?.revision ?? 0) !== expectedRevision) fail('MACHINE_CONFIG_CONFLICT') }
+  const machineStatus = (revoked, health, time) => revoked ? 'revoked' : health && time - health.lastSeenAt < 90_000 ? 'online' : 'unverified'
   const publicMachine = row => ({ id: row.id, machineId: row.id, revision: row.revision, name: row.config.name, endpoint: row.config.endpoint,
     secretRef: row.config.secretRef, roots: row.config.roots, tools: row.config.tools, protectedTunnel: row.config.protectedTunnel,
     ...(row.config.transport?{transport:row.config.transport}:{}),
-    status: row.revoked ? 'revoked' : row.health && now()-row.health.lastSeenAt<90000 ? 'online' : 'unverified', lastSeenAt: row.health?.lastSeenAt ?? null,
+    status: machineStatus(row.revoked, row.health, now()), lastSeenAt: row.health?.lastSeenAt ?? null,
     platform: row.health?.platform ?? null, version: row.health?.version ?? null, capabilities: row.health?.capabilities ?? [], desktop: row.health?.desktop ?? {status:'unverified'},
     revocations:db.prepare('SELECT bot_id,status,at_ms FROM remote_machine_revocations WHERE machine_id=?').all(row.id).map(r=>({botId:r.bot_id,status:r.status,at:r.at_ms})),
     bindings: db.prepare('SELECT bot_id,revision,scope,revoked FROM remote_machine_bindings WHERE machine_id=?').all(row.id).map(b => ({botId:b.bot_id,revision:b.revision,revoked:Boolean(b.revoked),...JSON.parse(b.scope)})) })
+  const projectMachine = row => publicMachine({ ...row, config: JSON.parse(row.config), health: row.health ? JSON.parse(row.health) : null })
   const desktopSessions = createDesktopSessionHost({ machine, binding, authority, issue, request, event, now, desktopProxy, desktopHttp,
     cleanupRequest:async(record,input,signal)=>request(record.config,'/control/v1/desktop/close',await secretFor(record),input,signal),
     connectDesktop: async (record,signal,origin,options={}) => {
@@ -377,7 +379,20 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, m
       })
     },
 
-    readModel() { alive(); return {status:'available',items:db.prepare('SELECT * FROM remote_machines ORDER BY id').all().map(row=>publicMachine({...row,config:JSON.parse(row.config),health:row.health?JSON.parse(row.health):null}))} },
+    routingDirectory() {
+      alive()
+      const time = now()
+      return new Map(db.prepare('SELECT id, revoked, health FROM remote_machines').all().map(row => {
+        const health = row.health ? JSON.parse(row.health) : null
+        return [row.id, { online: machineStatus(row.revoked, health, time) === 'online' }]
+      }))
+    },
+    readMachine(id) {
+      alive()
+      const row = db.prepare('SELECT * FROM remote_machines WHERE id=?').get(id)
+      return row ? projectMachine(row) : null
+    },
+    readModel() { alive(); return {status:'available',items:db.prepare('SELECT * FROM remote_machines ORDER BY id').all().map(projectMachine)} },
     close() { if(!closed){for(const call of active)call.controller.abort(new Error('MACHINE_DIRECTORY_CLOSED'));closed=true;closeChannels();db.close()} },
   }
   return Object.freeze(store)

@@ -109,7 +109,8 @@ test('bot product UI: budget waiting remains retryable while unknown tasks only 
     const retry=[...container.querySelectorAll('button')].find(button=>button.textContent==='重试')
     assert.equal(retry.disabled,false);await click(retry);assert.equal(calls[0].action,'task.retry')
     snapshot={...snapshot,tasks:{...snapshot.tasks,items:[{...snapshot.tasks.items[0],state:'needs-reconciliation',result:{remote:{stopConfirmed:false,possiblyApplied:true}}}]}}
-    const refresh=[...container.querySelectorAll('button')].find(button=>button.textContent==='刷新');await click(refresh)
+    const refresh=container.querySelector('button[aria-label="刷新当前页面"]')
+    assert.ok(refresh);await click(refresh)
     assert.ok(![...container.querySelectorAll('button')].some(button=>button.textContent==='重试'))
     const reconcile=[...container.querySelectorAll('button')].find(button=>button.textContent==='核对原收据')
     assert.ok(reconcile);await click(reconcile);assert.equal(calls[1].action,'task.reconcile')

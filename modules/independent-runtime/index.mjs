@@ -64,9 +64,10 @@ export function createPluginRuntime({ ctx, settings = {}, stateDir, integration,
   // the Host's frame, so one Bot can neither pick another Bot's model nor answer without policy.
   // The tool schemas travel with the request: they are the ones the Host just re-decided for this
   // step, so the model is only ever told about tools this Bot holds right now.
-  const providerFor = botId => async ({ messages, signal, tools, onText, conversationId }) => {
+  const providerFor = botId => async ({ messages, signal, tools, onText, conversationId, background }) => {
     const execution = executionOf()
-    return execution.complete({ botId, ...execution.routeFor(botId), messages, signal, ...(conversationId ? { conversationId } : {}), ...(tools ? { tools } : {}), ...(onText ? { onText } : {}) })
+    return execution.complete({ botId, ...execution.routeFor(botId), messages, signal, ...(conversationId ? { conversationId } : {}),
+      ...(tools ? { tools } : {}), ...(onText ? { onText } : {}), ...(background === true ? { background } : {}) })
   }
   // Tools are per Bot and Host-bound. The order is the Host's own, decided per call:
   //

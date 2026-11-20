@@ -22,7 +22,7 @@ async function fixture(t){
   }}
   let listener=await serve(agent,{mode:'e2e',port:0});t.after(()=>listener.close())
   const endpoint=`http://127.0.0.1:${listener.address.port}`
-  const machines=openRemoteMachines({Database,file,resolveSecret:async ref=>secrets.get(ref),botExists:id=>id==='bot-a'})
+  const machines=openRemoteMachines({Database,file,resolveSecret:async ref=>secrets.get(ref),botExists:id=>id==='bot-a',now:()=>clock})
   t.after(()=>machines.close())
   const create=()=>openSecurePairingHost({Database,file,machines,botExists:id=>id==='bot-a',now:()=>clock,
     resolveSecret:async ref=>secrets.get(ref),
@@ -33,6 +33,17 @@ async function fixture(t){
   return {get store(){return store},machines,file,input,create,secrets,stats:()=>({pings,pairs,writes}),failSave:()=>{saveFails=1},failAfterSave:()=>{saveAfterCommitFails=1},failPair:()=>{pairFails=1},advance:()=>{clock+=200_000},
     restartAgent:async()=>{const port=listener.address.port;await listener.close();store.close();store=new Store(join(directory,'agent'),Database,{admin:true});agent.store=store;listener=await serve(agent,{mode:'e2e',port})}}
 }
+
+test('routing device snapshot projects only identity and current reachability', async t => {
+  const f = await fixture(t), service = f.create()
+  t.after(() => service.close())
+  const { machineId } = await service.redeem(f.input, owner)
+  assert.deepEqual([...f.machines.routingDirectory()], [[machineId, { online: true }]])
+  assert.deepEqual(f.machines.readMachine(machineId), f.machines.readModel().items[0])
+  assert.equal(f.machines.readMachine('missing'), null)
+  f.advance()
+  assert.deepEqual([...f.machines.routingDirectory()], [[machineId, { online: false }]])
+})
 
 test('Host redeems over a pinned connection; raw device credentials only enter the secret service; completed retry does not pair twice',async t=>{
   const f=await fixture(t),service=f.create();t.after(()=>service.close())

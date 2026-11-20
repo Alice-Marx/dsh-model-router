@@ -26,10 +26,17 @@ function usageOf(value){
 }
 
 /** Every observed model call has one source receipt; only the linked run owns money. */
-export function createModelAccounting({store,authority,pricingFor,fundingRevisionFor,inputBoundFor,modelBoundsFor,preparedFrameFor,machineId,workspaceId,now=Date.now,ttlMs=120000,limits={dailyLimitUsd:1,monthlyLimitUsd:0},maxActive=16}){
+export function createModelAccounting({store,authority,pricingFor,fundingRevisionFor,inputBoundFor,modelBoundsFor,preparedFrameFor,endpointQueueFor,machineId,workspaceId,now=Date.now,ttlMs=120000,limits={dailyLimitUsd:1,monthlyLimitUsd:0},maxActive=16}){
   if(store?.kind!=='sqlite-router-state'||typeof store.recordModelReceipt!=='function'||typeof pricingFor!=='function')fail('MODEL_ACCOUNTING_STORAGE_REQUIRED')
   const active=new Set();let closed=false
+  const waiting=new Set()
   const controllerSet=new Set()
+  const assertIdentity = (options, identity, task) => {
+    authority.assertModel(identity.subject, options.provider, options.model)
+    authority.assertTool(identity.subject, 'model/infer')
+    if (authority.describe(identity.subject).botId !== identity.botId) fail('MODEL_OWNER_MISMATCH')
+    if (task && (task.botId !== identity.botId || task.provider !== options.provider || task.model !== options.model)) fail('MODEL_TASK_OWNER_MISMATCH')
+  }
   const receiptBase=(identity,options,policy,managed,task)=>{
     const id=uuid('call'),createdAt=now()
     return {schemaVersion:1,id,runId:managed?.runId??uuid('inference'),packageId:managed?(managed.packageId??'direct'):'inference',botId:identity.botId,
@@ -60,13 +67,10 @@ export function createModelAccounting({store,authority,pricingFor,fundingRevisio
     const managed=managedModelRequest(options)
     const task=taskModelRequest(options)
     const ready=deferred(),done=deferred()
-    return (async function*(){
+    const run = (async function*(){
       if(closed)fail('MODEL_ACCOUNTING_CLOSED')
       if(active.size>=maxActive||active.has(options))fail('MODEL_CONCURRENCY_LIMIT')
-      authority.assertModel(identity.subject,options.provider,options.model)
-      authority.assertTool(identity.subject,'model/infer')
-      if(authority.describe(identity.subject).botId!==identity.botId)fail('MODEL_OWNER_MISMATCH')
-      if(task&&(task.botId!==identity.botId||task.provider!==options.provider||task.model!==options.model))fail('MODEL_TASK_OWNER_MISMATCH')
+      assertIdentity(options, identity, task)
       const fundingQuery={botId:identity.botId,provider:options.provider,model:options.model,source:identity.source}
       const config=await pricingFor(fundingQuery)
       if(active.size>=maxActive||active.has(options))fail('MODEL_CONCURRENCY_LIMIT')
@@ -255,6 +259,27 @@ export function createModelAccounting({store,authority,pricingFor,fundingRevisio
         }
         if(cleanupError&&!primaryError)throw cleanupError
         if(primaryError&&!propagated&&!consumerClosed)throw primaryError
+      }
+    })()
+    if (!endpointQueueFor) return run
+    return (async function* () {
+      if (closed) fail('MODEL_ACCOUNTING_CLOSED')
+      const admit = endpointQueueFor(options.provider)
+      if (!admit) { yield* run; return }
+      if (waiting.has(options) || active.has(options)) fail('MODEL_CONCURRENCY_LIMIT')
+      assertIdentity(options, identity, task)
+      const controller = new AbortController()
+      const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal
+      waiting.add(options); controllerSet.add(controller)
+      let release
+      try {
+        // Obtain an endpoint slot before any new lease, budget hold or receipt.
+        release = await admit({ interactive: identity.interactive === true && !managed && !task, signal })
+        signal.throwIfAborted()
+        yield* run
+      } finally {
+        waiting.delete(options); controllerSet.delete(controller)
+        release?.()
       }
     })()
   }

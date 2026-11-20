@@ -20,6 +20,11 @@ html body[data-bot-product-ui] .bp-ai-mark { display:grid; place-items:center; w
 html body[data-bot-product-ui] .bp-ai-copy { flex:1; min-width:0; }
 html body[data-bot-product-ui] .bp-ai h4 { margin:0; font-size:15px; font-weight:550; overflow-wrap:anywhere; }
 html body[data-bot-product-ui] .bp-ai-copy>small { display:block; font-size:12px; color:var(--bp-muted); margin-top:3px; overflow-wrap:anywhere; }
+html body[data-bot-product-ui] .bp-ai-model-checks { margin-top:8px; font-size:12px; }
+html body[data-bot-product-ui] .bp-ai-model-checks summary { cursor:pointer; color:var(--bp-muted); }
+html body[data-bot-product-ui] .bp-ai-model-checks ul { list-style:none; padding:0; margin:6px 0 0; }
+html body[data-bot-product-ui] .bp-ai-model-checks li { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 10px; padding:7px 0; border-top:1px solid var(--bp-border); overflow-wrap:anywhere; }
+html body[data-bot-product-ui] .bp-ai-model-checks small { display:block; color:var(--bp-muted); }
 html body[data-bot-product-ui] .bp-ai-state { display:flex; align-items:center; gap:6px; color:var(--bp-muted); font-size:12px; margin:4px 0 0; }
 html body[data-bot-product-ui] .bp-ai-state>span { width:6px; height:6px; border-radius:50%; background:#9a701d; flex:none; }
 html body[data-bot-product-ui] .bp-ai-state[data-state=ready]>span { background:#17835a; }

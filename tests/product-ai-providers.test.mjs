@@ -4,6 +4,7 @@ import { createServer } from 'node:http'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { withProductIndependent } from './helpers/product-independent-composition.mjs'
 import { attachActualAgentLoop } from './helpers/actual-agent-loop.mjs'
+import { setImmediate as nextTick, setTimeout as delay } from 'node:timers/promises'
 
 test('plugin-owned connection serves actual integrated and independent Bots with real SQLite receipts', async () => {
   const sent = [], values = new Map()
@@ -62,4 +63,91 @@ test('independent connection configuration does not wait for an unrelated hung H
       assert.ok(view.record.catalog.models.some(model => model.provider === saved.route))
     } finally { ctx.llm.listModels = original }
   })
+})
+
+test('a real Harness scheduled turn yields the next shared local slot to independent chat', { timeout: 15_000 }, async t => {
+  const held = Promise.withResolvers(), release = Promise.withResolvers()
+  const seenScheduled = Promise.withResolvers(), seenChat = Promise.withResolvers(), seenCancelled = Promise.withResolvers()
+  const seen = []
+  let chatQueuedAt, chatDispatchedAt, firstTextAt
+  const server = createServer(async (request, response) => {
+    let raw = ''
+    for await (const part of request) raw += part
+    const call = raw.includes('schedule-check') ? 'scheduled' : raw.includes('front-chat') ? 'chat' : 'initial'
+    if (call === 'chat') chatDispatchedAt = performance.now()
+    seen.push(call)
+    if (call === 'initial') { held.resolve(); await release.promise }
+    const chunk = (delta, finish_reason) => JSON.stringify({ id: 'queue-test', object: 'chat.completion.chunk', model: 'offline',
+      choices: [{ index: 0, delta, finish_reason }] })
+    response.writeHead(200, { 'content-type': 'text/event-stream' })
+    response.end(`data: ${chunk({ content: 'OK' }, null)}\n\ndata: ${chunk({}, 'stop')}\n\ndata: [DONE]\n\n`)
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  let actual
+  const wait = promise => Promise.race([promise, delay(5_000, null, { ref: false }).then(() => assert.fail('expected local request did not arrive'))])
+  try {
+    await withProductIndependent(async ({ bind, dispatch, runtime, readRows }) => {
+      const baseUrl = `http://127.0.0.1:${server.address().port}`
+      const configure = path => dispatch('aiProviders.save', { expectedRevision: 0, preset: 'custom', name: path,
+        protocol: 'openai-completions', baseUrl: baseUrl + path, enabled: true, auth: 'none',
+        models: [{ id: 'offline', name: 'Fixture', contextWindow: 4096, maxTokens: 64, reasoning: false }] })
+      const scheduled = await configure('/v1'), chat = await configure('/alias/v1')
+      await bind('a', scheduled.route, 'offline')
+      await bind('b', chat.route, 'offline')
+      await runtime.move('b', 'independent')
+      const handle = await actual.context.agents.create({ sessionId: 'a', agentOptions: { provider: scheduled.route, model: 'offline' },
+        setup: ctx => { ctx.tools.restrict({ deny: ctx.tools.schemas().map(tool => tool.name) }) } })
+      const diagnostic = dispatch('aiProviders.check', { id: scheduled.id, expectedRevision: scheduled.revision, modelId: 'offline' })
+      let front
+      try {
+        await wait(held.promise)
+        handle.agent.send(createUserMessage({ content: [{ type: 'text', text: 'schedule-check' }], source: { kind: 'schedule' } }), 'next-turn', true)
+        await wait(seenScheduled.promise)
+        await nextTick()
+        const controller = new AbortController()
+        const cancelled = runtime.turn({ botId: 'b', input: 'queued-chat-cancel', signal: controller.signal })
+        const refused = assert.rejects(cancelled)
+        await wait(seenCancelled.promise)
+        await nextTick()
+        controller.abort()
+        await wait(refused)
+        assert.deepEqual(seen, ['initial'])
+        front = runtime.turn({ botId: 'b', input: 'front-chat', onProgress: ({ text }) => {
+          if (text) firstTextAt ??= performance.now()
+        } })
+        void front.catch(() => {})
+        await wait(seenChat.promise)
+        await nextTick()
+        assert.deepEqual(seen, ['initial'])
+        assert.deepEqual(readRows('router_model_calls'), [])
+        release.resolve()
+        await wait(diagnostic)
+        assert.equal((await wait(front)).answer, 'OK')
+        await wait(handle.agent.whenIdle())
+        assert.deepEqual(seen, ['initial', 'chat', 'scheduled'])
+        assert.ok(handle.agent.session.deriveMessages().some(message => message.role === 'assistant' && message.content.some(block => block.text === 'OK')))
+        assert.equal(readRows('router_model_calls').length, 2)
+        assert.ok(firstTextAt >= chatDispatchedAt && chatDispatchedAt >= chatQueuedAt)
+        t.diagnostic(`offline fixture: chat ingress to provider ${Math.round(chatDispatchedAt - chatQueuedAt)} ms, provider ingress to first text ${Math.round(firstTextAt - chatDispatchedAt)} ms`)
+      } finally {
+        release.resolve()
+        await Promise.allSettled([diagnostic, front])
+        await handle.dispose()
+      }
+    }, { beforeProduct: async ({ ctx }) => {
+      ctx.on('llm/stream', (options, next) => {
+        const messages = JSON.stringify(options.messages)
+        if (messages.includes('schedule-check')) seenScheduled.resolve()
+        if (messages.includes('front-chat')) { chatQueuedAt ??= performance.now(); seenChat.resolve() }
+        else if (messages.includes('queued-chat-cancel')) seenCancelled.resolve()
+        return next()
+      })
+      actual = await attachActualAgentLoop(ctx)
+      return () => actual.close()
+    } })
+  } finally {
+    release.resolve()
+    server.closeAllConnections()
+    await new Promise(resolve => server.close(resolve))
+  }
 })

@@ -26,11 +26,12 @@ const submittedPlanId = (originBotId, requestKey) => `route_${createHash('sha256
 /**
  * @param {{
  *   bots: () => Array<object>,
- *   settingsFor: (botId: string) => object | null,
+ *   settingsFor: (botId: string, machines?: Map<string, object> | null) => object | null,
  *   machineHealth?: (machineId: string) => { online?: boolean } | null,
- *   priceFor?: (route: object, botId: string) => number | null,
- *   qualityFor?: (botId: string) => number | null,
- *   loadFor?: (botId: string) => number | null,
+ *   routingDirectory?: () => Map<string, { online: boolean }> | null,
+ *   priceFor?: (route: object, botId: string, settings: object) => number | null,
+ *   qualityFor?: (botId: string, model: object | null, task: object) => number | null,
+ *   loadFor?: (botId: string, settings: object) => number | null,
  *   busyFor?: (botId: string) => boolean,
  *   routing?: object | (() => object),
  *   mainBotIds?: string[] | (() => string[]),
@@ -41,7 +42,7 @@ const submittedPlanId = (originBotId, requestKey) => `route_${createHash('sha256
  *   readSubmittedPlan?: (originBotId: string, planId: string) => object | Promise<object>,
  * }} source
  */
-export function createBotRoutingService({ bots, settingsFor, machineHealth, priceFor, qualityFor, loadFor, busyFor, routing, mainBotIds = [], submitPlan = null, subjectFor = null, bindWorker = null, newTaskId = null, readSubmittedPlan = null, executionBackendFor = null, settle = null, deliver = null, onAccepted = null }) {
+export function createBotRoutingService({ bots, settingsFor, machineHealth, routingDirectory, priceFor, qualityFor, loadFor, busyFor, routing, mainBotIds = [], submitPlan = null, subjectFor = null, bindWorker = null, newTaskId = null, readSubmittedPlan = null, executionBackendFor = null, settle = null, deliver = null, onAccepted = null }) {
   if (typeof bots !== 'function') fail('BOT_ROUTING_REQUIRES_BOTS')
   if (typeof settingsFor !== 'function') fail('BOT_ROUTING_REQUIRES_SETTINGS')
 
@@ -51,19 +52,22 @@ export function createBotRoutingService({ bots, settingsFor, machineHealth, pric
   // DS Bot persists its roster as an id-keyed object; tests/workbench providers may use a list.
   const readBots = () => {
     const roster = bots()
+    const main = new Set(readMainBotIds())
     return (Array.isArray(roster) ? roster : roster && typeof roster === 'object' ? Object.values(roster) : [])
-      .map(bot => ({ ...bot, main: bot?.main === true || readMainBotIds().includes(bot?.id) }))
+      .map(bot => ({ ...bot, main: bot?.main === true || main.has(bot?.id) }))
   }
 
-  const candidates = () => botRoutingCandidates({
-    bots: readBots(),
-    settingsFor,
-    machineHealth: machineHealth ?? (() => null),
-    priceFor: priceFor ?? (() => null),
-    qualityFor: qualityFor ?? (() => null),
-    loadFor: loadFor ?? (() => null),
-    busyFor: busyFor ?? (() => false),
-  })
+  const candidates = (task = {}, machines = routingDirectory?.()) => {
+    return botRoutingCandidates({
+      bots: readBots(),
+      settingsFor: botId => settingsFor(botId, machines),
+      machineHealth: routingDirectory ? id => machines?.get(id) ?? null : machineHealth,
+      priceFor,
+      qualityFor: (botId, model) => qualityFor?.(botId, model, task) ?? null,
+      loadFor,
+      busyFor,
+    })
+  }
 
   const service = {
     settings: readSettings,
@@ -82,6 +86,7 @@ export function createBotRoutingService({ bots, settingsFor, machineHealth, pric
         machineOnline: candidate.machineOnline,
         pricePerMTokUsd: candidate.pricePerMTokUsd,
         quality: candidate.quality,
+        load: candidate.load,
         busy: candidate.busy,
       }))
       return { enabled: settings.enabled, preset: settings.preset, autoGrant: settings.autoGrant, requesterBotId: readMainBotIds()[0] ?? null, candidates: rows }
@@ -95,20 +100,21 @@ export function createBotRoutingService({ bots, settingsFor, machineHealth, pric
       if (typeof text !== 'string' || text.trim() === '') fail('BOT_ROUTING_REQUIRES_TASK')
       const settings = readSettings()
       if (settings.enabled !== true) fail('BOT_ROUTING_DISABLED')
+      const machines = routingDirectory?.()
       // A Bot's own policy wins for the work it hands out; the global preset is the fallback.
       let preset = settings.preset
       if (typeof requesterBotId === 'string' && requesterBotId !== '') {
-        try { preset = settingsFor(requesterBotId)?.routing?.preset ?? preset } catch { /* keep the global preset */ }
+        try { preset = settingsFor(requesterBotId, machines)?.routing?.preset ?? preset } catch { /* keep the global preset */ }
       }
       needs = routingNeeds({ requiredTools, needs })
       requiresMachine = routingRequiresMachine({ requiredTools, requiresMachine, machineId, rootId })
-      const task = { requiredTools, requiresMachine, machineId, rootId, needs }
-      const all = withMachineFact(candidates(), task)
+      const task = { text, requiredTools, requiresMachine, machineId, rootId, needs }
+      const all = withMachineFact(candidates(task, machines), task)
       if (typeof pinnedBotId === 'string' && pinnedBotId !== '') {
         const pinned = all.find(candidate => candidate.botId === pinnedBotId)
         // A Bot that exists but is off, unbound or unreachable is named as such: "unknown" would
         // send a person looking for a Bot that is right there in the list.
-        if (!pinned) fail(`BOT_ROUTING_PINNED_INELIGIBLE:${pinnedBotId}:${pinnedReason(readBots(), settingsFor, pinnedBotId)}`)
+        if (!pinned) fail(`BOT_ROUTING_PINNED_INELIGIBLE:${pinnedBotId}:${pinnedReason(readBots(), id => settingsFor(id, machines), pinnedBotId)}`)
         const machineRefusal = pinnedMachineRefusal(pinned, task)
         if (machineRefusal) fail(`BOT_ROUTING_PINNED_INELIGIBLE:${pinnedBotId}:${machineRefusal}`)
         const probe = routeBot({ task, candidates: [pinned], preset })
@@ -198,7 +204,7 @@ export function createBotRoutingService({ bots, settingsFor, machineHealth, pric
           acceptance: Array.isArray(payload.acceptance) ? payload.acceptance : [],
           sessionId: owner ? null : context.sessionId,
         },
-        candidatesFor: () => candidates(),
+        candidatesFor: candidates,
         bindWorker: bindWorker ?? null,
         submitPlan,
         subjectFor,

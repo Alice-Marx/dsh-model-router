@@ -677,6 +677,10 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
       return {items,maxSeq}
     },
     // One Bot's durable tasks, oldest first; the read model never invents a task.
+    pendingTaskCount(owner) {
+      taskRef(owner)
+      return stmt("SELECT COUNT(*) AS count FROM tasks WHERE owner_bot=? AND state IN ('ready','admitting','running','cancelling')").get(owner).count
+    },
     list(owner) {taskRef(owner);return viewsOf(stmt('SELECT * FROM tasks WHERE owner_bot=? ORDER BY created_ms,id LIMIT 128').all(owner))},
     close() {if(!closed){closed=true;if(borrowed){try{db.pragma(`busy_timeout=${priorTimeout}`)}catch{}}else db.close();onClose()}},
   })

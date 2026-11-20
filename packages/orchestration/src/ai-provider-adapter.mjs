@@ -130,14 +130,14 @@ export class AiProviderAdapter extends LlmAdapter {
         if (event.type === 'done') {
           const usage = event.message.usage
           if (usage.input + usage.output + usage.cacheRead + usage.cacheWrite > 0) yield { type: 'usage', usage: { inputTokens: usage.input, outputTokens: usage.output, cacheReadTokens: usage.cacheRead, cacheWriteTokens: usage.cacheWrite, ...(usage.totalTokens > 0 ? { totalTokens: usage.totalTokens } : {}) } }
-          this.onResult(this.profile, { kind: 'verified', status: status ?? 200 })
+          this.onResult(this.profile, { kind: 'verified', status: status ?? 200 }, options.model)
           yield { type: 'finish', reason: { kind: event.reason === 'toolUse' ? 'tool-calls' : event.reason === 'length' ? 'max-tokens' : 'stop' },
             replayState: { meta: { kind: 'dsh-bot-ai-v1', contentHash: digest(event.message.content.map(sdkBlock)) }, content: event.message.content.map(stripReplay) } }
         }
       }
     } catch (error) {
-      if (timedOut) { this.onResult(this.profile, { kind: 'error', code: 'TIMEOUT' }); throw new LlmError('提供方长时间没有返回数据，请检查连接后重试。', 'TIMEOUT') }
-      this.onResult(this.profile, { kind: signal.aborted ? 'cancelled' : 'error', code: error?.code ?? 'PROVIDER_ERROR', ...(status ? { status } : {}) })
+      if (timedOut) { this.onResult(this.profile, { kind: 'error', code: 'TIMEOUT' }, options.model); throw new LlmError('提供方长时间没有返回数据，请检查连接后重试。', 'TIMEOUT') }
+      if (!signal.aborted) this.onResult(this.profile, { kind: 'error', code: error?.code ?? 'PROVIDER_ERROR', ...(status ? { status } : {}) }, options.model)
       if (error instanceof LlmError) throw error
       throw new LlmError(signal.aborted ? '此模型请求已取消。' : '无法连接独立 AI 提供方，请重新检查连接设置。', signal.aborted ? 'ABORTED' : 'PROVIDER_ERROR')
     } finally { clearTimeout(idleTimer); consumer.abort(); lease.release() }

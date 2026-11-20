@@ -54,7 +54,7 @@ export const botRejection = (candidate, task = {}) => rejection(candidate, task)
 function score(candidate, preset, maxPrice) {
   const price = finite(candidate.pricePerMTokUsd)
   const quality = finite(candidate.quality, 1)
-  const load = finite(candidate.load) ?? 0
+  const load = finite(candidate.load, 1) ?? 0
   // Cost is normalised against the most expensive eligible Bot, so one very expensive route
   // cannot swamp quality evidence: what matters is the ratio within this decision, not dollars.
   // An unknown price is the worst case, never zero.
@@ -91,7 +91,7 @@ export function routeBot({ task = {}, candidates = [], preset = 'balanced', limi
   const scored = []
   for (const candidate of eligible) {
     scored.push({ botId: candidate.botId, score: score(candidate, preset, maxPrice), model: candidate.model,
-      pricePerMTokUsd: finite(candidate.pricePerMTokUsd), quality: finite(candidate.quality, 1) })
+      pricePerMTokUsd: finite(candidate.pricePerMTokUsd), quality: finite(candidate.quality, 1), load: finite(candidate.load, 1) })
   }
   scored.sort((left, right) => left.score - right.score
     || Number(left.pricePerMTokUsd === null) - Number(right.pricePerMTokUsd === null)

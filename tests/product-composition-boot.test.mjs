@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { buildRoutingEvidence } from '../.dsh-plugin/shared/routing-evidence.mjs'
+import { withProductIndependent } from './helpers/product-independent-composition.mjs'
 
 // The composition is the only place that assembles the thread host and the web
 // panel store. Both are optional surfaces: a Host without the thread overlay
@@ -14,6 +16,29 @@ import { join } from 'node:path'
 const { startBotProduct } = await import('../packages/orchestration/src/product-composition.mjs')
 
 const accountStream = async (options, next) => next(options)
+
+test('product Bot routing reads the configured quality evidence for the task and exact model', async () => {
+  const text = 'review the architecture and tests for this code project'
+  const observations = Array.from({ length: 16 }, (_, index) => ({
+    id: `observation-${index}`, groupId: `group-${index}`, text, type: 'code',
+    provider: index < 8 ? 'alpha' : 'beta', model: index < 8 ? 'one' : 'vendor/two',
+    quality: index < 8 ? 0.2 : 0.9, reasoningEffort: '', channel: 'harness-llm',
+    timestamp: Date.now(), split: 'train', provenance: { kind: 'objective', source: 'fixture-evaluation', reference: `run-${index}` },
+  }))
+  let configured = JSON.stringify(buildRoutingEvidence({ observations }))
+  await withProductIndependent(async ({ bind, dispatch }) => {
+    await bind('a', 'alpha', 'one')
+    await bind('b', 'beta', 'vendor/two')
+    const choice = await dispatch('botRoutingDecide', { text })
+    assert.equal(choice.chosen.botId, 'b')
+    assert.deepEqual(choice.ranked.map(({ quality, load }) => [Number(quality.toFixed(2)), load]), [[0.9, 0], [0.2, 0]])
+    const unrelated = await dispatch('botRoutingDecide', { text: 'summarize the meeting minutes in a paragraph' })
+    assert.ok(unrelated.ranked.every(row => row.quality === null))
+    configured = '{'
+    const invalid = await dispatch('botRoutingDecide', { text })
+    assert.ok(invalid.ranked.every(row => row.quality === null))
+  }, { productConfig: { botRouting: { enabled: true, preset: 'quality' }, routingEvidenceJson: { get: () => configured } } })
+})
 
 function makeContext(provided = {}) {
   const services = new Map(Object.entries(provided))
