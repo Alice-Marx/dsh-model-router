@@ -86,59 +86,123 @@ const pickDraft = async (form, id) => {
   return entry
 }
 const motionSelector = id => '.bt-create-preview .bt-model-portrait[data-portrait="' + id + '"]'
+const checkGaze = async (form, id) => {
+  const selector = motionSelector(id), avatar = form.locator(selector)
+  await page.waitForFunction(selector => {
+    const root = document.querySelector(selector)
+    return root?.hasAttribute('data-portrait-breathing') && root.querySelector('img').naturalWidth === 256 &&
+      !root.querySelector('.bt-portrait-art').hidden
+  }, selector)
+  const { width, height } = await avatar.boundingBox()
+  const shifts = []
+  for (const direction of [-1, 1]) {
+    await avatar.hover({ position: { x: Math.round(width * (.5 + direction * .36)), y: Math.floor(height * .5) } })
+    const sample = await page.waitForFunction(({ selector, eyes, direction }) => {
+      const node = document.querySelector(selector)
+      const canvas = node?.querySelector('.bt-portrait-eyes')
+      if (!canvas || canvas.hidden) return false
+      const original = document.createElement('canvas')
+      original.width = original.height = canvas.width
+      const source = original.getContext('2d')
+      source.drawImage(node.querySelector('img'), 0, 0)
+      const painted = canvas.getContext('2d')
+      const measured = eyes.map(([left, top, right, bottom]) => {
+        const width = right - left, height = bottom - top
+        const before = source.getImageData(left, top, width, height).data
+        const after = painted.getImageData(left, top, width, height).data
+        let best = { shift: 0, error: Infinity }
+        // Compare both parts of the painted eye against horizontal translations of the original pixels.
+        for (let shift = -5; shift <= 5; shift++) {
+          let error = 0
+          for (let y = Math.ceil(height * .36); y < height * .76; y++) {
+            for (let x = Math.ceil(width * .27); x < width * .73; x++) {
+              const moved = (y * width + x) * 4, start = (y * width + x - shift) * 4
+              for (let channel = 0; channel < 3; channel++) error += (after[moved + channel] - before[start + channel]) ** 2
+            }
+          }
+          if (error < best.error) best = { shift, error }
+        }
+        return best.shift
+      })
+      return measured.every(pixels => pixels * direction >= 2) && measured
+    }, { selector, eyes: PORTRAIT_RIGS[id].eyes, direction }, { polling: 'raf', timeout: 2000 })
+    shifts.push(await sample.jsonValue())
+    await sample.dispose()
+  }
+  await page.mouse.move(1, 1)
+  await page.waitForFunction(selector => {
+    const node = document.querySelector(selector)
+    return node?.querySelector('.bt-portrait-eyes').hidden
+  }, selector, { polling: 'raf', timeout: 3000 })
+  return shifts
+}
 const checkMotion = async (form, id) => {
   const selector = motionSelector(id)
   const avatar = form.locator(selector)
   await avatar.waitFor()
   await page.waitForFunction(selector => document.querySelector(selector)?.hasAttribute('data-portrait-motion'), selector)
   await page.waitForFunction(selector => document.querySelector(selector + ' img')?.naturalWidth === 256, selector)
-  if (id === 'deepseek') {
-    const { width, height } = await avatar.boundingBox()
-    await avatar.hover({ position: { x: Math.floor(width * .85), y: Math.floor(height * .5) } })
-    assert.ok(Number(await avatar.evaluate(node => node.style.getPropertyValue('--bt-portrait-x'))) > 0)
-  }
-  await avatar.click()
-  const sample = await page.waitForFunction(({ selector, eyes }) => {
-    const node = document.querySelector(selector)
-    const eyelids = node?.querySelector('canvas')
-    if (!eyelids || eyelids.hidden) return false
-    const animation = node.querySelector('.bt-portrait-gesture').getAnimations().find(item => item.playState === 'running')
-    if (!animation) return false
-    const painted = eyelids.getContext('2d')
-    const image = node.querySelector('img')
+  const sample = await avatar.evaluateHandle((node, eyes) => ({ ready: new Promise(resolve => {
+    const eyelids = node.querySelector('.bt-portrait-eyes')
+    const art = node.querySelector('.bt-portrait-art')
     const original = document.createElement('canvas')
     original.width = eyelids.width
     original.height = eyelids.height
-    const source = original.getContext('2d')
-    source.drawImage(image, 0, 0)
-    const changes = eyes.map(([left, top, right, bottom]) => {
-      const box = [left, top, right - left, bottom - top]
-      const actual = painted.getImageData(...box).data
-      const before = source.getImageData(...box).data
-      let changed = 0
-      for (let i = 0; i < actual.length; i += 4) {
-        if (actual[i + 3] && Math.abs(actual[i] - before[i]) + Math.abs(actual[i + 1] - before[i + 1]) +
-          Math.abs(actual[i + 2] - before[i + 2]) > 30) changed++
+    const source = original.getContext('2d', { willReadFrequently: true })
+    source.drawImage(node.querySelector('img'), 0, 0)
+    const panels = [[62, 43, 130, 56], [62, 189, 130, 42]]
+    const eyeBoxes = eyes.map(([left, top, right, bottom]) => [left, top, right - left, bottom - top])
+    const originalEyes = eyeBoxes.map(box => source.getImageData(...box).data)
+    node.addEventListener('click', () => {
+      const render = art.getContext('2d')
+      const paint = eyelids.getContext('2d')
+      const initial = panels.map(box => (art.hidden ? source : render).getImageData(...box).data)
+      const scratch = document.createElement('canvas')
+      scratch.width = scratch.height = original.width
+      const read = scratch.getContext('2d', { willReadFrequently: true })
+      const start = performance.now()
+      const frames = [], blink = [0, 0]
+      let last = 0
+      const capture = time => {
+        const elapsed = time - start
+        if (elapsed - last >= 24) {
+          last = elapsed
+          read.drawImage(art.hidden ? original : art, 0, 0)
+          const motion = panels.map((box, index) => {
+            const current = read.getImageData(...box).data, before = initial[index]
+            let difference = 0
+            for (let i = 0; i < current.length; i += 4) {
+              difference += Math.abs(current[i] - before[i]) + Math.abs(current[i + 1] - before[i + 1]) +
+                Math.abs(current[i + 2] - before[i + 2])
+            }
+            return difference / (current.length * .75)
+          })
+          frames.push({ elapsed, head: motion[0], torso: motion[1] })
+          if (!eyelids.hidden) eyeBoxes.forEach((box, index) => {
+            const current = paint.getImageData(...box).data, before = originalEyes[index]
+            let changed = 0
+            for (let i = 0; i < current.length; i += 4) {
+              if (current[i + 3] && Math.abs(current[i] - before[i]) + Math.abs(current[i + 1] - before[i + 1]) +
+                Math.abs(current[i + 2] - before[i + 2]) > 30) changed++
+            }
+            blink[index] = Math.max(blink[index], changed)
+          })
+        }
+        if (elapsed < 1590) requestAnimationFrame(capture)
+        else resolve({ frames, blink })
       }
-      return changed
-    })
-    if (changes.some(pixels => pixels < 60)) return false
-    return { frames: animation.effect.getKeyframes(), duration: animation.effect.getTiming().duration, changes }
-  }, { selector, eyes: PORTRAIT_RIGS[id].eyes }, { polling: 'raf', timeout: 2000 })
-  const { frames, duration, changes } = await sample.jsonValue()
+      requestAnimationFrame(capture)
+    }, { once: true })
+  }) }), PORTRAIT_RIGS[id].eyes)
+  await avatar.click()
+  const { frames, blink } = await sample.evaluate(handle => handle.ready)
   await sample.dispose()
-  const heldIndex = frames.findIndex((frame, index) => {
-    const previous = frames[index - 1]
-    return previous && frame.transform === previous.transform && frame.offset - previous.offset >= .15
-  })
-  assert.ok(heldIndex > 0, id + ' must hold its main pose through several frames')
-  const held = frames[heldIndex]
-  const move = /translate\(([-.\d]+)%,\s*([-.\d]+)%\)/.exec(held.transform)
-  const roll = Math.abs(Number(/rotate\(([-.\d]+)deg\)/.exec(held.transform)?.[1]))
-  const vertical = Number(move?.[2])
-  assert.ok(roll >= 5 || Math.abs(vertical) >= 3, id + ' must have a clearly visible tilt or nod')
-  const holdMs = Math.round((held.offset - frames[heldIndex - 1].offset) * duration)
-  return { id, roll, vertical, holdMs, blinkChangedPixels: changes }
+  const peak = region => frames.reduce((best, frame) => frame[region] > best[region] ? frame : best)
+  const head = peak('head'), torso = peak('torso')
+  assert.ok(head.head > 2.5 && torso.torso > .9, id + ' must move both the head and chest in the rendered art')
+  assert.ok(blink.every(pixels => pixels > 145), id + ' must close both eyes during its greeting')
+  return { id, headMotion: head.head, torsoMotion: torso.torso, torsoDelayMs: Math.round(torso.elapsed - head.elapsed),
+    blinkChangedPixels: blink }
 }
 const checkReducedMotion = async (form, id) => {
   const selector = motionSelector(id)
@@ -146,11 +210,11 @@ const checkReducedMotion = async (form, id) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.waitForFunction(selector => {
     const node = document.querySelector(selector)
-    return node && !node.hasAttribute('data-portrait-motion') && node.querySelector('canvas').hidden &&
-      node.querySelector('.bt-portrait-gesture').getAnimations().length === 0
+    return node && !node.hasAttribute('data-portrait-motion') &&
+      [...node.querySelectorAll('canvas')].every(canvas => canvas.hidden)
   }, selector, { polling: 'raf', timeout: 2000 })
   await avatar.click()
-  assert.equal(await avatar.locator('canvas').isVisible(), false)
+  assert.equal(await avatar.locator('canvas:visible').count(), 0)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
 }
 const createPortraitBot = async (form, name, id) => {
@@ -181,12 +245,14 @@ try {
     await pickDraft(form, entry.id)
     motions.push(await checkMotion(form, entry.id))
   }
-  assert.equal(new Set(motions.map(({ roll, vertical }) => JSON.stringify([roll, vertical]))).size, 4)
-  checks.push('all 19 real previews change both eyelids, hold a clearly visible greeting, and render four motion styles')
+  assert.ok(motions.filter(({ torsoDelayMs }) => torsoDelayMs >= 55).length >= 15,
+    'shoulders should usually reach their peak well after the head in the rendered greetings')
+  checks.push('all 19 real previews blink on greeting and deform at both the head and shoulders; the shoulder movement trails the head')
   await pickDraft(form, 'deepseek')
+  const gazePixels = await checkGaze(form, 'deepseek')
   await checkMotion(form, 'deepseek')
   await checkReducedMotion(form, 'deepseek')
-  checks.push('the preview follows the pointer and reduced motion cancels the gesture and the blink')
+  checks.push('the preview has a breathing cycle, both eyes track the pointer in either direction and recenter, and reduced motion stops the breathing, gesture and blink')
   await capture('create-avatars-light')
   await form.getByRole('tab', { name: 'Bot', exact: true }).click()
   await form.locator('.bt-shape').first().click()
@@ -269,7 +335,7 @@ try {
   assert.deepEqual(errors, [])
   const report = { status: 'passed', buildLabel: 'local model-avatar verification build', packageVersion, actualHarnessRuntime: true, harnessVersion,
     apiMocks: false, syntheticUiShell: false, isolatedUserHome: true, nativeDesktopWindowVerified: false, paidModelCalls: 0,
-    avatars: MODEL_AVATARS.length, motions, client: { bytes: expectedClient.length, sha256: hash(expectedClient), exactServedBytes: true }, checks, images, pageErrors: errors }
+    avatars: MODEL_AVATARS.length, motions, gazePixels, client: { bytes: expectedClient.length, sha256: hash(expectedClient), exactServedBytes: true }, checks, images, pageErrors: errors }
   await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n'); console.log(JSON.stringify(report))
 } catch (cause) {
   await capture('failure'); throw cause

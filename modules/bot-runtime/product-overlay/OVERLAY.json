@@ -258,6 +258,11 @@
       "path": "src/client/model-portrait-eyes.js",
       "kind": "product-file",
       "summary": "Defines the eye bounds of the original portraits and renders their eyelid motion."
+    },
+    {
+      "path": "src/client/model-portrait-art.js",
+      "kind": "product-file",
+      "summary": "Deforms the original portrait around separate neck and upper-body pivots."
     }
   ]
 }

@@ -262,6 +262,11 @@
       "path": "src/client/model-portrait-eyes.js",
       "kind": "product-file",
       "summary": "Defines the eye bounds of the original portraits and renders their eyelid motion."
+    },
+    {
+      "path": "src/client/model-portrait-art.js",
+      "kind": "product-file",
+      "summary": "Deforms the original portrait around separate neck and upper-body pivots."
     }
   ],
   "files": [
@@ -317,8 +322,8 @@
     {
       "path": "vendor/ds-bot/client.js",
       "sourcePath": "ds-bot/client.js",
-      "sha256": "fa230dddc67fafd1c989185b1ce59dc9950b7f019e010d8d1230025a3fd13799",
-      "gitBlob": "a87838b12312e777a3dbd61d21bba8fb4f721ce3",
+      "sha256": "4594191568ae3db7c71e25bbd43afc7e590b8bcc12cdbcc8ad34274e50a82866",
+      "gitBlob": "403650bd68c9960c1cb495f1611d8e96d6398cf9",
       "origin": "generated"
     },
     {
@@ -1008,17 +1013,24 @@
       "origin": "overlay"
     },
     {
+      "path": "vendor/ds-bot/src/client/model-portrait-art.js",
+      "sourcePath": "ds-bot/src/client/model-portrait-art.js",
+      "sha256": "b160d1c63d07fecbed1f27b3c7f0698dc38ede12b406d915a193a7109497ea09",
+      "gitBlob": "15a06bc949b28326d244dd3d4dfb1f617b6dd15f",
+      "origin": "overlay"
+    },
+    {
       "path": "vendor/ds-bot/src/client/model-portrait-eyes.js",
       "sourcePath": "ds-bot/src/client/model-portrait-eyes.js",
-      "sha256": "b406ee4ec9c44b63c18f1399ad3ea1d15fa363272da86da9f41581b1eaa81f98",
-      "gitBlob": "a240d5d91da40aff93c378602ed3b6a138185a65",
+      "sha256": "e775b06d0f905208423f931c242866614a8ce7e0f3408f8e1d26dc333cc150e0",
+      "gitBlob": "7f1d3171173e3e26afe15eab085f5979a985e2b1",
       "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/model-portrait.js",
       "sourcePath": "ds-bot/src/client/model-portrait.js",
-      "sha256": "6573afbf538f8f660856711d734ef7e2921452098ce03a0ba5f414b3594a6c85",
-      "gitBlob": "7b0d41638ba5abde19855e97f5e9e37eb65416f6",
+      "sha256": "764e83e38d00c3947b5a94c2d5eda143a18c1a881fa3923d0cf526536eb5226b",
+      "gitBlob": "c4d7a8ac11269948e5900f8624926894ab524346",
       "origin": "overlay"
     },
     {

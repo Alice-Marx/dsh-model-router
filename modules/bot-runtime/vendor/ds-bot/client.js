@@ -1589,7 +1589,7 @@ function bodyOf(def, paint, flat = false) {
 }
 var eyeMarkup = ([cx, cy, w, h55, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><rect class="bt-eye" x="${-w / 2}" y="${-h55 / 2}" width="${w}" height="${h55}" rx="${w / 2}"/></g>`;
 var happyEyeMarkup = ([cx, cy, w, h55, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><path class="bt-eye-happy" opacity="0" d="M${-w * 0.62} ${h55 * 0.14}Q0 ${-h55 * 0.42} ${w * 0.62} ${h55 * 0.14}" fill="none" stroke="#000" stroke-width="${w * 0.5}" stroke-linecap="round"/></g>`;
-var maskBox = (size) => `maskUnits="userSpaceOnUse" x="${-size}" y="${-size}" width="${size * 3}" height="${size * 3}"`;
+var maskBox = (size2) => `maskUnits="userSpaceOnUse" x="${-size2}" y="${-size2}" width="${size2 * 3}" height="${size2 * 3}"`;
 var holes = (def, eyes) => `<rect x="${-def.size}" y="${-def.size}" width="${def.size * 3}" height="${def.size * 3}" fill="#fff"/>${eyes}`;
 var MASK_ID = "%MASK%";
 var markSerial = 0;
@@ -1609,7 +1609,7 @@ function characterMarkup(shape, color) {
   }
   return markup;
 }
-var svgUrl = (inner, size) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}">${inner}</svg>`)}")`;
+var svgUrl = (inner, size2) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size2} ${size2}">${inner}</svg>`)}")`;
 var maskCache = /* @__PURE__ */ new Map();
 function maskOf(shape) {
   let mask = maskCache.get(shape);
@@ -1994,13 +1994,13 @@ function registerShape(id, shape) {
   if (typeof shape?.body !== "function" || typeof shape.body("#000") !== "string") throw new Error("A shape needs body(paint) returning SVG markup");
   const at = shape.eyes?.at;
   if (!Array.isArray(at) || at.length !== 2 || !at.every(isPoint)) throw new Error("A shape needs eyes.at: two [x, y] points");
-  const size = Number.isFinite(shape.size) && shape.size > 0 ? shape.size : 100;
+  const size2 = Number.isFinite(shape.size) && shape.size > 0 ? shape.size : 100;
   const pick2 = (key, fallback) => Number.isFinite(shape.eyes[key]) ? shape.eyes[key] : fallback;
-  const eyes = at.map(([x, y]) => [x, y, pick2("w", size * 0.1), pick2("h", size * 0.23), pick2("tilt", -27)]);
+  const eyes = at.map(([x, y]) => [x, y, pick2("w", size2 * 0.1), pick2("h", size2 * 0.23), pick2("tilt", -27)]);
   const previous = SHAPES[id];
   SHAPES[id] = {
     label: String(shape.label ?? id),
-    size,
+    size: size2,
     body: shape.body,
     eyes,
     ...typeof shape.wrap === "string" ? { wrap: shape.wrap } : {}
@@ -2047,7 +2047,7 @@ var NAME_GOES_ON = /^(?:[a-z0-9_\-/\\]|\.[a-z0-9_-])/i;
 var ADDRESS_BEFORE = /[a-z0-9_./]/i;
 var LITERAL = /```[\s\S]*?(?:```|$)|`[^`\n]*`|\[[^\]\n]*\]\([^)\s]*(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\)/g;
 var fitsAt = (text, at, word) => text.slice(at, at + word.length).toLowerCase() === word.toLowerCase() && !NAME_GOES_ON.test(text.slice(at + word.length));
-var overlaps = (spans, start, end) => spans.some((span) => start < span.end && span.start < end);
+var overlaps = (spans, start, end2) => spans.some((span) => start < span.end && span.start < end2);
 function nameProblem(name) {
   const text = String(name ?? "").trim();
   if (text === "") return "A Bot needs a name";
@@ -2061,9 +2061,9 @@ function referenceSpans(text, labels = []) {
   for (const label of [...labels].sort((a, b) => b.length - a.length)) {
     const mention = `@${label}`;
     for (let at = text.indexOf(mention); at !== -1; at = text.indexOf(mention, at + 1)) {
-      const end = at + mention.length;
-      if (at > 0 && ADDRESS_BEFORE.test(text[at - 1]) || NAME_GOES_ON.test(text.slice(end)) || overlaps(spans, at, end)) continue;
-      spans.push({ start: at, end, label });
+      const end2 = at + mention.length;
+      if (at > 0 && ADDRESS_BEFORE.test(text[at - 1]) || NAME_GOES_ON.test(text.slice(end2)) || overlaps(spans, at, end2)) continue;
+      spans.push({ start: at, end: end2, label });
       break;
     }
   }
@@ -2082,9 +2082,9 @@ function mentionSpans(text, bots, { references = [] } = {}) {
     const bot = byLength.find((candidate) => fitsAt(value, at + 1, candidate.name));
     const all = bot ? void 0 : ALL_WORDS.find((word) => fitsAt(value, at + 1, word));
     if (!bot && !all) continue;
-    const end = at + 1 + (bot ? bot.name.length : all.length);
-    spans.push(bot ? { start: at, end, bot } : { start: at, end, all: true });
-    at = end - 1;
+    const end2 = at + 1 + (bot ? bot.name.length : all.length);
+    spans.push(bot ? { start: at, end: end2, bot } : { start: at, end: end2, all: true });
+    at = end2 - 1;
   }
   return spans;
 }
@@ -2318,10 +2318,10 @@ function runStatsOf(values) {
 
 // src/client/model-portrait-eyes.js
 var PORTRAIT_RIGS = Object.freeze({
-  chatgpt: { eyes: [[81, 126, 122, 151], [141, 118, 176, 145]], greeting: "bow", pace: 1.15, backdrop: "#eddffe" },
+  chatgpt: { eyes: [[81, 126, 122, 151], [141, 118, 176, 145]], neck: 184, greeting: "bow", pace: 1.15, backdrop: "#eddffe" },
   claude: { eyes: [[79, 116, 118, 143], [139, 109, 175, 138]], greeting: "bow", pace: 1.06, backdrop: "#fff0e6" },
-  deepseek: { eyes: [[84, 119, 123, 149], [139, 113, 177, 144]], greeting: "greet", pace: 0.91, backdrop: "#d6ecfd" },
-  doubao: { eyes: [[74, 113, 113, 141], [132, 105, 170, 134]], greeting: "perk", pace: 0.88, backdrop: "#dffcfd" },
+  deepseek: { eyes: [[84, 119, 123, 149], [139, 113, 177, 144]], neck: 182, greeting: "greet", pace: 0.91, backdrop: "#d6ecfd" },
+  doubao: { eyes: [[74, 113, 113, 141], [132, 105, 170, 134]], neck: 181, greeting: "perk", pace: 0.88, backdrop: "#dffcfd" },
   ernie: { eyes: [[81, 128, 120, 154], [139, 120, 175, 147]], greeting: "bow", pace: 1.1, backdrop: "#dee9fe" },
   gemini: { eyes: [[81, 127, 120, 155], [137, 120, 173, 150]], greeting: "peek", pace: 0.95, backdrop: "#dfdefe" },
   glm: { eyes: [[83, 126, 123, 154], [140, 119, 177, 148]], greeting: "bow", pace: 1.12, backdrop: "#d7e2f9" },
@@ -2334,9 +2334,9 @@ var PORTRAIT_RIGS = Object.freeze({
   minimax: { eyes: [[79, 121, 120, 157], [138, 115, 177, 148]], greeting: "perk", pace: 0.88, backdrop: "#fee5e2" },
   mistral: { eyes: [[82, 127, 125, 153], [140, 119, 177, 147]], greeting: "greet", pace: 0.97, backdrop: "#ffeadb" },
   perplexity: { eyes: [[83, 121, 120, 151], [138, 116, 173, 145]], greeting: "peek", pace: 1.12, backdrop: "#e1fbf4" },
-  qwen: { eyes: [[82, 119, 121, 146], [140, 111, 178, 140]], greeting: "peek", pace: 1.06, backdrop: "#ebdefe" },
+  qwen: { eyes: [[82, 119, 121, 146], [140, 111, 178, 140]], neck: 174, greeting: "peek", pace: 1.06, backdrop: "#ebdefe" },
   rwkv: { eyes: [[81, 129, 122, 157], [138, 120, 174, 148]], greeting: "greet", pace: 1, backdrop: "#ebe0fd" },
-  stepfun: { eyes: [[83, 115, 123, 144], [138, 108, 176, 136]], greeting: "perk", pace: 0.95, backdrop: "#d0eafe" }
+  stepfun: { eyes: [[83, 115, 123, 144], [138, 108, 176, 136]], neck: 176, greeting: "perk", pace: 0.95, backdrop: "#d0eafe" }
 });
 var PORTRAIT_SIZE = 256;
 var patchesByRig = /* @__PURE__ */ new WeakMap();
@@ -2378,111 +2378,271 @@ function eyePatches(image, rig) {
   patchesByRig.set(rig, patches);
   return patches;
 }
-function paintEye({ width, height, top, bottom, slant, source, skin, lash }, frame, amount) {
-  frame.set(source);
+function eyeColumns({ width, top, bottom, slant }) {
   const half = (width - 1) / 2;
-  for (let x = 0; x < width; x++) {
+  return Array.from({ length: width }, (_, x) => {
     const edge = Math.abs((x - half) / half);
     const arc = Math.sqrt(1 - edge * edge);
     const slope = (x - half) * slant;
     const start = top + slope + (1 - arc) * (bottom - top) * 0.38;
-    const end = bottom + slope - (1 - arc) * (bottom - top) * 0.5;
-    const hinge = start + (end - start) * 0.62;
+    const end2 = bottom + slope - (1 - arc) * (bottom - top) * 0.5;
+    return { start, end: end2, arc, side: smoothstep(unit((1 - edge) * 8)) };
+  });
+}
+function shiftGaze({ width, height, source, columns: columns2 }, frame, gazeX, gazeY) {
+  frame.set(source);
+  for (let x = 0; x < width; x++) {
+    const { start, end: end2, arc } = columns2[x];
+    for (let y = Math.max(0, Math.ceil(start)); y <= Math.min(height - 1, Math.floor(end2)); y++) {
+      const weight = arc * arc * smoothstep(unit(Math.min(y - start, end2 - y) / 7));
+      const sx = Math.max(0, Math.min(width - 1.01, x - gazeX * weight * 5));
+      const sy = Math.max(0, Math.min(height - 1.01, y - gazeY * weight * 3.4));
+      const col = Math.floor(sx), row = Math.floor(sy), dx = sx - col, dy = sy - row;
+      const above = (row * width + col) * 4, below = above + width * 4;
+      const index = (y * width + x) * 4;
+      for (let channel = 0; channel < 3; channel++) {
+        const upper = source[above + channel] * (1 - dx) + source[above + 4 + channel] * dx;
+        const lower = source[below + channel] * (1 - dx) + source[below + 4 + channel] * dx;
+        frame[index + channel] = upper * (1 - dy) + lower * dy;
+      }
+    }
+  }
+}
+function closeEye({ width, height, columns: columns2, skin, lash }, source, frame, amount) {
+  frame.set(source);
+  for (let x = 0; x < width; x++) {
+    const { start, end: end2, arc, side } = columns2[x];
+    const hinge = start + (end2 - start) * 0.62;
     const upper = start + (hinge - start) * amount;
-    const lower = end + (hinge + 1.8 * arc - end) * amount;
-    const side = smoothstep(unit((1 - edge) * 8));
-    for (let y = Math.max(0, Math.floor(start - 3)); y <= Math.min(height - 1, Math.ceil(end + 3)); y++) {
-      const feather = side * smoothstep(unit(Math.min((y - start + 3) / 3, (end + 3 - y) / 3)));
+    const lower = end2 + (hinge + 1.8 * arc - end2) * amount;
+    for (let y = Math.max(0, Math.floor(start - 3)); y <= Math.min(height - 1, Math.ceil(end2 + 3)); y++) {
+      const feather = side * smoothstep(unit(Math.min((y - start + 3) / 3, (end2 + 3 - y) / 3)));
       const index = (y * width + x) * 4;
       const line = unit((1.4 - Math.abs(y - hinge)) / 0.8) * unit((amount - 0.72) / 0.28) * side;
-      let eyeOffset = -1;
-      if (y >= upper && y <= lower) {
-        const row = Math.round(start + (end - start) * (y - upper) / Math.max(1, lower - upper));
-        eyeOffset = (row * width + x) * 4;
-      }
-      const blend = feather * unit(amount * 4);
+      const visible = smoothstep(unit(Math.min(y - upper, lower - y) + 0.62));
+      const sy = Math.max(0, Math.min(height - 1.01, start + (end2 - start) * unit((y - upper) / Math.max(1, lower - upper))));
+      const row = Math.floor(sy), eyeOffset = (row * width + x) * 4;
+      const lowerOffset = eyeOffset + width * 4;
+      const blend = feather * smoothstep(unit(amount * 3.6));
       for (let channel = 0; channel < 3; channel++) {
-        const color = eyeOffset === -1 ? skin[channel] : source[eyeOffset + channel];
+        const upperColor = source[eyeOffset + channel];
+        const eyeColor = upperColor + (source[lowerOffset + channel] - upperColor) * (sy - row);
+        const color = skin[channel] + (eyeColor - skin[channel]) * visible;
         const sample = color * (1 - line) + lash[channel] * line;
         frame[index + channel] = source[index + channel] * (1 - blend) + sample * blend;
       }
     }
   }
 }
-function makeBlinkPainter(canvas, image, rig) {
+function makeEyePainter(canvas, image, rig) {
   if (!image?.complete || image.naturalWidth !== PORTRAIT_SIZE || image.naturalHeight !== PORTRAIT_SIZE) return null;
   const ctx = canvas?.getContext("2d");
   const patches = ctx && eyePatches(image, rig);
   if (!patches) return null;
   ctx.clearRect(0, 0, PORTRAIT_SIZE, PORTRAIT_SIZE);
-  const frames = patches.map(({ width, height }) => ctx.createImageData(width, height));
-  return (amount) => {
-    canvas.hidden = amount === 0;
+  const buffers = patches.map((patch) => ({
+    patch: { ...patch, columns: eyeColumns(patch) },
+    frame: ctx.createImageData(patch.width, patch.height),
+    shifted: new Uint8ClampedArray(patch.source.length)
+  }));
+  return (x, y, leftLid, rightLid) => {
+    canvas.hidden = x === 0 && y === 0 && leftLid === 0 && rightLid === 0;
     if (canvas.hidden) return;
-    for (const [index, patch] of patches.entries()) {
-      paintEye(patch, frames[index].data, amount);
-      ctx.putImageData(frames[index], patch.x, patch.y);
+    for (const [index, { patch, frame, shifted }] of buffers.entries()) {
+      const lid = index === 0 ? leftLid : rightLid;
+      let source = patch.source;
+      if (x || y) {
+        shiftGaze(patch, shifted, x, y);
+        source = shifted;
+      }
+      if (lid) closeEye(patch, source, frame.data, lid);
+      else frame.data.set(source);
+      ctx.putImageData(frame, patch.x, patch.y);
     }
+  };
+}
+
+// src/client/model-portrait-art.js
+var size = PORTRAIT_SIZE;
+var smooth = (value) => {
+  const t2 = Math.max(0, Math.min(1, value));
+  return t2 * t2 * (3 - 2 * t2);
+};
+function triangle(a, b, c) {
+  const bx = b.u - a.u, by = b.v - a.v, cx = c.u - a.u, cy = c.v - a.v;
+  const area = bx * cy - by * cx;
+  return { a, b, c, inv: [cy / area, -by / area, -cx / area, bx / area] };
+}
+function paintTriangle(ctx, source, { a, b, c, inv }) {
+  const bx = b.x - a.x, by = b.y - a.y, cx = c.x - a.x, cy = c.y - a.y;
+  const xx = bx * inv[0] + cx * inv[1], xy = bx * inv[2] + cx * inv[3];
+  const yx = by * inv[0] + cy * inv[1], yy = by * inv[2] + cy * inv[3];
+  const centerX = (a.x + b.x + c.x) / 3, centerY = (a.y + b.y + c.y) / 3;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(a.x + (a.x - centerX) * 0.035, a.y + (a.y - centerY) * 0.035);
+  ctx.lineTo(b.x + (b.x - centerX) * 0.035, b.y + (b.y - centerY) * 0.035);
+  ctx.lineTo(c.x + (c.x - centerX) * 0.035, c.y + (c.y - centerY) * 0.035);
+  ctx.closePath();
+  ctx.clip();
+  ctx.setTransform(xx, yx, xy, yy, a.x - xx * a.u - xy * a.v, a.y - yx * a.u - yy * a.v);
+  ctx.drawImage(source, 0, 0);
+  ctx.restore();
+}
+function portraitMesh(rig, compact2) {
+  const center = rig.eyes.reduce((total, [left, , right]) => total + (left + right) / 4, 0);
+  const neck = rig.neck ?? (rig.eyes[0][3] + rig.eyes[1][3]) / 2 + 39;
+  const columns2 = compact2 ? [0, 24, 128, 232, size] : [0, 20, 74, 128, 182, 236, size];
+  const rows2 = [0, 15, 59, 103, neck - 32, neck - 14, neck + 9, neck + 30, 239, size];
+  const grid = rows2.map((v) => columns2.map((u) => {
+    const edge = smooth(Math.min(u, v, size - u, size - v) / 18);
+    const side = smooth((Math.abs(u - center) - 36) / 58);
+    const head = (1 - smooth((v - neck + 26 + side * 14) / 58)) * edge;
+    return { u, v, x: u, y: v, dx: u - center, head, headY: v - neck, torso: edge, torsoY: v - 231 };
+  }));
+  const triangles = [];
+  for (let row = 1; row < rows2.length; row++) {
+    for (let col = 1; col < columns2.length; col++) {
+      const a = grid[row - 1][col - 1], b = grid[row - 1][col];
+      const c = grid[row][col], d = grid[row][col - 1];
+      triangles.push(triangle(a, b, c), triangle(a, c, d));
+    }
+  }
+  return { points: grid.flat(), triangles };
+}
+var angle = (degrees) => degrees * Math.PI / 180;
+function makePortraitArt(canvas, image, eyes, rig, compact2) {
+  const mesh = portraitMesh(rig, compact2);
+  let ctx, composite;
+  return (head, torso) => {
+    const [hx, hy, hr] = head, [tx, ty, tr] = torso;
+    if (!hx && !hy && !hr && !tx && !ty && !tr || image.naturalWidth !== size || image.naturalHeight !== size) {
+      canvas.hidden = true;
+      return;
+    }
+    ctx ??= canvas.getContext("2d");
+    if (!ctx) return;
+    let source = image;
+    if (eyes && !eyes.hidden) {
+      if (!composite) {
+        const buffer = document.createElement("canvas");
+        buffer.width = buffer.height = size;
+        composite = buffer.getContext("2d");
+      }
+      if (composite) {
+        composite.drawImage(image, 0, 0);
+        composite.drawImage(eyes, 0, 0);
+        source = composite.canvas;
+      }
+    }
+    const hSin = Math.sin(angle(hr)), hCos = Math.cos(angle(hr)) - 1;
+    const tSin = Math.sin(angle(tr)), tCos = Math.cos(angle(tr)) - 1;
+    for (const vertex of mesh.points) {
+      const { u, v, dx, head: head2, headY, torso: torso2, torsoY } = vertex;
+      vertex.x = u + head2 * (hx + dx * hCos - headY * hSin) + torso2 * (tx + dx * tCos - torsoY * tSin);
+      vertex.y = v + head2 * (hy + dx * hSin + headY * hCos) + torso2 * (ty + dx * tSin + torsoY * tCos);
+    }
+    ctx.drawImage(source, 0, 0);
+    for (const tri of mesh.triangles) paintTriangle(ctx, source, tri);
+    canvas.hidden = false;
   };
 }
 
 // src/client/model-portrait.js
 var import_react = require("react");
 var states = {
-  idle: { pose: [0, 0, 0], clips: ["breathe", "glance", "tilt"], interval: [3700, 6700] },
-  thinking: { pose: [0, -1.7, -4.5], clips: ["ponder", "glance"], interval: [1700, 3e3] },
-  searching: { pose: [0, -0.6, 0], clips: ["scan", "glance"], interval: [1150, 1850] },
-  working: { pose: [0, 1.2, 0], clips: ["nod", "focus"], interval: [1300, 2200] },
-  sending: { pose: [0.7, 0, 2], clips: ["send", "nod"], interval: [1400, 2350] },
-  orbit: { pose: [0, 0, 1], clips: ["scan", "breathe"], interval: [2e3, 3200] },
-  waiting: { pose: [0, 0.6, -1.5], clips: ["breathe", "tilt"], interval: [3700, 5900] },
-  alert: { pose: [0, -0.8, 4], clips: ["listen"], interval: null },
+  idle: { pose: [0, 0, 0], clips: ["glance", "tilt"], interval: [4200, 7100] },
+  thinking: { pose: [-0.23, -0.7, -1.8], eyes: [0.28, -0.46, 0.06], clips: ["ponder", "glance"], interval: [2400, 3900] },
+  searching: { pose: [0, -0.45, 0], clips: ["scan", "glance"], interval: [2050, 3100] },
+  working: { pose: [0, 0.65, 0.25], eyes: [0, 0.21, 0.09], clips: ["nod", "focus"], interval: [2400, 3700] },
+  sending: { pose: [0.4, -0.1, 0.85], eyes: [0.18, -0.1, 0], clips: ["send", "nod"], interval: [2400, 3700] },
+  orbit: { pose: [0, -0.2, 0.5], clips: ["scan", "tilt"], interval: [2800, 4600] },
+  waiting: { pose: [0, 0.4, -0.75], eyes: [0, 0.1, 0.06], clips: ["tilt", "glance"], interval: [4400, 6800] },
+  alert: { pose: [0, -0.8, 2.2], clips: ["listen"], interval: null },
   done: { pose: [0, 0, 0], clips: ["settle"], interval: null }
 };
 var clips = {
-  breathe: { duration: 1440, points: [[0.4, 0, -1.7, 0, 1.008, 1.029], [0.57, 0, -1.7, 0, 1.008, 1.029]] },
-  glance: { duration: 1180, points: [[0.29, 3.1, -0.8, 6], [0.61, 3.1, -0.8, 6]] },
-  tilt: { duration: 1240, points: [[0.35, 1.2, -0.8, 6.5], [0.65, 1.2, -0.8, 6.5]] },
-  ponder: { duration: 1240, points: [[0.3, 0, -3, 3.5], [0.72, 0, -3, 3.5]] },
-  scan: { duration: 1180, points: [
-    [0.18, -3.6, -0.6, -7.5],
-    [0.37, -3.6, -0.6, -7.5],
-    [0.61, 3.6, -0.6, 7.5],
-    [0.8, 3.6, -0.6, 7.5]
-  ] },
-  nod: { duration: 860, points: [
-    [0.2, 0, -1.1, 0, 0.99, 1.017],
-    [0.43, 0, 3.5, 0, 1.026, 0.952],
-    [0.56, 0, 3.5, 0, 1.026, 0.952],
-    [0.8, 0, -0.8, 0, 1, 1.012]
-  ] },
-  focus: { duration: 940, points: [[0.3, 0, 1.5, 0, 1.045, 1.045], [0.62, 0, 1.5, 0, 1.045, 1.045]] },
-  send: { duration: 790, points: [[0.2, -1.4, 0.3, -1.3], [0.5, 3.9, -0.7, 6.1], [0.67, 3.9, -0.7, 6.1]] },
-  listen: { duration: 790, points: [[0.32, 0, -2.6, 3.6, 1.028, 1.038], [0.59, 0, -2.6, 3.6, 1.028, 1.038]] },
-  settle: { duration: 790, points: [[0.27, 0, 2.3, 0, 1.028, 0.958], [0.55, 0, -0.9, 0, 0.989, 1.02]] },
-  greet: { duration: 980, points: [
-    [0.17, 0, 2.1, -1.2, 1.029, 0.956],
-    [0.43, 1.2, -5, 7.6, 0.99, 1.059],
-    [0.61, 1.2, -5, 7.6, 0.99, 1.059],
-    [0.8, 0.15, 1.1, -0.8, 1.014, 0.988]
-  ] },
-  bow: { duration: 1060, points: [
-    [0.19, 0, -1.8, -1.3, 0.993, 1.023],
-    [0.42, 0.6, 4.7, 3, 1.035, 0.942],
-    [0.64, 0.6, 4.7, 3, 1.035, 0.942],
-    [0.83, 0, -0.9, 0, 1, 1.016]
-  ] },
-  peek: { duration: 1100, points: [
-    [0.23, -1.3, 0.5, -2.1],
-    [0.43, 3.5, -0.9, 8.3],
-    [0.66, 3.5, -0.9, 8.3]
-  ] },
-  perk: { duration: 940, points: [
-    [0.15, 0, 2.7, 0, 1.033, 0.95],
-    [0.38, 0.8, -4.8, 4.8, 0.988, 1.062],
-    [0.58, 0.8, -4.8, 4.8, 0.988, 1.062],
-    [0.81, 0, 1, -1, 1.016, 0.982]
-  ] }
+  glance: {
+    duration: 1010,
+    head: [[0.33, 1.3, -0.35, 2.6], [0.65, 0.85, -0.12, 1.8]],
+    eyes: [[0.15, 0.73, -0.17, 0], [0.55, 0.64, -0.13, 0], [0.85, 0, 0, 0]]
+  },
+  tilt: {
+    duration: 1340,
+    head: [[0.34, 0.44, 0.25, 2.6], [0.68, 0.28, 0.15, 1.6]],
+    eyes: [[0.2, 0.34, 0.14, 0.08], [0.57, 0.24, 0.1, 0.09]]
+  },
+  ponder: {
+    duration: 1390,
+    head: [[0.36, 0.2, -1.7, 1.8], [0.67, 0.3, -0.9, 1.35]],
+    eyes: [[0.22, 0.2, -0.45, 0.06], [0.68, 0.19, -0.33, 0.05]]
+  },
+  scan: {
+    duration: 1390,
+    head: [[0.24, -1.2, -0.33, -2.8], [0.65, 1.45, -0.25, 3.2], [0.81, 0.7, 0.05, 1.35]],
+    eyes: [[0.13, -0.93, 0.07, 0.05], [0.32, -0.68, 0.04, 0.04], [0.47, 0.92, -0.05, 0.03], [0.74, 0.72, -0.02, 0.03]]
+  },
+  nod: { duration: 780, head: [[0.23, 0, -0.74, 0.15], [0.52, 0.21, 3.4, 0.9], [0.78, 0.05, 0.46, 0.24]] },
+  focus: {
+    duration: 940,
+    head: [[0.39, 0.2, 1.2, 0.85], [0.65, 0.1, 0.95, 0.42]],
+    eyes: [[0.2, 0, 0.23, 0.12], [0.64, 0, 0.18, 0.1]]
+  },
+  send: {
+    duration: 850,
+    head: [[0.21, -0.66, 0.27, -0.92], [0.51, 1.25, -1, 2.7], [0.72, 0.8, -0.45, 1.8]],
+    eyes: [[0.13, -0.2, 0.12, 0.04], [0.37, 0.61, -0.21, 0], [0.61, 0.49, -0.13, 0]]
+  },
+  listen: {
+    duration: 940,
+    head: [[0.36, 0.34, -1.7, 1.7], [0.7, 0.2, -0.56, 0.87]],
+    eyes: [[0.18, 0.44, -0.25, 0], [0.6, 0.33, -0.2, 0]]
+  },
+  settle: { duration: 900, head: [[0.35, 0, 1.5, 0.26], [0.65, 0, -0.39, -0.14]], blink: 0.25 },
+  greet: {
+    duration: 1180,
+    head: [
+      [0.17, -0.15, 0.82, -0.85],
+      [0.46, 0.95, -3, 4.8],
+      [0.69, 0.65, -1.45, 3.2],
+      [0.89, 0.06, 0.33, -0.25]
+    ],
+    eyes: [[0.12, 0, 0.22, 0.07], [0.38, 0.27, -0.29, 0], [0.69, 0.23, -0.2, 0]],
+    blink: 0.15
+  },
+  bow: {
+    duration: 1200,
+    head: [
+      [0.19, -0.15, -1.05, -0.48],
+      [0.48, 0.58, 4.6, 1.94],
+      [0.7, 0.25, 2.3, 1.1],
+      [0.89, 0.06, -0.43, -0.13]
+    ],
+    eyes: [[0.14, 0, -0.18, 0], [0.46, 0.12, 0.38, 0.08], [0.67, 0.07, 0.23, 0.06]],
+    blink: 0.33
+  },
+  peek: {
+    duration: 1230,
+    head: [
+      [0.21, -0.55, 0.35, -1.55],
+      [0.51, 2.1, -1.15, 5.05],
+      [0.72, 1.28, -0.5, 3.6],
+      [0.91, -0.12, 0.03, -0.41]
+    ],
+    eyes: [[0.14, -0.29, 0.12, 0.05], [0.37, 0.83, -0.17, 0], [0.64, 0.59, -0.11, 0]],
+    blink: 0.19
+  },
+  perk: {
+    duration: 1110,
+    head: [
+      [0.17, 0.08, 1.3, -0.2],
+      [0.4, 0.49, -3.8, 3.65],
+      [0.66, 0.36, -1.46, 2.28],
+      [0.89, -0.03, 0.27, -0.22]
+    ],
+    eyes: [[0.13, 0, 0.27, 0.08], [0.34, 0.27, -0.49, 0], [0.59, 0.22, -0.38, 0]],
+    blink: 0.11
+  }
 };
 var reducedQuery = "(prefers-reduced-motion: reduce)";
 var listeners = /* @__PURE__ */ new Set();
@@ -2535,136 +2695,264 @@ function watchViewport(node, onChange) {
     }
   };
 }
-var ease = "cubic-bezier(.32,.04,.26,1)";
 var clamp = (value) => Math.max(-1, Math.min(1, value));
-function poseTransform([x, y, roll, sx = 1, sy = 1], strength, side = 1, zoom = 1) {
-  return `translate(${x * strength * side}%,${y * strength}%) rotate(${roll * strength * side}deg) scale(${zoom + (sx - 1) * strength},${zoom + (sy - 1) * strength})`;
+var unit2 = (value) => Math.max(0, Math.min(1, value));
+var smooth2 = (value) => value * value * (3 - 2 * value);
+var zero = [0, 0, 0];
+var origin = [0, ...zero];
+var end = [1, ...zero];
+function cueAt(points, progress) {
+  if (!points || progress <= 0 || progress >= 1) return zero;
+  const next = points.findIndex(([offset]) => offset >= progress);
+  const from = points[next < 0 ? points.length - 1 : next - 1] ?? origin;
+  const to = points[next] ?? end;
+  const mix = (progress - from[0]) / (to[0] - from[0]);
+  return zero.map((_, index) => from[index + 1] + (to[index + 1] - from[index + 1]) * mix);
 }
-function ModelPortrait({ entry, botId, state, size, gaze, pokeable, onError }) {
-  const root = (0, import_react.useRef)(null), gesture = (0, import_react.useRef)(null), picture = (0, import_react.useRef)(null), eyelids = (0, import_react.useRef)(null), interact = (0, import_react.useRef)(null);
+function spring() {
+  const value = zero.slice(), velocity = zero.slice();
+  return {
+    value,
+    step(target, dt, rate) {
+      const decay = Math.exp(-rate * dt);
+      let moving = false;
+      for (let i = 0; i < value.length; i++) {
+        const distance = value[i] - target[i];
+        const speed = velocity[i] + rate * distance;
+        value[i] = target[i] + (distance + speed * dt) * decay;
+        velocity[i] = (velocity[i] - rate * speed * dt) * decay;
+        if (Math.abs(value[i] - target[i]) > 3e-3 || Math.abs(velocity[i]) > 0.035) moving = true;
+        else {
+          value[i] = target[i];
+          velocity[i] = 0;
+        }
+      }
+      return moving;
+    }
+  };
+}
+var blinkAt = (progress) => smooth2(unit2(Math.min(progress / 0.34, (1 - progress) / 0.62)));
+function createPortraitTrack({ art, canvas, image, rig, pace, strength, phase, compact: compact2, expressive }) {
+  const paintArt = makePortraitArt(art, image, canvas, rig, compact2);
+  const head = spring(), torso = spring(), eyes = spring();
+  const breath = expressive && !compact2;
+  let painter, frame, lastFrame, lastPaint, cue, blinkStart, pointer, wasBusy;
+  let base = states.idle, direction = 1;
+  const blinkDuration = 186 * Math.min(pace, 1.16);
+  const draw = (time) => {
+    frame = void 0;
+    const dt = lastFrame === void 0 ? 0.016 : Math.min(0.065, Math.max(1e-3, (time - lastFrame) / 1e3));
+    lastFrame = time;
+    const progress = cue ? (time - cue.start) / cue.duration : 1.2;
+    const [px, py] = pointer ?? zero;
+    const [bx, by, br] = base.pose;
+    const side = cue?.side ?? 1;
+    const [hx, hy, hr] = cueAt(cue?.clip.head, progress);
+    const [tx, ty, tr] = cueAt(cue?.clip.head, (progress - 0.08) / 1.12);
+    const movingHead = head.step([
+      (bx * direction + hx * side + px * 1.15) * strength,
+      (by + hy + py * 1.65) * strength,
+      (br * direction + hr * side + px * 1.8) * strength
+    ], dt, 22 / pace);
+    const movingTorso = torso.step([
+      (bx * direction + tx * side + px * 0.63) * strength * 0.37,
+      (by + ty) * strength * 0.6 + py * 0.3,
+      (br * direction + tr * side + px * 1.2) * strength * 0.39
+    ], dt, 12 / pace);
+    let movingEyes = false;
+    if (expressive) {
+      const [ex, ey, lid] = base.eyes ?? zero;
+      const [cueX, cueY, cueLid] = cueAt(cue?.clip.eyes, progress);
+      const weight = pointer ? 0.29 : 1;
+      movingEyes = eyes.step([
+        clamp(px * 0.97 + (ex * direction + cueX * side) * weight),
+        clamp(py * 0.97 + (ey + cueY) * weight),
+        unit2(lid + cueLid)
+      ], dt, pointer ? 39 : 30);
+    }
+    const blinkOffset = cue?.clip.blink;
+    const cueBlink = blinkOffset === void 0 ? Infinity : (time - cue.start - cue.duration * blinkOffset) / blinkDuration;
+    const idleBlink = blinkStart === void 0 ? Infinity : (time - blinkStart) / blinkDuration;
+    const busy = !!cue || blinkStart !== void 0 || movingHead || movingTorso || movingEyes;
+    if (busy || wasBusy || lastPaint === void 0 || breath && time - lastPaint >= 32) {
+      const [x, y, lid] = eyes.value;
+      const left = expressive ? Math.max(lid, blinkAt(idleBlink), blinkAt(cueBlink)) : 0;
+      const right = expressive ? Math.max(lid, blinkAt(idleBlink - 0.027), blinkAt(cueBlink - 0.027)) : 0;
+      if (x || y || left || right) painter ??= makeEyePainter(canvas, image, rig);
+      painter?.(x, y, left, right);
+      const inhale = breath ? Math.sin(time / (720 * pace) + phase * 2 * Math.PI) : 0;
+      const [a, b, c] = head.value, [d, e, f] = torso.value;
+      paintArt([a, b - inhale * 0.09, c], [d, e + inhale * 0.85, f + inhale * 0.12]);
+      lastPaint = time;
+    }
+    wasBusy = busy;
+    if (progress >= 1.2) cue = void 0;
+    if (idleBlink >= 1.03) blinkStart = void 0;
+    if (busy || breath) queue();
+    else lastFrame = void 0;
+  };
+  function queue() {
+    if (frame === void 0) frame = requestAnimationFrame(draw);
+  }
+  const load = () => {
+    lastPaint = void 0;
+    queue();
+  };
+  image.addEventListener("load", load);
+  return {
+    point(position) {
+      pointer = position;
+      queue();
+    },
+    pose(motion, side) {
+      base = motion;
+      direction = side;
+      queue();
+    },
+    play(clip2, side) {
+      cue = clip2 && { clip: clip2, side, start: performance.now(), duration: clip2.duration * pace };
+      queue();
+    },
+    blink() {
+      blinkStart = performance.now();
+      queue();
+    },
+    stop() {
+      image.removeEventListener("load", load);
+      if (frame !== void 0) cancelAnimationFrame(frame);
+      painter?.(0, 0, 0, 0);
+      art.hidden = true;
+    }
+  };
+}
+function ModelPortrait({ entry, botId, state, size: size2, gaze, pokeable, onError }) {
+  const root = (0, import_react.useRef)(null), picture = (0, import_react.useRef)(null), eyelids = (0, import_react.useRef)(null), art = (0, import_react.useRef)(null);
+  const driver = (0, import_react.useRef)(null), currentState = (0, import_react.useRef)(state);
   const setting = (0, import_react.useSyncExternalStore)(watchMotion, motionSetting, () => "off");
   const [visible, setVisible] = (0, import_react.useState)(false);
   (0, import_react.useEffect)(() => watchViewport(root.current, setVisible), []);
   const active = visible && setting !== "off";
   const canInteract = active && setting !== "quiet";
   const rig = PORTRAIT_RIGS[entry.id];
-  const motion = states[state] ?? states.idle;
-  const compact2 = size <= 44;
-  const strength = (compact2 ? 0.8 : 1) * (setting === "quiet" ? 0.7 : 1);
+  const compact2 = size2 <= 44;
+  const strength = (compact2 ? 0.82 : 1) * (setting === "quiet" ? 0.58 : 1);
+  const phase = fnv1a(`${botId}:${entry.id}`) % 1e3 / 1e3;
+  (0, import_react.useEffect)(() => {
+    currentState.current = state;
+    driver.current?.setState(state);
+  }, [state]);
+  (0, import_react.useEffect)(() => {
+    if (!gaze) driver.current?.point();
+  }, [gaze]);
   (0, import_react.useEffect)(() => {
     if (!active || !rig) return void 0;
-    const node = gesture.current;
-    const rootNode = root.current;
-    let timer, animation, blinkFrame, paint, lastClip, side = fnv1a(botId) % 2 ? 1 : -1;
-    const pace = rig.pace * (compact2 ? 1.15 : 1);
-    const blink = () => {
-      if (blinkFrame) return;
-      try {
-        paint ??= makeBlinkPainter(eyelids.current, picture.current, rig);
-      } catch {
-        return;
-      }
-      if (!paint) return;
-      const start = performance.now();
-      const duration = 255 * Math.min(pace, 1.2);
-      const draw = (time) => {
-        const position = Math.min(1, Math.max(0, (time - start) / duration));
-        const lid = position < 0.32 ? position / 0.32 : Math.min(1, (1 - position) / 0.5);
-        paint(lid * lid * (3 - 2 * lid));
-        blinkFrame = position < 1 ? requestAnimationFrame(draw) : void 0;
-      };
-      blinkFrame = requestAnimationFrame(draw);
-    };
-    const play = (name) => {
-      if (typeof node.animate !== "function") return;
-      const { duration, points } = clips[name];
-      const startingPose = animation?.playState === "running" ? getComputedStyle(node).transform : "none";
-      animation?.cancel();
-      const frames = [
-        { offset: 0, transform: startingPose, easing: ease },
-        ...points.map(([offset, ...pose]) => ({ offset, transform: poseTransform(pose, strength, side), easing: ease })),
-        { offset: 1, transform: "none" }
-      ];
-      animation = node.animate(frames, { duration: duration * pace });
+    const initialSide = phase < 0.5 ? -1 : 1;
+    let timer, blinkTimer, lastClip, state2, pointing, side = initialSide;
+    const pace = rig.pace * (compact2 ? 1.13 : 1) * (setting === "lively" ? 0.92 : 1);
+    const track = createPortraitTrack({
+      art: art.current,
+      canvas: eyelids.current,
+      image: picture.current,
+      rig,
+      pace,
+      strength,
+      phase,
+      compact: compact2,
+      expressive: canInteract
+    });
+    const play = (clip2) => {
+      track.play(clip2, side);
       side = -side;
     };
-    const rest = motion.interval;
     const schedule = (fraction = Math.random(), first = false) => {
-      const [low, high] = rest;
-      const span = first && state === "idle" && !compact2 ? 1050 + 1100 * fraction : low + (high - low) * fraction;
-      const delay = span * pace * (setting === "lively" && state === "idle" ? 0.78 : 1);
+      const motion = states[state2];
+      if (!canInteract || !motion.interval) return;
+      const [low, high] = motion.interval;
+      const span = first && state2 === "idle" && !compact2 ? 2200 + 1400 * fraction : low + (high - low) * fraction;
+      const delay = span * pace * (setting === "lively" && state2 === "idle" ? 0.76 : 1);
       timer = setTimeout(() => {
-        const choices = motion.clips.filter((name) => name !== lastClip);
-        lastClip = choices[Math.floor(Math.random() * choices.length)];
-        play(lastClip);
-        if (state === "idle" || state === "waiting" || Math.random() < 0.4) blink();
+        if (!pointing || state2 !== "idle") {
+          const choices = motion.clips.filter((name) => name !== lastClip);
+          lastClip = choices[Math.floor(Math.random() * choices.length)];
+          play(clips[lastClip]);
+        }
         schedule();
       }, delay);
     };
-    if (state !== "idle") {
-      lastClip = motion.clips[0];
-      play(lastClip);
-    }
-    if (setting !== "quiet" && rest) {
-      const phase = fnv1a(`${botId}:${entry.id}`) % 1e3 / 1e3;
-      schedule(phase, true);
-    }
-    if (canInteract) interact.current = () => {
-      play(rig.greeting);
-      blink();
+    const scheduleBlink = (fraction) => {
+      const delay = (2850 + 3050 * fraction) * pace * (setting === "lively" ? 0.82 : 1);
+      blinkTimer = setTimeout(() => {
+        track.blink();
+        scheduleBlink(Math.random());
+      }, delay);
     };
-    return () => {
-      interact.current = null;
+    const setState = (next) => {
+      const name = Object.hasOwn(states, next) ? next : "idle";
+      if (state2 === name) return;
+      state2 = name;
       clearTimeout(timer);
-      animation?.cancel();
-      if (blinkFrame) cancelAnimationFrame(blinkFrame);
-      paint?.(0);
-      rootNode.style.removeProperty("--bt-portrait-x");
-      rootNode.style.removeProperty("--bt-portrait-y");
+      const motion = states[state2];
+      track.pose(motion, initialSide);
+      lastClip = state2 === "idle" ? void 0 : motion.clips[0];
+      track.play(clips[lastClip], initialSide);
+      schedule(phase, true);
     };
-  }, [active, botId, canInteract, compact2, entry.id, motion, rig, setting, state, strength]);
+    driver.current = {
+      setState,
+      point(position) {
+        pointing = !!position;
+        track.point(position);
+      },
+      greet() {
+        clearTimeout(timer);
+        clearTimeout(blinkTimer);
+        scheduleBlink(0.32 + Math.random() * 0.68);
+        play(clips[rig.greeting]);
+        schedule();
+      }
+    };
+    setState(currentState.current);
+    if (canInteract) scheduleBlink(phase);
+    return () => {
+      driver.current = null;
+      clearTimeout(timer);
+      clearTimeout(blinkTimer);
+      track.stop();
+    };
+  }, [active, canInteract, compact2, phase, rig, setting, strength]);
   const pointAt = (event) => {
     if (event.pointerType === "touch") return;
-    const node = event.currentTarget, box = node.getBoundingClientRect();
-    node.style.setProperty("--bt-portrait-x", clamp((event.clientX - box.left - box.width / 2) / (box.width / 2)).toFixed(2));
-    node.style.setProperty("--bt-portrait-y", clamp((event.clientY - box.top - box.height / 2) / (box.height / 2)).toFixed(2));
+    const box = event.currentTarget.getBoundingClientRect();
+    const x = clamp((event.clientX - box.left) / box.width * 2 - 1);
+    const y = clamp((event.clientY - box.top) / box.height * 2 - 1);
+    const radius = Math.max(1, Math.hypot(x, y));
+    driver.current?.point([x / radius, y / radius]);
   };
-  const clearPoint = (event) => {
-    event.currentTarget.style.removeProperty("--bt-portrait-x");
-    event.currentTarget.style.removeProperty("--bt-portrait-y");
-  };
-  return (0, import_react.createElement)("span", {
-    ref: root,
-    className: "bt-model-portrait",
-    "data-portrait": entry.id,
-    style: { backgroundColor: rig?.backdrop },
-    "data-portrait-motion": active ? setting : void 0,
-    onPointerMove: canInteract && gaze ? pointAt : void 0,
-    onPointerLeave: canInteract && gaze ? clearPoint : void 0,
-    onClick: canInteract && pokeable ? () => interact.current?.() : void 0
-  }, (0, import_react.createElement)(
+  const clearPoint = () => driver.current?.point();
+  return (0, import_react.createElement)(
     "span",
-    { className: "bt-portrait-look" },
-    (0, import_react.createElement)(
-      "span",
-      { className: "bt-portrait-pose", style: { transform: active ? poseTransform(motion.pose, strength, 1, 1.045) : "none" } },
-      (0, import_react.createElement)(
-        "span",
-        { ref: gesture, className: "bt-portrait-gesture" },
-        (0, import_react.createElement)("img", { ref: picture, src: entry.image, alt: "", draggable: false, onError }),
-        (0, import_react.createElement)("canvas", { ref: eyelids, width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, hidden: true })
-      )
-    )
-  ));
+    {
+      ref: root,
+      className: "bt-model-portrait",
+      "data-portrait": entry.id,
+      style: { backgroundColor: rig?.backdrop },
+      "data-portrait-motion": active ? setting : void 0,
+      "data-portrait-breathing": canInteract && !compact2 ? "" : void 0,
+      onPointerMove: canInteract && gaze ? pointAt : void 0,
+      onPointerLeave: canInteract && gaze ? clearPoint : void 0,
+      onPointerCancel: canInteract && gaze ? clearPoint : void 0,
+      onClick: canInteract && pokeable ? () => driver.current?.greet() : void 0
+    },
+    (0, import_react.createElement)("img", { ref: picture, src: entry.image, alt: "", draggable: false, onError }),
+    (0, import_react.createElement)("canvas", { ref: eyelids, className: "bt-portrait-eyes", width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, hidden: true }),
+    (0, import_react.createElement)("canvas", { ref: art, className: "bt-portrait-art", width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, hidden: true })
+  );
 }
 var MODEL_PORTRAIT_CSS = `
 .bt-model-portrait{display:block;position:relative;width:100%;height:100%;overflow:hidden;border-radius:50%;isolation:isolate}
-.bt-model-portrait :is(.bt-portrait-pose,.bt-portrait-look,.bt-portrait-gesture){display:block;position:absolute;inset:0;transform-origin:50% 64%}
 .bt-model-portrait img,.bt-model-portrait canvas{position:absolute;inset:0;width:100%;height:100%}
 .bt-model-portrait canvas{pointer-events:none}
-.bt-model-portrait[data-portrait-motion] .bt-portrait-pose{transition:transform .4s cubic-bezier(.21,.68,.29,1)}
-.bt-model-portrait[data-portrait-motion] .bt-portrait-look{transition:transform .22s ease-out;transform:translate(calc(var(--bt-portrait-x,0)*2.1%),calc(var(--bt-portrait-y,0)*1.65%)) rotate(calc(var(--bt-portrait-x,0)*3.5deg))}
-@media(prefers-reduced-motion:reduce){.bt-model-portrait *{transform:none!important;animation:none!important;transition:none!important}}
+@media(prefers-reduced-motion:reduce){.bt-model-portrait canvas{display:none!important}}
 `;
 
 // src/client/motion.js
@@ -2695,10 +2983,10 @@ function springEasing(stiffness, damping) {
     const wd = w0 * Math.sqrt(1 - zeta * zeta);
     return 1 - Math.exp(-zeta * w0 * t2) * (Math.cos(wd * t2) + zeta * w0 / wd * Math.sin(wd * t2));
   };
-  let end = 0.05;
-  while (end < 2 && Math.abs(1 - at(end)) > 1e-3) end += 0.01;
-  const points = Array.from({ length: 25 }, (_, index) => (index === 24 ? 1 : at(end * index / 24)).toFixed(4));
-  return { duration: Math.round(end * 1e3), easing: `linear(${points.join(",")})`, stiffness, damping };
+  let end2 = 0.05;
+  while (end2 < 2 && Math.abs(1 - at(end2)) > 1e-3) end2 += 0.01;
+  const points = Array.from({ length: 25 }, (_, index) => (index === 24 ? 1 : at(end2 * index / 24)).toFixed(4));
+  return { duration: Math.round(end2 * 1e3), easing: `linear(${points.join(",")})`, stiffness, damping };
 }
 var SPRING_SHAPE = springEasing(400, 31.2);
 var SPRING_TAP = springEasing(900, 48);
@@ -2708,7 +2996,7 @@ var SPRING_POP = springEasing(500, 22);
 var SPRING_LEAD = springEasing(784, 48.2);
 var SPRING_TRAIL = springEasing(289, 29.2);
 var QUICK_EDGES = { lead: springEasing(900, 51), trail: springEasing(400, 34) };
-var spring = (curve, ...properties) => properties.map((property) => `${property} ${curve.duration}ms ${curve.easing}`).join(",");
+var spring2 = (curve, ...properties) => properties.map((property) => `${property} ${curve.duration}ms ${curve.easing}`).join(",");
 function liveSprings(apply2) {
   const values = /* @__PURE__ */ new Map();
   let frame = 0;
@@ -2767,11 +3055,11 @@ function useGlide(key, { axis = "x", selector = CHOSEN, lead = SPRING_LEAD, trai
       key: void 0,
       node: null,
       observer: null,
-      springs: liveSprings(({ start, end }) => {
+      springs: liveSprings(({ start, end: end2 }) => {
         const knob = thumb.current;
         if (!knob) return;
         knob.style.transform = axis === "x" ? `translateX(${start}px)` : `translateY(${start}px)`;
-        knob.style[axis === "x" ? "width" : "height"] = `${Math.max(0, end - start)}px`;
+        knob.style[axis === "x" ? "width" : "height"] = `${Math.max(0, end2 - start)}px`;
       })
     };
   }
@@ -2785,14 +3073,14 @@ function useGlide(key, { axis = "x", selector = CHOSEN, lead = SPRING_LEAD, trai
       return;
     }
     const start = axis === "x" ? chosen.offsetLeft : chosen.offsetTop;
-    const end = start + (axis === "x" ? chosen.offsetWidth : chosen.offsetHeight);
+    const end2 = start + (axis === "x" ? chosen.offsetWidth : chosen.offsetHeight);
     const { springs } = own.current;
     const before = springs.target();
     const hidden = knob.dataset.hidden !== void 0;
-    if (jump && !hidden && before?.start === start && before?.end === end && container.dataset.glide !== void 0) return;
+    if (jump && !hidden && before?.start === start && before?.end === end2 && container.dataset.glide !== void 0) return;
     delete knob.dataset.hidden;
     const forward = before === null || start >= before.start;
-    springs.set({ start, end }, forward ? { start: trail, end: lead } : { start: lead, end: trail }, jump || hidden || before === null || reducedMotion());
+    springs.set({ start, end: end2 }, forward ? { start: trail, end: lead } : { start: lead, end: trail }, jump || hidden || before === null || reducedMotion());
     container.dataset.glide = "";
   };
   (0, import_react2.useLayoutEffect)(() => {
@@ -3078,9 +3366,9 @@ html[data-bt-collapsing] [class*="_frame"]:has(>[class*="_sidebarCol"]){transiti
 .bt-pill:hover{background:color-mix(in srgb,var(--bt-main),#777 9%)}
 .bt-pill:active{transform:scale(.965)}
 .bt-pill-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
-.bt-pill-mem{flex:none;display:inline-flex;width:0;margin-left:-8px;overflow:hidden;transition:${spring(SPRING_SHAPE, "width", "margin-left")}}
-.bt-pill[data-memory=updated] .bt-pill-mem{width:var(--bt-mem-w);margin-left:0;transition:${spring(SPRING_STRETCH, "width", "margin-left")}}
-.bt-pill-mem-in{flex:none;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:var(--bt-ink-2);font-size:13px;font-weight:500;opacity:0;filter:blur(6px);transform:translateX(-8px);transition:opacity .14s ease,filter .18s ease,${spring(SPRING_SHAPE, "transform")}}
+.bt-pill-mem{flex:none;display:inline-flex;width:0;margin-left:-8px;overflow:hidden;transition:${spring2(SPRING_SHAPE, "width", "margin-left")}}
+.bt-pill[data-memory=updated] .bt-pill-mem{width:var(--bt-mem-w);margin-left:0;transition:${spring2(SPRING_STRETCH, "width", "margin-left")}}
+.bt-pill-mem-in{flex:none;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:var(--bt-ink-2);font-size:13px;font-weight:500;opacity:0;filter:blur(6px);transform:translateX(-8px);transition:opacity .14s ease,filter .18s ease,${spring2(SPRING_SHAPE, "transform")}}
 .bt-pill-mem-in::before{content:"";flex:none;width:1px;height:14px;margin-right:4px;background:var(--bt-line-2)}
 .bt-pill[data-memory=updated] .bt-pill-mem-in{opacity:1;filter:none;transform:none;transition-delay:70ms}
 .bt-pill-mem-ico{flex:none;display:inline-flex;width:16px;height:16px;color:var(--bt-accent)}
@@ -3132,7 +3420,7 @@ button.bt-lead{border:0;background:none;padding:0;cursor:pointer}
 .bt-group-name:has(>.bt-lead){display:flex;align-items:center;margin:0 0 2px;font-size:13px;line-height:22px;font-weight:600;color:var(--bt-ink)}
 .bt-group-name>.bt-lead{margin:0 8px 0 0}
 .bt-group-time,.bt-group-took{margin-left:6px;font-size:11px;line-height:16px;font-weight:400;color:var(--bt-ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
-.bt-x{border:0;background:none;color:var(--bt-ink-2);cursor:pointer;width:24px;height:24px;border-radius:6px;font-size:16px;line-height:24px;padding:0;transition:background-color .12s ease,color .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-x{border:0;background:none;color:var(--bt-ink-2);cursor:pointer;width:24px;height:24px;border-radius:6px;font-size:16px;line-height:24px;padding:0;transition:background-color .12s ease,color .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-x:hover{background:var(--bt-hover);color:var(--bt-ink)}
 
 .bt-q{margin:0 auto 8px;width:100%;max-width:var(--dsh-chat-content-width,748px);display:flex;flex-direction:column;gap:12px;--bt-q-edge:color-mix(in srgb,var(--bt-ink) 10%,transparent);--bt-q-rule:color-mix(in srgb,var(--bt-ink) 8%,transparent);--bt-q-rule-2:color-mix(in srgb,var(--bt-ink) 5%,transparent);background:var(--bt-card);box-shadow:0 1px 3px rgba(20,20,20,.04),inset 0 0 0 1px var(--bt-q-edge);border-radius:16px;padding:14px 16px;box-sizing:border-box;color:var(--bt-ink);font-family:var(--bt-font);animation:bt-q-in ${SPRING_SHAPE.duration}ms ${SPRING_SHAPE.easing} backwards,bt-veil-in .2s ease-out backwards}
@@ -3143,7 +3431,7 @@ body[data-ds-dark-theme] .bt-q{--bt-q-edge:rgba(255,255,255,.16);--bt-q-rule:rgb
 .bt-q-text{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
 .bt-q-title{margin:0;font-size:15px;line-height:22px;font-weight:600;overflow-wrap:anywhere}
 .bt-q-detail{font-size:13px;line-height:18px;color:var(--bt-ink-2)}
-.bt-q-x{flex:none;width:20px;height:20px;border:0;padding:0;border-radius:6px;background:none;color:var(--bt-ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background-color .12s ease,color .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-q-x{flex:none;width:20px;height:20px;border:0;padding:0;border-radius:6px;background:none;color:var(--bt-ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background-color .12s ease,color .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-q-x svg{width:14px;height:14px}
 .bt-q-x:hover{background:var(--bt-hover);color:var(--bt-ink)}
 .bt-q-x:focus-visible,.bt-q-opt:focus-visible{outline:2px solid var(--bt-accent);outline-offset:-2px}
@@ -3184,7 +3472,7 @@ button.bt-q-opt:active{background:var(--bt-active)}
 .bt-q-input{flex:1;width:100%;min-width:0;max-height:120px;margin:0;padding:0;border:0;outline:none;background:transparent;color:var(--bt-ink);font:inherit;font-size:14px;line-height:20px;resize:none;overflow-y:hidden;white-space:pre-wrap;overflow-wrap:anywhere}
 .bt-q-input:not(:placeholder-shown){field-sizing:content}
 .bt-q-input::placeholder{color:var(--bt-ink-3)}
-.bt-q-submit,.bt-q-btn{flex:none;height:36px;padding:0 14px;border:0;border-radius:999px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .12s ease,background-color .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-q-submit,.bt-q-btn{flex:none;height:36px;padding:0 14px;border:0;border-radius:999px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .12s ease,background-color .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-q-submit{background:var(--bt-accent);color:var(--bt-accent-ink,#fff);animation:bt-q-submit-in ${SPRING_TAP.duration}ms ${SPRING_TAP.easing} backwards,bt-veil-in .16s ease-out backwards}
 @keyframes bt-q-submit-in{from{transform:translateX(8px) scale(.9)}}
 .bt-q-submit:hover:not(:disabled){opacity:.86}
@@ -3373,10 +3661,10 @@ html[data-windows-titlebar]:not([data-fullscreen]) :is(.bt-pane,.bt-panel)::befo
 .bt-shape-row{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
 .bt-shape{position:relative;aspect-ratio:1;border:0;border-radius:10px;background:none;color:var(--bt-ink);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .bt-shape:hover{background:var(--bt-hover)}
-.bt-shape .bt-ring{position:absolute;left:50%;top:50%;width:36px;height:36px;translate:-50% -50%;overflow:visible;opacity:0;scale:.82;pointer-events:none;transition:opacity .14s ease,${spring(SPRING_POP, "scale")}}
+.bt-shape .bt-ring{position:absolute;left:50%;top:50%;width:36px;height:36px;translate:-50% -50%;overflow:visible;opacity:0;scale:.82;pointer-events:none;transition:opacity .14s ease,${spring2(SPRING_POP, "scale")}}
 .bt-shape[aria-pressed=true] .bt-ring{opacity:1;scale:1}
 .bt-colors{display:grid;grid-template-columns:repeat(6,1fr);justify-items:center;gap:6px;padding-top:6px;border-top:.5px solid var(--bt-line)}
-.bt-color{width:26px;height:26px;border-radius:50%;border:2px solid transparent;padding:2.5px;background:none;cursor:pointer;box-sizing:border-box;transition:border-color .14s ease,${spring(SPRING_TAP, "scale")}}
+.bt-color{width:26px;height:26px;border-radius:50%;border:2px solid transparent;padding:2.5px;background:none;cursor:pointer;box-sizing:border-box;transition:border-color .14s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-color[aria-pressed=true] span{animation:bt-check-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
 .bt-color span{display:block;width:100%;height:100%;border-radius:50%}
 .bt-color[aria-pressed=true]{border-color:var(--bt-ink)}
@@ -3585,7 +3873,7 @@ body[data-bt-layout=flat] .bt-tools::after{display:none}
 .bt-tool:active{background:var(--bt-active)}
 .bt-tool:focus-visible{outline:2px solid var(--bt-accent);outline-offset:-2px}
 .bt-react-strip{position:fixed;z-index:60;pointer-events:auto;display:flex;gap:2px;padding:4px;border-radius:999px;background:var(--bt-glass-bg);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);border:.5px solid var(--bt-glass-rim);box-shadow:var(--bt-glass-shadow);transform:translate(-50%,-100%);transform-origin:bottom center;animation:bt-pop-lift ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .14s ease-out}
-.bt-react-strip button{width:32px;height:32px;border:0;border-radius:50%;background:none;font-size:18px;line-height:1;cursor:pointer;transition:background-color .12s ease,${spring(SPRING_POP, "transform")};animation:bt-check-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing} backwards}
+.bt-react-strip button{width:32px;height:32px;border:0;border-radius:50%;background:none;font-size:18px;line-height:1;cursor:pointer;transition:background-color .12s ease,${spring2(SPRING_POP, "transform")};animation:bt-check-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing} backwards}
 .bt-react-strip button:nth-child(2){animation-delay:20ms}
 .bt-react-strip button:nth-child(3){animation-delay:40ms}
 .bt-react-strip button:nth-child(4){animation-delay:60ms}
@@ -3593,7 +3881,7 @@ body[data-bt-layout=flat] .bt-tools::after{display:none}
 .bt-react-strip button:hover{background:var(--bt-hover);transform:scale(1.15)}
 .bt-react-strip button:active{transform:scale(.92)}
 .bt-reacts{display:flex;gap:4px;margin-top:4px}
-.bt-react{height:22px;min-width:30px;padding:0 6px;border-radius:999px;border:.5px solid var(--bt-line-2);background:var(--bt-main);font-size:13px;line-height:20px;cursor:pointer;animation:bt-react-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing};transition:background-color .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-react{height:22px;min-width:30px;padding:0 6px;border-radius:999px;border:.5px solid var(--bt-line-2);background:var(--bt-main);font-size:13px;line-height:20px;cursor:pointer;animation:bt-react-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing};transition:background-color .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-react:hover{background:var(--bt-hover)}
 .bt-react:active{scale:.92}
 @keyframes bt-react-pop{from{transform:scale(.6);opacity:0}}
@@ -3698,12 +3986,12 @@ body[data-ds-dark-theme] .bt-theme-chip i{background:var(--da)}
 .bt-range input{flex:1;min-width:0;height:20px;margin:0;background:none;-webkit-appearance:none;appearance:none;cursor:pointer}
 .bt-range input::-webkit-slider-runnable-track{height:4px;border-radius:999px;background:linear-gradient(to right,var(--bt-accent) var(--bt-fill),var(--bt-active) var(--bt-fill))}
 .bt-range input::-moz-range-track{height:4px;border-radius:999px;background:linear-gradient(to right,var(--bt-accent) var(--bt-fill),var(--bt-active) var(--bt-fill))}
-.bt-range input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;margin-top:-6px;border:0;border-radius:50%;corner-shape:round;background:var(--bt-card);box-shadow:inset 0 0 0 .5px var(--bt-line-2),0 1px 3px rgba(0,0,0,.08);transition:${spring(SPRING_TAP, "scale")}}
+.bt-range input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;margin-top:-6px;border:0;border-radius:50%;corner-shape:round;background:var(--bt-card);box-shadow:inset 0 0 0 .5px var(--bt-line-2),0 1px 3px rgba(0,0,0,.08);transition:${spring2(SPRING_TAP, "scale")}}
 .bt-range input::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:var(--bt-card);box-shadow:inset 0 0 0 .5px var(--bt-line-2),0 1px 3px rgba(0,0,0,.08)}
 .bt-range input:active::-webkit-slider-thumb{scale:1.15}
 .bt-range input:focus-visible{outline:2px solid var(--bt-accent);outline-offset:2px;border-radius:999px}
 .bt-range output{flex:none;width:38px;text-align:right;font-size:13px;color:var(--bt-ink-2);font-variant-numeric:tabular-nums}
-.bt-seg button{position:relative;z-index:1;flex:1;height:30px;border:0;border-radius:8px;background:none;font:inherit;font-size:13px;color:var(--bt-ink-2);cursor:pointer;transition:background-color .15s ease,color .15s ease,box-shadow .15s ease,${spring(SPRING_TAP, "scale")}}
+.bt-seg button{position:relative;z-index:1;flex:1;height:30px;border:0;border-radius:8px;background:none;font:inherit;font-size:13px;color:var(--bt-ink-2);cursor:pointer;transition:background-color .15s ease,color .15s ease,box-shadow .15s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-seg button[aria-pressed=true]{background:var(--bt-card);color:var(--bt-ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .bt-seg button:disabled{opacity:.4;cursor:default}
 .bt-seg button:active:not(:disabled){scale:.96}
@@ -3790,7 +4078,7 @@ body[data-ds-dark-theme] .bt-theme-chip i{background:var(--da)}
 .bt-mem-ask:focus-within{border-color:var(--bt-ink-3);box-shadow:0 4px 20px rgba(0,0,0,.1)}
 .bt-mem-input{flex:1;min-width:0;border:0;background:none;outline:none;color:var(--bt-ink);font:inherit;font-size:15px;line-height:22px;padding:0}
 .bt-mem-input::placeholder{color:var(--bt-ink-3)}
-.bt-mem-send{flex:none;width:36px;height:36px;border-radius:50%;border:0;background:var(--bt-ink);color:var(--bt-main);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:opacity .15s ease,${spring(SPRING_TAP, "scale")}}
+.bt-mem-send{flex:none;width:36px;height:36px;border-radius:50%;border:0;background:var(--bt-ink);color:var(--bt-main);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:opacity .15s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-mem-send:disabled{opacity:.22;cursor:default}
 .bt-mem-send:not(:disabled):active{scale:.92}
 .bt-mem-send>*{animation:bt-check-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
@@ -3815,7 +4103,7 @@ body[data-ds-dark-theme] .bt-theme-chip i{background:var(--da)}
 .bt-panel-view>.bt-drawer-body[data-move=tab]{animation:bt-veil-in .2s ease-out}
 .bt-drawer-name-input{animation:bt-veil-in .16s ease-out}
 .bt-pop-in{display:inline-flex;animation:bt-check-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
-:is(.bt-soft,.bt-send,.bt-icon-btn,.bt-settings-close,.bt-mini,.bt-tab,.bt-nc-send,.bt-avedit-tab,.bt-shape,.bt-pick,.bt-swatch,.bt-palette-clear){transition:background-color .12s ease,color .12s ease,border-color .12s ease,opacity .12s ease,${spring(SPRING_TAP, "scale")}}
+:is(.bt-soft,.bt-send,.bt-icon-btn,.bt-settings-close,.bt-mini,.bt-tab,.bt-nc-send,.bt-avedit-tab,.bt-shape,.bt-pick,.bt-swatch,.bt-palette-clear){transition:background-color .12s ease,color .12s ease,border-color .12s ease,opacity .12s ease,${spring2(SPRING_TAP, "scale")}}
 :is(.bt-icon-btn,.bt-settings-close,.bt-nc-send,.bt-shape,.bt-swatch,.bt-color,.bt-x,.bt-q-x,.bt-palette-clear):active:not(:disabled){scale:.9}
 :is(.bt-soft,.bt-send,.bt-mini,.bt-tab,.bt-avedit-tab,.bt-pick,.bt-q-submit,.bt-q-btn):active:not(:disabled){scale:.96}
 @media (prefers-reduced-motion:reduce){.bt-thumb{transition:none}.bt-panel-view>[data-move],.bt-drawer-name-input,.bt-veil,.bt-pop-in,.bt-token,.bt-drop,.bt-newchat,.bt-option-hint,.bt-connector-form,.bt-settings-head>*{animation:none}}
@@ -3967,7 +4255,7 @@ body[data-bt-goal] [class*="_scroll"]:has(> [class*="_column"]){padding-top:calc
 }
 @keyframes bt-fade-in{from{opacity:0}to{opacity:1}}
 @keyframes bt-fade-out{from{opacity:1}to{opacity:0}}
-[data-composer-card]{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;gap:0!important;min-height:44px!important;border-radius:22px!important;padding:7.5px!important;box-sizing:border-box;background:var(--bt-glass-bg)!important;-webkit-backdrop-filter:blur(20px) saturate(180%)!important;backdrop-filter:blur(20px) saturate(180%)!important;border:.5px solid var(--bt-glass-rim)!important;box-shadow:var(--bt-glass-shadow),0 0 0 1px rgba(228,228,228,.04)!important;transition:border-color .15s ease,background-color .15s ease,${spring(SPRING_SHAPE, "border-radius")}!important}
+[data-composer-card]{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;gap:0!important;min-height:44px!important;border-radius:22px!important;padding:7.5px!important;box-sizing:border-box;background:var(--bt-glass-bg)!important;-webkit-backdrop-filter:blur(20px) saturate(180%)!important;backdrop-filter:blur(20px) saturate(180%)!important;border:.5px solid var(--bt-glass-rim)!important;box-shadow:var(--bt-glass-shadow),0 0 0 1px rgba(228,228,228,.04)!important;transition:border-color .15s ease,background-color .15s ease,${spring2(SPRING_SHAPE, "border-radius")}!important}
 [data-composer-card]:hover,[data-composer-card]:focus-within{border-color:color-mix(in srgb,var(--bt-ink) 30%,transparent)!important}
 [data-composer-card]:has(> [data-slot="conversation.input.attachments"] *),[data-composer-card]:has([data-composer-input] br + *),[data-composer-card]:has([data-composer-input] > :nth-child(2)){border-radius:18px!important}
 [class*="_root"]:has(> [data-composer-card]){padding:0 11px 13px 16px!important}
@@ -3988,10 +4276,10 @@ body[data-bt-goal] [class*="_scroll"]:has(> [class*="_column"]){padding-top:calc
 [data-composer-placeholder]::before{content:var(--bt-placeholder,"Message")!important;display:block!important;font-size:14px!important;line-height:24px!important;color:color-mix(in srgb,var(--bt-ink) 36%,transparent)!important}
 /* The team's "+" (ComposerPlus) takes the seat of the shell's command-menu button. */
 [data-composer-card] button[class*="_add"]{display:none!important}
-.bt-plus{flex:none;width:28px;height:28px;padding:0;border:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,transparent);box-shadow:inset 0 0 0 .5px var(--bt-line);color:var(--bt-ink-2);cursor:pointer;transition:background-color .15s ease,color .15s ease,${spring(SPRING_TAP, "scale")}}
+.bt-plus{flex:none;width:28px;height:28px;padding:0;border:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,transparent);box-shadow:inset 0 0 0 .5px var(--bt-line);color:var(--bt-ink-2);cursor:pointer;transition:background-color .15s ease,color .15s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-plus:hover,.bt-plus[aria-expanded=true]{background:color-mix(in srgb,var(--bt-ink) 10%,transparent);color:var(--bt-ink)}
 .bt-plus:active{scale:.9}
-.bt-plus svg{width:14px;height:14px;transition:${spring(SPRING_POP, "rotate")}}
+.bt-plus svg{width:14px;height:14px;transition:${spring2(SPRING_POP, "rotate")}}
 .bt-plus[aria-expanded=true] svg{rotate:45deg}
 .bt-plus-menu{min-width:180px}
 [data-composer-card] [class*="_tools"]{gap:0!important}
@@ -4000,14 +4288,14 @@ body[data-bt-goal] [class*="_scroll"]:has(> [class*="_column"]){padding-top:calc
 [data-composer-card] [class*="_trailing"]{gap:8px!important}
 /* No display here: DSH hides these controls with [hidden] while the Bot works. */
 [data-composer-card] [class*="_standardControls"]{align-items:center!important;gap:8px!important}
-[data-composer-card] button[class*="_primary"]{width:28px!important;height:28px!important;background:var(--bt-accent)!important;color:var(--bt-accent-ink,#fff)!important;border-radius:50%!important;transition:opacity .15s ease,${spring(SPRING_TAP, "scale")};animation:bt-icon-swap ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
+[data-composer-card] button[class*="_primary"]{width:28px!important;height:28px!important;background:var(--bt-accent)!important;color:var(--bt-accent-ink,#fff)!important;border-radius:50%!important;transition:opacity .15s ease,${spring2(SPRING_TAP, "scale")};animation:bt-icon-swap ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
 [data-composer-card] button[class*="_primary"]:hover:not(:disabled){opacity:.9}
 [data-composer-card] button[class*="_primary"]:active:not(:disabled){scale:.9}
 @keyframes bt-icon-swap{from{opacity:0;transform:scale(.5) rotate(-30deg)}}
 [data-composer-card] button[class*="_primary"] svg{width:14px;height:14px}
 [data-composer-card] button[class*="_primary"]:disabled{display:none!important}
 [data-composer-dock]{display:none!important}
-.bt-mic,.bt-voice{flex:none;width:28px;height:28px;border-radius:50%;border:0;padding:0;display:inline-grid;place-items:center;cursor:pointer;transition:background-color .15s ease,color .15s ease,${spring(SPRING_TAP, "scale")}}
+.bt-mic,.bt-voice{flex:none;width:28px;height:28px;border-radius:50%;border:0;padding:0;display:inline-grid;place-items:center;cursor:pointer;transition:background-color .15s ease,color .15s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-mic{background:color-mix(in srgb,var(--bt-ink) 5%,transparent);box-shadow:inset 0 0 0 .5px var(--bt-line);color:var(--bt-ink-2)}
 .bt-mic:hover{background:color-mix(in srgb,var(--bt-ink) 10%,transparent);color:var(--bt-ink)}
 .bt-mic[aria-pressed=true]{background:#ff3e51;color:#fff;animation:bt-mic-pulse 1.4s ease-in-out infinite}
@@ -4061,7 +4349,7 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-q-dock .bt-q{margin:0 auto 8px}
 [class*="_toBottomSlot"]{justify-content:center!important;padding-right:0!important}
 [data-conversation-scroll] [class*="_toBottomSlot"]{bottom:calc(var(--dsh-composer-height,152px) + 8px)!important}
-[class*="_toBottomSlot"]>button{width:36px!important;height:36px!important;margin-top:-36px!important;background:var(--bt-glass-bg)!important;-webkit-backdrop-filter:blur(16px) saturate(180%)!important;backdrop-filter:blur(16px) saturate(180%)!important;color:var(--bt-ink)!important;box-shadow:var(--bt-glass-shadow)!important;animation:bt-tobottom-in ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .16s ease-out;transition:background-color .12s ease,${spring(SPRING_TAP, "scale")}}
+[class*="_toBottomSlot"]>button{width:36px!important;height:36px!important;margin-top:-36px!important;background:var(--bt-glass-bg)!important;-webkit-backdrop-filter:blur(16px) saturate(180%)!important;backdrop-filter:blur(16px) saturate(180%)!important;color:var(--bt-ink)!important;box-shadow:var(--bt-glass-shadow)!important;animation:bt-tobottom-in ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .16s ease-out;transition:background-color .12s ease,${spring2(SPRING_TAP, "scale")}}
 [class*="_toBottomSlot"]>button:active{scale:.9}
 [class*="_toBottomSlot"]>button:hover{background:color-mix(in srgb,var(--bt-ink) 4%,var(--bt-main))!important}
 [class*="_toBottomSlot"]>button svg{display:none}
@@ -4289,7 +4577,7 @@ function useGaze(ref, enabled) {
   }, [enabled]);
 }
 var FIDGETS = ["hop", "sway", "stretch", "look"];
-function BotMark({ bot, look: given, size = 36, state = "idle", live = false, gaze = false, pokeable = false, label }) {
+function BotMark({ bot, look: given, size: size2 = 36, state = "idle", live = false, gaze = false, pokeable = false, label }) {
   const look = given ?? lookOf(bot);
   const ref = (0, import_react4.useRef)(null);
   const maskId = (0, import_react4.useRef)("");
@@ -4309,7 +4597,7 @@ function BotMark({ bot, look: given, size = 36, state = "idle", live = false, ga
     "data-fidget": live ? FIDGETS[fnv1a(`${bot?.id ?? ""}:fidget`) % FIDGETS.length] : void 0,
     "data-gaze": gaze ? "" : void 0,
     "data-poke": pokeable ? "" : void 0,
-    style: { width: size, height: size, ...live ? { "--bt-delay": `${-(fnv1a(String(bot?.id ?? "")) % 5e3) / 1e3}s`, "--bt-fidget-delay": `${-(fnv1a(`${bot?.id ?? ""}:when`) % 9e3) / 1e3}s` } : {} },
+    style: { width: size2, height: size2, ...live ? { "--bt-delay": `${-(fnv1a(String(bot?.id ?? "")) % 5e3) / 1e3}s`, "--bt-fidget-delay": `${-(fnv1a(`${bot?.id ?? ""}:when`) % 9e3) / 1e3}s` } : {} },
     role: label ? "img" : void 0,
     "aria-label": label,
     "aria-hidden": label ? void 0 : true,
@@ -4323,7 +4611,7 @@ function BotMark({ bot, look: given, size = 36, state = "idle", live = false, ga
     entry: portrait,
     botId: bot?.id ?? portrait.id,
     state: markState,
-    size,
+    size: size2,
     gaze,
     pokeable,
     onError: () => setBroken(image)
@@ -4332,10 +4620,10 @@ function BotMark({ bot, look: given, size = 36, state = "idle", live = false, ga
   const box = shapeOf(look.shape).size;
   return (0, import_react4.createElement)("span", common, (0, import_react4.createElement)("svg", { viewBox: `0 0 ${box} ${box}`, dangerouslySetInnerHTML: { __html: characterMarkup(look.shape, look.color).replaceAll(MASK_ID, maskId.current) } }));
 }
-function StarIcon({ size = 8 }) {
+function StarIcon({ size: size2 = 8 }) {
   return (0, import_react4.createElement)(
     "svg",
-    { width: size, height: size, viewBox: "0 0 10 10", "aria-hidden": true },
+    { width: size2, height: size2, viewBox: "0 0 10 10", "aria-hidden": true },
     (0, import_react4.createElement)("path", { d: "M5 .6l1.3 2.8 3 .3-2.3 2 .7 3L5 7.2 2.3 8.7l.7-3L.7 3.7l3-.3z", fill: "#fff" })
   );
 }
@@ -4366,14 +4654,14 @@ function useSettled(state) {
   }, [state]);
   return settled;
 }
-function BotAvatar({ bot, size, state = "idle", main, admin, badge = true, live = true, gaze = false, pokeable = false }) {
+function BotAvatar({ bot, size: size2, state = "idle", main, admin, badge = true, live = true, gaze = false, pokeable = false }) {
   const settled = useSettled(state);
-  if (bot === void 0) return (0, import_react4.createElement)(BotMark, { size });
+  if (bot === void 0) return (0, import_react4.createElement)(BotMark, { size: size2 });
   const badgeKind = !badge ? null : state === "alert" ? "alert" : state !== "idle" && state !== "waiting" ? "working" : admin ? "admin" : main ? "main" : null;
   return (0, import_react4.createElement)(
     "span",
-    { className: "bt-mark", style: { width: size, height: size, "--bt-size": `${size}px` } },
-    (0, import_react4.createElement)(BotMark, { bot, size, state: settled ? "done" : state, live, gaze, pokeable }),
+    { className: "bt-mark", style: { width: size2, height: size2, "--bt-size": `${size2}px` } },
+    (0, import_react4.createElement)(BotMark, { bot, size: size2, state: settled ? "done" : state, live, gaze, pokeable }),
     badgeKind === "working" ? (0, import_react4.createElement)("span", { className: "bt-badge bt-badge-working", "aria-label": t("Working"), role: "img" }) : null,
     badgeKind === "alert" ? (0, import_react4.createElement)("span", { className: "bt-badge bt-badge-alert", "aria-label": t("Waiting for your answer"), role: "img" }, "?") : null,
     badgeKind === "admin" ? (0, import_react4.createElement)("span", { className: "bt-badge bt-badge-admin", "aria-label": t("Admin"), role: "img" }, (0, import_react4.createElement)(StarIcon)) : null,
@@ -4384,33 +4672,33 @@ function clusterSeats(count, frame) {
   if (count === 1) return [[0, 0, frame]];
   if (count === 2) return [[0, 0, frame * 2 / 3], [frame / 3, frame / 3, frame * 2 / 3]];
   if (count === 3) {
-    const size = frame * 5 / 9;
-    const rest = frame - size;
-    return [[rest / 2, 0, size], [0, rest, size], [rest, rest, size]];
+    const size2 = frame * 5 / 9;
+    const rest = frame - size2;
+    return [[rest / 2, 0, size2], [0, rest, size2], [rest, rest, size2]];
   }
   const half = frame / 2;
   return [[0, 0, half], [half, 0, half], [0, half, half], [half, half, half]];
 }
-function RoomAvatar({ room: room2, roster, size = 36 }) {
+function RoomAvatar({ room: room2, roster, size: size2 = 36 }) {
   const members = room2.members.map((id) => roster.byId[id]).filter(Boolean);
   const people = members.length === 1 ? [members[0], null] : members;
   const seat = (bot, seatSize, key) => bot ? (0, import_react4.createElement)(BotMark, { key, bot, size: seatSize }) : (0, import_react4.createElement)("span", { key, className: "bt-cluster-you", style: { width: seatSize * 0.92, height: seatSize * 0.92, margin: seatSize * 0.04 } });
-  if (people.length === 0) return (0, import_react4.createElement)(BotMark, { size });
-  if (size <= 20 && people.length > 1) {
+  if (people.length === 0) return (0, import_react4.createElement)(BotMark, { size: size2 });
+  if (size2 <= 20 && people.length > 1) {
     return (0, import_react4.createElement)(
       "span",
-      { className: "bt-stack", style: { "--bt-stack-size": `${size}px` } },
-      people.slice(0, 3).map((bot, index) => seat(bot, size, bot?.id ?? `you-${index}`)),
+      { className: "bt-stack", style: { "--bt-stack-size": `${size2}px` } },
+      people.slice(0, 3).map((bot, index) => seat(bot, size2, bot?.id ?? `you-${index}`)),
       people.length > 3 ? (0, import_react4.createElement)("span", { className: "bt-stack-more" }, `+${people.length - 3}`) : null
     );
   }
-  const seats = clusterSeats(Math.min(people.length, 4), size);
+  const seats = clusterSeats(Math.min(people.length, 4), size2);
   const overflow = people.length > 4 ? people.length - 3 : 0;
-  const gap = size / 14;
+  const gap = size2 / 14;
   const rings = seats.map(([x, y, s]) => ({ cx: x + s / 2, cy: y + s / 2, r: s * 0.48 + gap }));
   return (0, import_react4.createElement)(
     "span",
-    { className: "bt-cluster", style: { width: size, height: size } },
+    { className: "bt-cluster", style: { width: size2, height: size2 } },
     seats.map(([x, y, s], index) => {
       const holes2 = rings.slice(index + 1).filter((ring) => Math.hypot(ring.cx - x - s / 2, ring.cy - y - s / 2) < ring.r + s * 0.46).map((ring) => `radial-gradient(circle at ${ring.cx - x}px ${ring.cy - y}px,transparent ${ring.r}px,#000 ${ring.r + 0.5}px)`);
       const style = { left: x, top: y, width: s, height: s };
@@ -4455,18 +4743,18 @@ function PeopleIcon() {
 function ArrowUpIcon() {
   return (0, import_react5.createElement)("svg", { width: 16, height: 16, viewBox: "0 0 20 20", "aria-hidden": true }, (0, import_react5.createElement)("path", { d: "M10 16V4M5 9l5-5 5 5", stroke: "currentColor", strokeWidth: 1.8, fill: "none", strokeLinecap: "round", strokeLinejoin: "round" }));
 }
-function MicIcon({ size = 16 }) {
+function MicIcon({ size: size2 = 16 }) {
   return (0, import_react5.createElement)(
     "svg",
-    { width: size, height: size, viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", "aria-hidden": true },
+    { width: size2, height: size2, viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", "aria-hidden": true },
     (0, import_react5.createElement)("rect", { x: 7, y: 2.5, width: 6, height: 10, rx: 3, fill: "currentColor", stroke: "none" }),
     (0, import_react5.createElement)("path", { d: "M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5" })
   );
 }
-function WaveIcon({ size = 16 }) {
+function WaveIcon({ size: size2 = 16 }) {
   return (0, import_react5.createElement)(
     "svg",
-    { width: size, height: size, viewBox: "0 0 20 20", fill: "currentColor", "aria-hidden": true },
+    { width: size2, height: size2, viewBox: "0 0 20 20", fill: "currentColor", "aria-hidden": true },
     [[3, 7.5, 5], [6.5, 4.5, 11], [10, 2.5, 15], [13.5, 5.5, 9], [17, 8, 4]].map(([x, y, height]) => (0, import_react5.createElement)("rect", { key: x, x: x - 1, y, width: 2, height, rx: 1 }))
   );
 }
@@ -4912,7 +5200,7 @@ function GoalIsland({ room: room2, goal, view, open, composing, roomWork, roster
 var GOAL_CSS = `
 /* One surface: the pill's own background, border and shadow. The pill row is
    40px, the pod bar 30px; the surface reshapes on SPRING_SHAPE. */
-.bt-island{position:relative;z-index:6;align-self:flex-start;display:flex;flex-direction:column;pointer-events:auto;width:min(380px,calc(100% - 120px));background:var(--bt-glass-bg);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);border:.5px solid var(--bt-glass-rim);border-radius:20px;box-shadow:var(--bt-glass-shadow);color:var(--bt-ink);font-family:inherit;font-size:14px;line-height:20px;box-sizing:border-box;transition:${spring(SPRING_SHAPE, "width", "border-radius")}}
+.bt-island{position:relative;z-index:6;align-self:flex-start;display:flex;flex-direction:column;pointer-events:auto;width:min(380px,calc(100% - 120px));background:var(--bt-glass-bg);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);border:.5px solid var(--bt-glass-rim);border-radius:20px;box-shadow:var(--bt-glass-shadow);color:var(--bt-ink);font-family:inherit;font-size:14px;line-height:20px;box-sizing:border-box;transition:${spring2(SPRING_SHAPE, "width", "border-radius")}}
 .bt-island[data-open]{width:min(560px,calc(100% - 48px));border-radius:18px}
 .bt-island[data-morph]{overflow:hidden}
 .bt-island .bt-pill{width:100%;max-width:none;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;border:0;box-shadow:none;border-radius:20px 20px 0 0}
@@ -4946,7 +5234,7 @@ var GOAL_CSS = `
 /* The track shrinks so 20 stages still fit the bar: each segment is 14px and
    gives up to 3px, the current one 20px. */
 .bt-goal-segs{display:inline-flex;align-items:center;gap:3px;flex:0 1 auto;min-width:0}
-.bt-goal-segs i{display:block;flex:0 1 auto;width:14px;min-width:3px;height:4px;border-radius:999px;background:var(--bt-line-2);transition:${spring(SPRING_SHAPE, "width")},background-color .12s ease}
+.bt-goal-segs i{display:block;flex:0 1 auto;width:14px;min-width:3px;height:4px;border-radius:999px;background:var(--bt-line-2);transition:${spring2(SPRING_SHAPE, "width")},background-color .12s ease}
 .bt-goal-segs i[data-seg=done]{background:var(--bt-green)}
 .bt-goal-segs i[data-seg=current]{width:20px;background:var(--bt-accent)}
 .bt-goal-segs i[data-seg=checking]{width:20px;background:color-mix(in srgb,var(--bt-accent) 60%,transparent)}
@@ -4956,7 +5244,7 @@ var GOAL_CSS = `
 .bt-goal-face+.bt-goal-face{margin-left:-6px}
 .bt-goal-more{font-size:11px;line-height:16px;color:var(--bt-ink-3);margin-left:3px}
 .bt-goal-chev{flex:none;display:inline-flex;color:var(--bt-ink-3)}
-.bt-goal-chev svg{width:14px;height:14px;transition:${spring(SPRING_SHAPE, "transform")}}
+.bt-goal-chev svg{width:14px;height:14px;transition:${spring2(SPRING_SHAPE, "transform")}}
 .bt-goal-bar[aria-expanded=true] .bt-goal-chev svg{transform:rotate(180deg)}
 /* The bar's extras hand off to the open panel and give their room to the label. */
 .bt-island[data-open] .bt-goal-segs,.bt-island[data-open] .bt-goal-faces{display:none}
@@ -5004,7 +5292,7 @@ var GOAL_CSS = `
 .bt-goal-checks{display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:4px 6px;margin-left:-6px;border-radius:6px;font:inherit;font-size:12px;line-height:16px;color:var(--bt-ink-2);cursor:pointer}
 .bt-goal-checks:hover{background:var(--bt-hover)}
 .bt-goal-mchev{display:inline-flex;width:14px;height:14px;color:var(--bt-ink-3)}
-.bt-goal-mchev svg{width:14px;height:14px;transition:${spring(SPRING_SHAPE, "transform")}}
+.bt-goal-mchev svg{width:14px;height:14px;transition:${spring2(SPRING_SHAPE, "transform")}}
 .bt-goal-checks[aria-expanded=true] .bt-goal-mchev svg{transform:rotate(180deg)}
 .bt-goal-facts{display:flex;align-items:center;gap:6px;flex:none;margin-left:auto}
 .bt-goal-danger{color:var(--bt-danger)}
@@ -5613,20 +5901,20 @@ function tokenize(source) {
       continue;
     }
     if (char === '"' || char === "'") {
-      let end = at + 1;
+      let end2 = at + 1;
       let text = "";
-      while (end < source.length && source[end] !== char) {
-        if (source[end] === "\\" && end + 1 < source.length) {
-          text += source[end + 1];
-          end += 2;
+      while (end2 < source.length && source[end2] !== char) {
+        if (source[end2] === "\\" && end2 + 1 < source.length) {
+          text += source[end2 + 1];
+          end2 += 2;
           continue;
         }
-        text += source[end];
-        end += 1;
+        text += source[end2];
+        end2 += 1;
       }
-      if (end >= source.length) fail(`unclosed string at ${at + 1}`);
+      if (end2 >= source.length) fail(`unclosed string at ${at + 1}`);
       tokens.push({ kind: "string", value: text, at });
-      at = end + 1;
+      at = end2 + 1;
       continue;
     }
     const operator = OPERATORS.find((op) => source.startsWith(op, at));
@@ -6332,8 +6620,8 @@ function componentSummary(node, lookup) {
     case "chart": {
       const series = Array.isArray(node.series) ? node.series[0] : void 0;
       const values = Array.isArray(series?.values) ? series.values : [];
-      const unit2 = node.unit ? ` ${node.unit}` : "";
-      return `chart: ${(Array.isArray(node.categories) ? node.categories : []).map((label, index) => `${label}=${value(values[index])}${unit2}`).join(", ")}`;
+      const unit3 = node.unit ? ` ${node.unit}` : "";
+      return `chart: ${(Array.isArray(node.categories) ? node.categories : []).map((label, index) => `${label}=${value(values[index])}${unit3}`).join(", ")}`;
     }
     case "progress":
       return `progress: ${node.label ? `${node.label} ` : ""}${Math.round(progressPercent(node, lookup))}%`;
@@ -6450,12 +6738,12 @@ var PALETTE = ["var(--dv-accent)", "var(--dv-ink-tangerine)", "var(--dv-ink-gree
 var colorAt = (index) => PALETTE[index % PALETTE.length];
 var TICK = 10;
 var LABEL = 11;
-var textWidth = (text, size) => [...String(text)].reduce((sum, char) => sum + (char.charCodeAt(0) > 11904 ? size : size * 0.58), 0);
-var fit = (text, room2, size) => {
-  if (textWidth(text, size) <= room2) return text;
+var textWidth = (text, size2) => [...String(text)].reduce((sum, char) => sum + (char.charCodeAt(0) > 11904 ? size2 : size2 * 0.58), 0);
+var fit = (text, room2, size2) => {
+  if (textWidth(text, size2) <= room2) return text;
   let out = "";
   for (const char of String(text)) {
-    if (textWidth(`${out}${char}…`, size) > room2) break;
+    if (textWidth(`${out}${char}…`, size2) > room2) break;
     out += char;
   }
   return out === "" ? "" : `${out}…`;
@@ -6466,7 +6754,7 @@ function formatNumber(value) {
   const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
   return Number(value.toFixed(digits)).toLocaleString("en-US", { maximumFractionDigits: digits });
 }
-var withUnit = (value, unit2) => unit2 ? unit2 === "%" ? `${formatNumber(value)}%` : `${formatNumber(value)} ${unit2}` : formatNumber(value);
+var withUnit = (value, unit3) => unit3 ? unit3 === "%" ? `${formatNumber(value)}%` : `${formatNumber(value)} ${unit3}` : formatNumber(value);
 function niceTicks(low, high) {
   let lo = low;
   let hi = high;
@@ -6479,9 +6767,9 @@ function niceTicks(low, high) {
   const magnitude = 10 ** Math.floor(Math.log10(raw));
   const step = [1, 2, 2.5, 5, 10].map((scale) => scale * magnitude).find((candidate) => candidate >= raw);
   const start = Math.floor(lo / step + 1e-9) * step;
-  const end = Math.ceil(hi / step - 1e-9) * step;
+  const end2 = Math.ceil(hi / step - 1e-9) * step;
   const ticks = [];
-  for (let value = start; value <= end + step / 2; value += step) ticks.push(Number(value.toPrecision(12)));
+  for (let value = start; value <= end2 + step / 2; value += step) ticks.push(Number(value.toPrecision(12)));
   return ticks;
 }
 function chartData(node, lookup) {
@@ -6497,25 +6785,25 @@ function chartData(node, lookup) {
   return { kind: node.kind ?? "bar", categories, series, unit: typeof node.unit === "string" ? node.unit : "" };
 }
 var csvCell = (value) => /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-function chartCsv({ categories, series, unit: unit2 }, t2 = (key) => key) {
-  const head = ["", ...series.map((item, index) => item.name || (series.length === 1 ? unit2 || t2("Value") : `${t2("Series")} ${index + 1}`))];
+function chartCsv({ categories, series, unit: unit3 }, t2 = (key) => key) {
+  const head = ["", ...series.map((item, index) => item.name || (series.length === 1 ? unit3 || t2("Value") : `${t2("Series")} ${index + 1}`))];
   const rows2 = categories.map((label, at) => [label, ...series.map((item) => String(item.values[at]))]);
   return [head, ...rows2].map((row) => row.map((cell) => csvCell(String(cell))).join(",")).join("\n");
 }
-function valueAxis(values, zero) {
+function valueAxis(values, zero2) {
   const finite = values.length > 0 ? values : [0];
   const low = Math.min(...finite);
   const high = Math.max(...finite);
-  if (zero) return niceTicks(Math.min(0, low), Math.max(0, high));
+  if (zero2) return niceTicks(Math.min(0, low), Math.max(0, high));
   const pad2 = (high - low) * 0.1 || Math.abs(high) * 0.1 || 1;
   return niceTicks(low - pad2, high + pad2);
 }
-function columns({ categories, series, unit: unit2, kind }, width, active, shown) {
+function columns({ categories, series, unit: unit3, kind }, width, active, shown) {
   const visible = series.filter((_, index) => shown[index]);
   const ticks = valueAxis(visible.flatMap((item) => item.values), kind !== "line");
   const lo = ticks[0];
   const hi = ticks.at(-1);
-  const left = Math.ceil(Math.max(...ticks.map((tick) => textWidth(withUnit(tick, unit2), TICK)))) + 10;
+  const left = Math.ceil(Math.max(...ticks.map((tick) => textWidth(withUnit(tick, unit3), TICK)))) + 10;
   const top = 8;
   const height = 220;
   const bottom = 24;
@@ -6525,7 +6813,7 @@ function columns({ categories, series, unit: unit2, kind }, width, active, shown
   const parts = [];
   for (const tick of ticks) {
     parts.push((0, import_react13.createElement)("line", { key: `g${tick}`, className: "dv-chart-grid", x1: plot.x, x2: plot.x + plot.w, y1: y(tick), y2: y(tick) }));
-    parts.push((0, import_react13.createElement)("text", { key: `t${tick}`, className: "dv-chart-tick", x: plot.x - 8, y: y(tick) + 3, textAnchor: "end" }, withUnit(tick, unit2)));
+    parts.push((0, import_react13.createElement)("text", { key: `t${tick}`, className: "dv-chart-tick", x: plot.x - 8, y: y(tick) + 3, textAnchor: "end" }, withUnit(tick, unit3)));
   }
   const points = [];
   categories.forEach((label, at) => {
@@ -6537,13 +6825,13 @@ function columns({ categories, series, unit: unit2, kind }, width, active, shown
     const group = band * 0.72;
     const gap = visible.length > 1 ? 2 : 0;
     const barW = Math.max(2, (group - gap * (visible.length - 1)) / visible.length);
-    const zero = y(Math.max(lo, Math.min(0, hi)));
+    const zero2 = y(Math.max(lo, Math.min(0, hi)));
     categories.forEach((_, at) => {
       visible.forEach((item, row) => {
         const value = item.values[at];
         const x = plot.x + band * at + (band - group) / 2 + row * (barW + gap);
-        const top2 = Math.min(y(value), zero);
-        const tall = Math.max(1, Math.abs(y(value) - zero));
+        const top2 = Math.min(y(value), zero2);
+        const tall = Math.max(1, Math.abs(y(value) - zero2));
         const r = Math.min(4, barW / 2, tall);
         const up = value >= 0;
         const d = up ? `M${x},${top2 + tall}V${top2 + r}q0,-${r} ${r},-${r}h${barW - 2 * r}q${r},0 ${r},${r}V${top2 + tall}z` : `M${x},${top2}V${top2 + tall - r}q0,${r} ${r},${r}h${barW - 2 * r}q${r},0 ${r},-${r}V${top2}z`;
@@ -6568,13 +6856,13 @@ function columns({ categories, series, unit: unit2, kind }, width, active, shown
   const hits = categories.map((_, at) => ({ x: plot.x + band * at, y: plot.y, w: band, h: plot.h }));
   return { parts, height, points, hits };
 }
-function rows({ categories, series, unit: unit2 }, width, active, shown) {
+function rows({ categories, series, unit: unit3 }, width, active, shown) {
   const visible = series.filter((_, index) => shown[index]);
   const ticks = valueAxis(visible.flatMap((item) => item.values), true);
   const lo = ticks[0];
   const hi = ticks.at(-1);
   const labelW = Math.min(width * 0.38, Math.ceil(Math.max(...categories.map((label) => textWidth(label, LABEL)))) + 10);
-  const valueW = Math.ceil(Math.max(...visible.flatMap((item) => item.values).map((value) => textWidth(withUnit(value, unit2), LABEL)))) + 10;
+  const valueW = Math.ceil(Math.max(...visible.flatMap((item) => item.values).map((value) => textWidth(withUnit(value, unit3), LABEL)))) + 10;
   const barH = 14;
   const rowH = 10 + visible.length * barH + (visible.length - 1) * 2;
   const top = 4;
@@ -6584,22 +6872,22 @@ function rows({ categories, series, unit: unit2 }, width, active, shown) {
   const parts = [];
   for (const tick of ticks) {
     parts.push((0, import_react13.createElement)("line", { key: `g${tick}`, className: "dv-chart-grid", x1: x(tick), x2: x(tick), y1: plot.y, y2: plot.y + plot.h }));
-    parts.push((0, import_react13.createElement)("text", { key: `t${tick}`, className: "dv-chart-tick", x: x(tick), y: height - 6, textAnchor: "middle" }, withUnit(tick, unit2)));
+    parts.push((0, import_react13.createElement)("text", { key: `t${tick}`, className: "dv-chart-tick", x: x(tick), y: height - 6, textAnchor: "middle" }, withUnit(tick, unit3)));
   }
   const points = [];
-  const zero = x(Math.max(lo, Math.min(0, hi)));
+  const zero2 = x(Math.max(lo, Math.min(0, hi)));
   categories.forEach((label, at) => {
     const rowY = plot.y + rowH * at + 5;
     parts.push((0, import_react13.createElement)("text", { key: `c${at}`, className: "dv-chart-label", x: labelW - 10, y: rowY + (rowH - 10) / 2 + 4, textAnchor: "end" }, fit(label, labelW - 12, LABEL)));
     visible.forEach((item, row) => {
       const value = item.values[at];
       const by = rowY + row * (barH + 2);
-      const left = Math.min(x(value), zero);
-      const long = Math.max(1, Math.abs(x(value) - zero));
+      const left = Math.min(x(value), zero2);
+      const long = Math.max(1, Math.abs(x(value) - zero2));
       parts.push((0, import_react13.createElement)("rect", { key: `b${at}-${row}`, className: "dv-chart-mark", "data-dim": active !== null && active !== at ? "" : void 0, x: left, y: by, width: long, height: barH, rx: Math.min(4, long / 2), style: { fill: item.color } }));
-      parts.push((0, import_react13.createElement)("text", { key: `v${at}-${row}`, className: "dv-chart-value", x: left + long + 6, y: by + barH - 3 }, withUnit(value, unit2)));
+      parts.push((0, import_react13.createElement)("text", { key: `v${at}-${row}`, className: "dv-chart-value", x: left + long + 6, y: by + barH - 3 }, withUnit(value, unit3)));
     });
-    points.push({ x: Math.max(...visible.map((item) => x(item.values[at])), zero), y: rowY });
+    points.push({ x: Math.max(...visible.map((item) => x(item.values[at])), zero2), y: rowY });
   });
   const hits = categories.map((_, at) => ({ x: 0, y: plot.y + rowH * at, w: width, h: rowH }));
   return { parts, height, points, hits };
@@ -6607,29 +6895,29 @@ function rows({ categories, series, unit: unit2 }, width, active, shown) {
 function donut({ categories, series }, width, active, hover) {
   const values = (series[0]?.values ?? []).map((value) => Math.max(0, value));
   const total = values.reduce((sum, value) => sum + value, 0);
-  const size = Math.min(180, Math.max(120, width * 0.42));
-  const r = size / 2;
+  const size2 = Math.min(180, Math.max(120, width * 0.42));
+  const r = size2 / 2;
   const inner = r * 0.62;
   const cx = r;
   const cy = r;
   const parts = [];
   const points = [];
-  let angle = -Math.PI / 2;
+  let angle2 = -Math.PI / 2;
   values.forEach((value, at) => {
     const sweep = total > 0 ? value / total * Math.PI * 2 : 0;
-    const end = angle + sweep;
-    const mid = angle + sweep / 2;
+    const end2 = angle2 + sweep;
+    const mid = angle2 + sweep / 2;
     points.push({ x: cx + Math.cos(mid) * (r - (r - inner) / 2), y: cy + Math.sin(mid) * (r - (r - inner) / 2) });
     if (sweep > 0) {
       const large = sweep > Math.PI ? 1 : 0;
       const full2 = sweep >= Math.PI * 2 - 1e-6;
       const p = (radius, theta) => `${cx + Math.cos(theta) * radius},${cy + Math.sin(theta) * radius}`;
-      const d = full2 ? `M${p(r, angle)}A${r},${r} 0 1 1 ${p(r, angle + Math.PI)}A${r},${r} 0 1 1 ${p(r, angle)}M${p(inner, angle)}A${inner},${inner} 0 1 0 ${p(inner, angle + Math.PI)}A${inner},${inner} 0 1 0 ${p(inner, angle)}z` : `M${p(r, angle)}A${r},${r} 0 ${large} 1 ${p(r, end)}L${p(inner, end)}A${inner},${inner} 0 ${large} 0 ${p(inner, angle)}z`;
+      const d = full2 ? `M${p(r, angle2)}A${r},${r} 0 1 1 ${p(r, angle2 + Math.PI)}A${r},${r} 0 1 1 ${p(r, angle2)}M${p(inner, angle2)}A${inner},${inner} 0 1 0 ${p(inner, angle2 + Math.PI)}A${inner},${inner} 0 1 0 ${p(inner, angle2)}z` : `M${p(r, angle2)}A${r},${r} 0 ${large} 1 ${p(r, end2)}L${p(inner, end2)}A${inner},${inner} 0 ${large} 0 ${p(inner, angle2)}z`;
       parts.push((0, import_react13.createElement)("path", { key: `s${at}`, className: "dv-chart-mark", "data-dim": active !== null && active !== at ? "" : void 0, d, fillRule: "evenodd", style: { fill: colorAt(at) }, onPointerEnter: () => hover(at) }));
     }
-    angle = end;
+    angle2 = end2;
   });
-  return { parts, height: size, size, points, total, values, categories };
+  return { parts, height: size2, size: size2, points, total, values, categories };
 }
 function useWidth(box, initial) {
   const [width, setWidth] = (0, import_react13.useState)(initial);
@@ -6695,8 +6983,8 @@ var TableIcon = () => (0, import_react13.createElement)(
 );
 function ChartTable({ data }) {
   const ui2 = useViewUi();
-  const { categories, series, unit: unit2 } = data;
-  const heads = series.map((item, index) => item.name || (series.length === 1 ? unit2 || ui2.t("Value") : `${ui2.t("Series")} ${index + 1}`));
+  const { categories, series, unit: unit3 } = data;
+  const heads = series.map((item, index) => item.name || (series.length === 1 ? unit3 || ui2.t("Value") : `${ui2.t("Series")} ${index + 1}`));
   return (0, import_react13.createElement)(
     "div",
     { className: "dv-widget-table" },
@@ -6708,7 +6996,7 @@ function ChartTable({ data }) {
         "tr",
         { key: at },
         (0, import_react13.createElement)("th", { scope: "row" }, label),
-        series.map((item, index) => (0, import_react13.createElement)("td", { key: index, className: "dv-num" }, withUnit(item.values[at], series.length === 1 && !item.name ? "" : unit2)))
+        series.map((item, index) => (0, import_react13.createElement)("td", { key: index, className: "dv-num" }, withUnit(item.values[at], series.length === 1 && !item.name ? "" : unit3)))
       )))
     )
   );
@@ -6716,7 +7004,7 @@ function ChartTable({ data }) {
 function WidgetChart({ node, lookup, registerChart, refreshCharts }) {
   const ui2 = useViewUi();
   const data = chartData(node, lookup);
-  const { kind, categories, series, unit: unit2 } = data;
+  const { kind, categories, series, unit: unit3 } = data;
   const box = (0, import_react13.useRef)(null);
   const svg = (0, import_react13.useRef)(null);
   const width = useWidth(box, 520);
@@ -6749,8 +7037,8 @@ function WidgetChart({ node, lookup, registerChart, refreshCharts }) {
     setActive((current) => current === null ? 0 : (current + keys[event.key] + categories.length) % categories.length);
   };
   const point = active === null ? null : drawn.points[active];
-  const share = (at) => unit2 === "%" ? withUnit(drawn.values[at], unit2) : `${withUnit(drawn.values[at], unit2)} · ${drawn.total > 0 ? Math.round(drawn.values[at] / drawn.total * 100) : 0}%`;
-  const tipRows = active === null || isDonut ? [] : series.filter((_, index) => shown[index]).map((item) => ({ color: item.color, name: item.name, value: withUnit(item.values[active], unit2) }));
+  const share = (at) => unit3 === "%" ? withUnit(drawn.values[at], unit3) : `${withUnit(drawn.values[at], unit3)} · ${drawn.total > 0 ? Math.round(drawn.values[at] / drawn.total * 100) : 0}%`;
+  const tipRows = active === null || isDonut ? [] : series.filter((_, index) => shown[index]).map((item) => ({ color: item.color, name: item.name, value: withUnit(item.values[active], unit3) }));
   const copy2 = () => {
     void navigator.clipboard?.writeText(chartCsv(data, ui2.t)).then(() => {
       setCopied(true);
@@ -6816,7 +7104,7 @@ function WidgetChart({ node, lookup, registerChart, refreshCharts }) {
         onPointerLeave: () => setActive(null)
       },
       drawn.parts,
-      isDonut ? active === null ? (0, import_react13.createElement)("text", { className: "dv-chart-center", x: svgWidth / 2, y: drawn.height / 2 + 5, textAnchor: "middle" }, unit2 === "%" ? "" : withUnit(drawn.total, unit2)) : (0, import_react13.createElement)(
+      isDonut ? active === null ? (0, import_react13.createElement)("text", { className: "dv-chart-center", x: svgWidth / 2, y: drawn.height / 2 + 5, textAnchor: "middle" }, unit3 === "%" ? "" : withUnit(drawn.total, unit3)) : (0, import_react13.createElement)(
         import_react13.Fragment,
         null,
         (0, import_react13.createElement)("text", { className: "dv-chart-center-name", x: svgWidth / 2, y: drawn.height / 2 - 4, textAnchor: "middle" }, fit(categories[active], drawn.size * 0.56, LABEL)),
@@ -7246,7 +7534,7 @@ function InputHead({ id, label, value }) {
     value !== void 0 ? (0, import_react15.createElement)("output", { htmlFor: id, className: "dv-view-input-value" }, value) : null
   );
 }
-var withUnit2 = (value, unit2) => `${asText(value)}${unit2 ? ` ${unit2}` : ""}`;
+var withUnit2 = (value, unit3) => `${asText(value)}${unit3 ? ` ${unit3}` : ""}`;
 var grouped2 = (value) => typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("en-US", { maximumFractionDigits: 6 }) : asText(value);
 function SliderInput({ node, ctx }) {
   const id = (0, import_react15.useId)();
@@ -8352,7 +8640,7 @@ var SECRET_CSS = `
 .bt-secret-input[data-masked]{-webkit-text-security:disc}
 .bt-secret-input::placeholder{color:var(--bt-ink-3);font-family:var(--bt-font);letter-spacing:0}
 .bt-secret-scope{position:relative;display:inline-grid;grid-template-columns:1fr 1fr;align-self:flex-start;padding:2px;border-radius:999px;background:var(--bt-hover)}
-.bt-secret-glide{position:absolute;top:2px;bottom:2px;left:2px;width:calc(50% - 2px);border-radius:999px;background:var(--bt-main);box-shadow:0 1px 3px rgba(20,20,20,.08),inset 0 0 0 .5px color-mix(in srgb,var(--bt-ink) 6%,transparent);transition:${spring(SPRING_SHAPE, "transform")}}
+.bt-secret-glide{position:absolute;top:2px;bottom:2px;left:2px;width:calc(50% - 2px);border-radius:999px;background:var(--bt-main);box-shadow:0 1px 3px rgba(20,20,20,.08),inset 0 0 0 .5px color-mix(in srgb,var(--bt-ink) 6%,transparent);transition:${spring2(SPRING_SHAPE, "transform")}}
 .bt-secret-glide[data-at="1"]{transform:translateX(100%)}
 .bt-secret-seg{position:relative;z-index:1;height:28px;padding:0 14px;border:0;border-radius:999px;background:none;color:var(--bt-ink-2);font:inherit;font-size:13px;white-space:nowrap;cursor:pointer;transition:color .16s ease}
 .bt-secret-seg[aria-checked=true]{color:var(--bt-ink);font-weight:500}
@@ -8423,8 +8711,8 @@ var visibleReasoning = (text) => {
   if (text[0] !== "<") return text;
   if ("<signature>".startsWith(text)) return "";
   if (!text.startsWith("<signature>")) return text;
-  const end = text.indexOf("</signature>");
-  return end === -1 ? "" : text.slice(end + "</signature>".length).replace(/^(\r?\n)+/, "");
+  const end2 = text.indexOf("</signature>");
+  return end2 === -1 ? "" : text.slice(end2 + "</signature>".length).replace(/^(\r?\n)+/, "");
 };
 var stepReasoning = (step) => step.blocks.filter((block) => block.kind === "reasoning").map((block) => visibleReasoning(block.text)).join("\n").trim();
 
@@ -8504,9 +8792,9 @@ var closes = (line, open) => {
   const marker = CLOSE.exec(line)?.[1];
   return marker !== void 0 && marker[0] === open[0] && marker.length >= open.length;
 };
-function cutAt(text, end) {
-  const code = text.charCodeAt(end - 1);
-  return text.slice(0, code >= 55296 && code <= 56319 ? end - 1 : end);
+function cutAt(text, end2) {
+  const code = text.charCodeAt(end2 - 1);
+  return text.slice(0, code >= 55296 && code <= 56319 ? end2 - 1 : end2);
 }
 function moreLines(text, max) {
   let lines = 1;
@@ -8624,9 +8912,9 @@ function turnContaining(seq, turns) {
   for (const turn of turns.values()) {
     const start = seqNum(turn?.start);
     if (start === void 0 || seq < start) continue;
-    const end = seqNum(turn?.end);
-    if (end !== void 0) {
-      if (seq > end || start < closedStart) continue;
+    const end2 = seqNum(turn?.end);
+    if (end2 !== void 0) {
+      if (seq > end2 || start < closedStart) continue;
       closed = turn;
       closedStart = start;
       continue;
@@ -10902,10 +11190,10 @@ function TeamSidebar(props) {
       chatRoom.hold(false);
     };
     const ends = ["pointerup", "pointercancel", "lostpointercapture"];
-    const onEnd = (end) => {
+    const onEnd = (end2) => {
       if (done) return;
       done = true;
-      if (end.type === "pointerup") track(end.clientX);
+      if (end2.type === "pointerup") track(end2.clientX);
       grip.removeEventListener("pointermove", onMove);
       for (const name of ends) grip.removeEventListener(name, onEnd);
       setDrag(null);
@@ -11555,8 +11843,8 @@ var RETURN_CSS = `
 .bt-return .bt-mark{--bt-ink-deepseek:#4D6BFE}
 .bt-return-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 `;
-function BrandMark({ size = 24 }) {
-  return (0, import_react23.createElement)("span", { className: "bt-brand-whale" }, (0, import_react23.createElement)(BotMark, { look: MAIN_LOOK, size }));
+function BrandMark({ size: size2 = 24 }) {
+  return (0, import_react23.createElement)("span", { className: "bt-brand-whale" }, (0, import_react23.createElement)(BotMark, { look: MAIN_LOOK, size: size2 }));
 }
 function BrandName() {
   return (0, import_react23.createElement)("span", { style: { fontWeight: 600, fontSize: 14 } }, "DS Bot");
@@ -12026,7 +12314,7 @@ function menuIcons(roster) {
   return (row) => {
     if (!row.bot) return PeopleIcon;
     const id = row.bot.id;
-    if (!marks.has(id)) marks.set(id, ({ size = 14 }) => (0, import_react25.createElement)(BotMark, { bot: roster.getSnapshot().byId[id] ?? row.bot, size }));
+    if (!marks.has(id)) marks.set(id, ({ size: size2 = 14 }) => (0, import_react25.createElement)(BotMark, { bot: roster.getSnapshot().byId[id] ?? row.bot, size: size2 }));
     return marks.get(id);
   };
 }
@@ -13172,7 +13460,7 @@ var MODEL_CSS = `
 .bt-model-copy{display:flex;flex-direction:column;min-width:0}
 .bt-model-name{font-size:13px;line-height:18px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-model-provider{font-size:11px;line-height:14px;color:var(--bt-ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bt-model-caret{flex:none;color:var(--bt-ink-3);transition:${spring(SPRING_SHAPE, "transform")}}
+.bt-model-caret{flex:none;color:var(--bt-ink-3);transition:${spring2(SPRING_SHAPE, "transform")}}
 .bt-model-trigger[aria-expanded=true] .bt-model-caret{transform:rotate(180deg)}
 .bt-model-menu{overflow-y:auto;scrollbar-width:thin}
 .bt-model-group{flex:none;padding:8px 8px 2px;font-size:11px;line-height:14px;font-weight:500;color:var(--bt-ink-3);text-transform:none}
@@ -13935,12 +14223,12 @@ function TaskForm({ roster, actions, start, onDone, onCancel }) {
   const [time, setTime] = (0, import_react31.useState)("09:00");
   const [weekdays, setWeekdays] = (0, import_react31.useState)([1, 2, 3, 4, 5]);
   const [count, setCount] = (0, import_react31.useState)(1);
-  const [unit2, setUnit] = (0, import_react31.useState)("hours");
+  const [unit3, setUnit] = (0, import_react31.useState)("hours");
   const [busy, setBusy] = (0, import_react31.useState)(false);
   const [error, setError] = (0, import_react31.useState)("");
   const timing = () => {
     if (kind === "at") return { kind, at: new Date(at).toISOString() };
-    if (kind === "every") return { kind, minutes: Math.round(Number(count) * UNITS.find(([id]) => id === unit2)[1]) };
+    if (kind === "every") return { kind, minutes: Math.round(Number(count) * UNITS.find(([id]) => id === unit3)[1]) };
     return { kind, time, timeZone: localZone(), ...kind === "weekly" ? { weekdays } : {} };
   };
   const submit = (event) => {
@@ -14012,7 +14300,7 @@ function TaskForm({ roster, actions, start, onDone, onCancel }) {
           (0, import_react31.createElement)("input", { className: "bt-input bt-task-count", type: "number", min: 1, value: count, "aria-label": t("How many"), onChange: (event) => setCount(event.target.value) }),
           (0, import_react31.createElement)(
             "select",
-            { className: "bt-select bt-task-unit", value: unit2, "aria-label": t("Unit"), onChange: (event) => setUnit(event.target.value) },
+            { className: "bt-select bt-task-unit", value: unit3, "aria-label": t("Unit"), onChange: (event) => setUnit(event.target.value) },
             UNITS.map(([id, , label]) => (0, import_react31.createElement)("option", { key: id, value: id }, t(label)))
           )
         ) : null
@@ -15094,12 +15382,12 @@ function modelHint(bot, roster) {
   if (bot.appliedModel && bot.appliedModel === bot.model) return t("Every message of this Bot runs on it.");
   return t("Applies from the next message.");
 }
-function ShapeRing({ shape, size }) {
+function ShapeRing({ shape, size: size2 }) {
   const maskId = (0, import_react35.useRef)("");
   if (maskId.current === "") maskId.current = `bt-ring-${nextMarkSerial()}`;
   const def = shapeOf(shape);
-  const unit2 = def.size / size;
-  const markup = `<defs><mask id="${maskId.current}" ${maskBox(def.size)}>${holes(def, `<g stroke="#000" stroke-width="${6 * unit2}" stroke-linejoin="round">${bodyOf(def, "#000", true)}</g>`)}</mask></defs><g mask="url(#${maskId.current})" stroke="currentColor" stroke-width="${8 * unit2}" stroke-linejoin="round">${bodyOf(def, "currentColor", true)}</g>`;
+  const unit3 = def.size / size2;
+  const markup = `<defs><mask id="${maskId.current}" ${maskBox(def.size)}>${holes(def, `<g stroke="#000" stroke-width="${6 * unit3}" stroke-linejoin="round">${bodyOf(def, "#000", true)}</g>`)}</mask></defs><g mask="url(#${maskId.current})" stroke="currentColor" stroke-width="${8 * unit3}" stroke-linejoin="round">${bodyOf(def, "currentColor", true)}</g>`;
   return (0, import_react35.createElement)("svg", { className: "bt-ring", viewBox: `0 0 ${def.size} ${def.size}`, "aria-hidden": true, dangerouslySetInnerHTML: { __html: markup } });
 }
 function CharacterGrid({ look, hasPhoto = false, onShape, onColor }) {
@@ -15426,7 +15714,7 @@ label.bt-bs-row{cursor:text}
 .bt-switch[aria-checked=true]{background:var(--bt-accent)}
 .bt-switch:disabled{opacity:.45;cursor:default}
 .bt-switch:focus-visible{outline:2px solid var(--bt-accent);outline-offset:2px}
-.bt-switch-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:${spring(SPRING_SHAPE, "transform")},${spring(SPRING_TAP, "width")}}
+.bt-switch-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:${spring2(SPRING_SHAPE, "transform")},${spring2(SPRING_TAP, "width")}}
 .bt-switch[aria-checked=true] .bt-switch-knob{transform:translateX(16px)}
 .bt-switch:active:not(:disabled) .bt-switch-knob{width:21px}
 .bt-switch[aria-checked=true]:active:not(:disabled) .bt-switch-knob{transform:translateX(11px)}
@@ -16021,13 +16309,13 @@ function useMicLevel(enabled) {
       analyser.fftSize = 256;
       audio.createMediaStreamSource(media).connect(analyser);
       const data = new Uint8Array(analyser.frequencyBinCount);
-      let smooth = 0;
+      let smooth3 = 0;
       const tick = () => {
         analyser.getByteTimeDomainData(data);
         let sum = 0;
         for (const value of data) sum += ((value - 128) / 128) ** 2;
-        smooth = smooth * 0.8 + Math.min(1, Math.sqrt(sum / data.length) * 4) * 0.2;
-        setLevel(Math.round(smooth * 100) / 100);
+        smooth3 = smooth3 * 0.8 + Math.min(1, Math.sqrt(sum / data.length) * 4) * 0.2;
+        setLevel(Math.round(smooth3 * 100) / 100);
         frame = requestAnimationFrame(tick);
       };
       tick();
@@ -16120,7 +16408,7 @@ function VoiceMode({ sessionId, roster, actions, useSessions, useSessionStatus }
     let capture = null;
     let frame = 0;
     let stopped = false;
-    let smooth = 0;
+    let smooth3 = 0;
     const detect = turnDetector();
     const limit = Math.max(1, catalog.maxDurationSeconds - 1) * 1e3;
     const finish = async (current) => {
@@ -16147,8 +16435,8 @@ function VoiceMode({ sessionId, roster, actions, useSessions, useSessionStatus }
       const tick = () => {
         const now = performance.now();
         const level2 = capture.level();
-        smooth = smooth * 0.8 + level2 * 0.2;
-        setServiceLevel(Math.round(smooth * 100) / 100);
+        smooth3 = smooth3 * 0.8 + level2 * 0.2;
+        setServiceLevel(Math.round(smooth3 * 100) / 100);
         const state = detect(level2, now);
         if (state === "done" || state === "speech" && now - began >= limit) {
           const current = capture;
@@ -16682,28 +16970,28 @@ var mondayOf = (ms) => ms - (new Date(ms).getUTCDay() + 6) % 7 * DAY_MS;
 function spanRange(from, to) {
   if (to < from) [from, to] = [to, from];
   const days = Math.round((hourMs(to) - hourMs(from)) / DAY_MS) + 1;
-  const unit2 = days <= 2 ? "hour" : days <= 62 ? "day" : days <= 182 ? "week" : "month";
-  const range = { id: "custom", unit: unit2, from, to, days };
+  const unit3 = days <= 2 ? "hour" : days <= 62 ? "day" : days <= 182 ? "week" : "month";
+  const range = { id: "custom", unit: unit3, from, to, days };
   const count = spanBuckets(range).length;
-  const stride = unit2 === "hour" ? 6 : [1, 2, 3, 5, 7, 10, 14].find((step) => count / step <= 12) ?? Math.ceil(count / 12);
+  const stride = unit3 === "hour" ? 6 : [1, 2, 3, 5, 7, 10, 14].find((step) => count / step <= 12) ?? Math.ceil(count / 12);
   return { ...range, count, stride };
 }
 function spanBuckets(range) {
   const first = hourMs(range.from);
-  const end = hourMs(range.to) + DAY_MS;
+  const end2 = hourMs(range.to) + DAY_MS;
   const buckets = [];
   if (range.unit === "hour" || range.unit === "day") {
     const step = range.unit === "hour" ? HOUR_MS : DAY_MS;
-    for (let start = first; start < end; start += step) buckets.push({ start, end: start + step, key: range.unit === "hour" ? hourKey(start) : dayKey(start) });
+    for (let start = first; start < end2; start += step) buckets.push({ start, end: start + step, key: range.unit === "hour" ? hourKey(start) : dayKey(start) });
   } else if (range.unit === "week") {
-    for (let monday = mondayOf(first); monday < end; monday += 7 * DAY_MS) {
-      buckets.push({ start: Math.max(monday, first), end: Math.min(monday + 7 * DAY_MS, end), key: dayKey(monday) });
+    for (let monday = mondayOf(first); monday < end2; monday += 7 * DAY_MS) {
+      buckets.push({ start: Math.max(monday, first), end: Math.min(monday + 7 * DAY_MS, end2), key: dayKey(monday) });
     }
   } else {
     const year = new Date(first).getUTCFullYear();
-    for (let month = new Date(first).getUTCMonth(); Date.UTC(year, month, 1) < end; month += 1) {
+    for (let month = new Date(first).getUTCMonth(); Date.UTC(year, month, 1) < end2; month += 1) {
       const start = Date.UTC(year, month, 1);
-      buckets.push({ start: Math.max(start, first), end: Math.min(Date.UTC(year, month + 1, 1), end), key: dayKey(start).slice(0, 7) });
+      buckets.push({ start: Math.max(start, first), end: Math.min(Date.UTC(year, month + 1, 1), end2), key: dayKey(start).slice(0, 7) });
     }
   }
   return buckets;
@@ -16716,15 +17004,15 @@ function spanOf(range, now) {
   return { buckets: buckets.slice(range.count), from: hourKey(buckets[range.count].start), to: now, before: hourKey(buckets[0].start) };
 }
 function bucketsOf(range, now) {
-  const end = hourMs(now);
-  const today = end - end % DAY_MS;
+  const end2 = hourMs(now);
+  const today = end2 - end2 % DAY_MS;
   const buckets = [];
   for (let back = range.count * 2 - 1; back >= 0; back -= 1) {
     let start;
-    if (range.unit === "hour") start = end - back * HOUR_MS;
+    if (range.unit === "hour") start = end2 - back * HOUR_MS;
     else if (range.unit === "day") start = today - back * DAY_MS;
     else if (range.unit === "week") start = mondayOf(today) - back * 7 * DAY_MS;
-    else start = Date.UTC(new Date(end).getUTCFullYear(), new Date(end).getUTCMonth() - back, 1);
+    else start = Date.UTC(new Date(end2).getUTCFullYear(), new Date(end2).getUTCMonth() - back, 1);
     buckets.push({ start, key: range.unit === "hour" ? hourKey(start) : range.unit === "month" ? dayKey(start).slice(0, 7) : dayKey(start) });
   }
   return buckets;
@@ -16782,8 +17070,8 @@ function trimmed(value) {
   return text.includes(".") ? text.replace(/\.?0+$/, "") : text;
 }
 function compact(count) {
-  for (const [size, unit2] of [[1e9, "B"], [1e6, "M"], [1e3, "K"]]) {
-    if (count >= size * 0.9995) return `${trimmed(count / size)}${unit2}`;
+  for (const [size2, unit3] of [[1e9, "B"], [1e6, "M"], [1e3, "K"]]) {
+    if (count >= size2 * 0.9995) return `${trimmed(count / size2)}${unit3}`;
   }
   return String(Math.round(count));
 }
@@ -16800,7 +17088,7 @@ var TOP_SERIES = 7;
 var RING_R = 42;
 var RING = 2 * Math.PI * RING_R;
 var rangeLabel = (id) => ({ "24h": t("24 hours"), "7d": t("7 days"), "30d": t("30 days"), "12w": t("12 weeks"), "12m": t("12 months") })[id];
-var unitLabel = (unit2) => ({ hour: t("Per hour"), day: t("Per day"), week: t("Per week"), month: t("Per month") })[unit2];
+var unitLabel = (unit3) => ({ hour: t("Per hour"), day: t("Per day"), week: t("Per week"), month: t("Per month") })[unit3];
 var MODEL_INKS = ["deepseek", "tangerine", "green", "violet", "sky", "rose", "yellow", "cyan", "magenta", "brown"];
 var PARTS = [["output", 1], ["input", 0.6], ["cacheRead", 0.32]];
 var partLabel = (part) => ({ output: t("Output"), input: t("Input"), cacheRead: t("Cache hit") })[part];
@@ -16815,10 +17103,10 @@ var hourText = (ms) => `${String(new Date(ms).getUTCHours()).padStart(2, "0")}:0
 var yearOf = (ms) => new Date(ms).getUTCFullYear();
 function spanText(from, to) {
   const start = hourMs(from);
-  const end = hourMs(to);
+  const end2 = hourMs(to);
   const year = (/* @__PURE__ */ new Date()).getFullYear();
-  const format = dates(yearOf(start) !== year || yearOf(end) !== year ? { year: "numeric", month: "short", day: "numeric" } : { month: "short", day: "numeric" });
-  return from === to ? format.format(start) : `${format.format(start)} – ${format.format(end)}`;
+  const format = dates(yearOf(start) !== year || yearOf(end2) !== year ? { year: "numeric", month: "short", day: "numeric" } : { month: "short", day: "numeric" });
+  return from === to ? format.format(start) : `${format.format(start)} – ${format.format(end2)}`;
 }
 var daysText = (count) => count === 1 ? t("1 day") : t("{count} days", { count });
 var lastText = (range) => range.from ? spanText(range.from, range.to) : t("Last {range}", { range: rangeLabel(range.id) });
@@ -16863,12 +17151,12 @@ function useTween(value) {
   }, [value]);
   return shown;
 }
-var glyphBox = (size, icon2) => (0, import_react43.createElement)("span", { className: "bt-us-glyph", style: { width: size, height: size } }, (0, import_react43.createElement)(icon2));
-function ModelGlyph({ name, paint, size }) {
+var glyphBox = (size2, icon2) => (0, import_react43.createElement)("span", { className: "bt-us-glyph", style: { width: size2, height: size2 } }, (0, import_react43.createElement)(icon2));
+function ModelGlyph({ name, paint, size: size2 }) {
   return (0, import_react43.createElement)("span", {
     className: "bt-us-model",
     "aria-hidden": true,
-    style: { width: size, height: size, fontSize: Math.round(size * 0.42), background: `color-mix(in srgb, ${paint} 20%, var(--bt-card))`, color: `color-mix(in srgb, ${paint} 72%, var(--bt-ink))` }
+    style: { width: size2, height: size2, fontSize: Math.round(size2 * 0.42), background: `color-mix(in srgb, ${paint} 20%, var(--bt-card))`, color: `color-mix(in srgb, ${paint} 72%, var(--bt-ink))` }
   }, (name.match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase());
 }
 function ownerFace(owner, roster) {
@@ -16882,7 +17170,7 @@ function ownerFace(owner, roster) {
       sub: owner.deleted ? t("Deleted") : role.toLowerCase() === name.toLowerCase() ? "" : role,
       paint: paintCss(colorOf(bot)),
       stops: GRADIENTS[colorOf(bot)],
-      glyph: (size) => (0, import_react43.createElement)(BotAvatar, { bot, size, badge: false, live: false })
+      glyph: (size2) => (0, import_react43.createElement)(BotAvatar, { bot, size: size2, badge: false, live: false })
     };
   }
   if (owner.kind === "room") {
@@ -16892,7 +17180,7 @@ function ownerFace(owner, roster) {
       name: owner.name || t("Deleted group chat"),
       sub: owner.deleted ? t("Deleted") : t("Group chat"),
       paint: "var(--bt-us-rest)",
-      glyph: (size) => room2 ? (0, import_react43.createElement)(RoomAvatar, { room: room2, roster, size }) : glyphBox(size, ChatsIcon)
+      glyph: (size2) => room2 ? (0, import_react43.createElement)(RoomAvatar, { room: room2, roster, size: size2 }) : glyphBox(size2, ChatsIcon)
     };
   }
   if (owner.kind === "agent") {
@@ -16901,10 +17189,10 @@ function ownerFace(owner, roster) {
       name: owner.name || "DSH Agent",
       sub: owner.deleted ? t("Deleted") : "",
       paint: "var(--bt-us-rest)",
-      glyph: (size) => glyphBox(size, ChatsIcon)
+      glyph: (size2) => glyphBox(size2, ChatsIcon)
     };
   }
-  return { kind: "other", name: t("Other"), sub: "", paint: "var(--bt-us-rest)", glyph: (size) => glyphBox(size, ChatsIcon) };
+  return { kind: "other", name: t("Other"), sub: "", paint: "var(--bt-us-rest)", glyph: (size2) => glyphBox(size2, ChatsIcon) };
 }
 function kindLabel(kind, botFocus) {
   const labels = { chat: botFocus ? t("Own chat") : t("Conversations"), group: t("Group chats"), compaction: t("Compaction and handoff"), image: t("Image reading"), memory: t("Memory"), "session-title": t("Titles"), btw: t("Side chat"), side: t("Side chat"), other: t("Other") };
@@ -17320,7 +17608,7 @@ function UsagePage({ roster, actions, focusId }) {
     const models2 = view.models.map((model, at) => {
       const name = model.name || model.model || t("Unknown model");
       const paint = modelPaint.get(at) ?? "var(--bt-us-rest)";
-      return { kind: "model", name, sub: model.providerName ?? model.provider, paint, glyph: (size) => (0, import_react43.createElement)(ModelGlyph, { name, paint, size }) };
+      return { kind: "model", name, sub: model.providerName ?? model.provider, paint, glyph: (size2) => (0, import_react43.createElement)(ModelGlyph, { name, paint, size: size2 }) };
     });
     const ownerAt2 = focus?.kind === "owner" ? view.owners.findIndex((owner) => owner.key === focus.key) : -1;
     const modelAt = focus?.kind === "model" ? view.models.findIndex((model) => model.key === focus.key) : -1;
@@ -17802,9 +18090,9 @@ function BrowserPage({ roster, actions, run: run2, Section, Row: Row3 }) {
     let until;
     if (duration === "hour") until = now + 60 * 60 * 1e3;
     else if (duration === "today") {
-      const end = new Date(now);
-      end.setHours(23, 59, 59, 999);
-      until = end.getTime();
+      const end2 = new Date(now);
+      end2.setHours(23, 59, 59, 999);
+      until = end2.getTime();
     } else if (duration === "week") until = now + 7 * 24 * 60 * 60 * 1e3;
     const grant = { site: siteValue(site), kinds: [...kinds], ...until !== void 0 ? { until } : {} };
     setBusy(true);
@@ -19184,7 +19472,7 @@ function useMemberWork(room2, useWork) {
 }
 var MEMBER_CSS = `
 .bt-mw-dock{display:flex;justify-content:center;margin:0 auto 8px;pointer-events:none}
-.bt-mw-pill{pointer-events:auto;position:relative;display:inline-flex;align-items:center;flex:none;box-sizing:border-box;height:32px;max-width:100%;padding:0;border:0;border-radius:999px;overflow:hidden;background:var(--bt-main);box-shadow:0 0 0 .5px var(--bt-line-2),0 2px 8px -2px rgba(0,0,0,.12);color:var(--bt-ink-2);font:inherit;font-size:13px;line-height:18px;cursor:pointer;animation:bt-mw-in ${SPRING_SHAPE.duration}ms ${SPRING_SHAPE.easing} backwards,bt-veil-in .18s ease-out backwards;transition:background-color .12s ease,${spring(SPRING_SHAPE, "width")},${spring(SPRING_TAP, "scale")}}
+.bt-mw-pill{pointer-events:auto;position:relative;display:inline-flex;align-items:center;flex:none;box-sizing:border-box;height:32px;max-width:100%;padding:0;border:0;border-radius:999px;overflow:hidden;background:var(--bt-main);box-shadow:0 0 0 .5px var(--bt-line-2),0 2px 8px -2px rgba(0,0,0,.12);color:var(--bt-ink-2);font:inherit;font-size:13px;line-height:18px;cursor:pointer;animation:bt-mw-in ${SPRING_SHAPE.duration}ms ${SPRING_SHAPE.easing} backwards,bt-veil-in .18s ease-out backwards;transition:background-color .12s ease,${spring2(SPRING_SHAPE, "width")},${spring2(SPRING_TAP, "scale")}}
 .bt-mw-pill:hover{background:color-mix(in srgb,var(--bt-ink) 4%,var(--bt-main))}
 .bt-mw-pill:active{scale:.97}
 .bt-mw-dock[data-leaving] .bt-mw-pill{animation:bt-mw-out .16s cubic-bezier(.4,0,1,1) forwards;pointer-events:none}
@@ -19223,7 +19511,7 @@ body[data-ds-dark-theme] .bt-mw-ask{color:#f0b84a}
 .bt-member-time{flex:none;margin-left:.3em;font-variant-numeric:tabular-nums}
 .bt-member-state.bt-mw-ask{color:#b7791f}
 body[data-ds-dark-theme] .bt-member-state.bt-mw-ask{color:#f0b84a}
-.bt-member-stop{flex:none;height:26px;padding:0 11px;border:0;border-radius:13px;background:var(--bt-main);box-shadow:inset 0 0 0 .5px var(--bt-line-2);color:var(--bt-ink-2);font:inherit;font-size:12px;cursor:pointer;transition:background-color .12s ease,color .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-member-stop{flex:none;height:26px;padding:0 11px;border:0;border-radius:13px;background:var(--bt-main);box-shadow:inset 0 0 0 .5px var(--bt-line-2);color:var(--bt-ink-2);font:inherit;font-size:12px;cursor:pointer;transition:background-color .12s ease,color .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-member-stop:hover{background:var(--bt-active);color:var(--bt-ink)}
 .bt-member-stop:active:not(:disabled){scale:.94}
 .bt-member-stop:disabled{opacity:.5;cursor:default}
@@ -20481,8 +20769,8 @@ function BotPanel({ pane, leaving, room: room2, overlay, roster, actions, useSes
       for (const column of columns2) column.style.setProperty("margin-right", `${next}px`, "important");
     };
     const ends = ["pointerup", "pointercancel", "lostpointercapture"];
-    const onEnd = (end) => {
-      if (end.type === "pointerup") onMove(end);
+    const onEnd = (end2) => {
+      if (end2.type === "pointerup") onMove(end2);
       grip.removeEventListener("pointermove", onMove);
       for (const name of ends) grip.removeEventListener(name, onEnd);
       chatRoom.setRight(next);
@@ -20765,12 +21053,12 @@ function readPage(limits) {
     const auto = String(el.getAttribute("autocomplete") || "").toLowerCase();
     return el.type === "password" || /(^|\s)(cc-|one-time-code)/.test(auto) || SECRET_HINT.test(`${el.getAttribute("name") || ""} ${el.id || ""}`);
   };
-  const keep = (text2, end = "") => {
+  const keep = (text2, end2 = "") => {
     if (text2 === "") return "";
     stash.push(text2);
     return `
 
-${stash.length - 1}${end}
+${stash.length - 1}${end2}
 
 `;
   };
@@ -21025,8 +21313,8 @@ ${"#".repeat(Math.min(6, Number(level) || 2))} ${title}${mark}
       const quoted2 = block(body2);
       return quoted2 ? keep(quoted2.split("\n").map((line) => line ? `> ${line}` : ">").join("\n")) : "";
     }
-    const end = body2.trimEnd().length;
-    const marked = mark ? `${body2.slice(0, end)}${mark}${body2.slice(end)}` : body2;
+    const end2 = body2.trimEnd().length;
+    const marked = mark ? `${body2.slice(0, end2)}${mark}${body2.slice(end2)}` : body2;
     if (ctx.pre && !BLOCK_DISPLAY.test(display)) return marked;
     if (keepsSpace && BLOCK_DISPLAY.test(display) && tag !== "pre") {
       return keep(expand(marked).replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").replace(/^\n+|\s+$/g, ""), "");
@@ -21727,11 +22015,11 @@ function proposalPlacement(proposal, turns) {
   let latest;
   let before;
   for (const location2 of turns.values()) {
-    const end = location2?.end?.time;
-    if (location2?.status !== "closed" || !Number.isFinite(end)) continue;
-    const later = (target) => target === void 0 || end > target.end.time || end === target.end.time && location2.turn > target.turn;
+    const end2 = location2?.end?.time;
+    if (location2?.status !== "closed" || !Number.isFinite(end2)) continue;
+    const later = (target) => target === void 0 || end2 > target.end.time || end2 === target.end.time && location2.turn > target.turn;
     if (later(latest)) latest = location2;
-    if (end <= proposal.at && later(before)) before = location2;
+    if (end2 <= proposal.at && later(before)) before = location2;
   }
   const turn = (before ?? latest)?.turn;
   return turn === void 0 ? { kind: "dock" } : { kind: "turn", turn };
@@ -21997,7 +22285,7 @@ var LEARNING_CSS = `
 .bt-learning-more:hover{background:var(--bt-hover);color:var(--bt-ink)}
 .bt-learning-more:focus-visible{outline:2px solid var(--bt-accent);outline-offset:2px}
 .bt-learning-why{margin:0;font-size:12px;line-height:17px;color:var(--bt-ink-2)}
-.bt-learning-btn{flex:none;display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 16px;border:0;border-radius:999px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:background-color .12s ease,opacity .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-learning-btn{flex:none;display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 16px;border:0;border-radius:999px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:background-color .12s ease,opacity .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-learning-btn svg{width:15px;height:15px}
 .bt-learning-decline{background:transparent;box-shadow:inset 0 0 0 1px var(--bt-line-2);color:var(--bt-ink)}
 .bt-learning-decline:hover:not(:disabled){background:var(--bt-hover)}

@@ -125,8 +125,8 @@ var require_jsQR = __commonJS({
             var GenericGF = (
               /** @class */
               (function() {
-                function GenericGF2(primitive, size, genBase) {
-                  this.primitive = primitive, this.size = size, this.generatorBase = genBase, this.expTable = new Array(this.size), this.logTable = new Array(this.size);
+                function GenericGF2(primitive, size2, genBase) {
+                  this.primitive = primitive, this.size = size2, this.generatorBase = genBase, this.expTable = new Array(this.size), this.logTable = new Array(this.size);
                   for (var x = 1, i = 0; i < this.size; i++)
                     this.expTable[i] = x, x = x * 2, x >= this.size && (x = (x ^ this.primitive) & this.size - 1);
                   for (var i = 0; i < this.size - 1; i++)
@@ -207,7 +207,7 @@ var require_jsQR = __commonJS({
                     return this.field.zero;
                   if (scalar === 1)
                     return this;
-                  for (var size = this.coefficients.length, product = new Uint8ClampedArray(size), i = 0; i < size; i++)
+                  for (var size2 = this.coefficients.length, product = new Uint8ClampedArray(size2), i = 0; i < size2; i++)
                     product[i] = this.field.multiply(this.coefficients[i], scalar);
                   return new GenericGFPoly2(this.field, product);
                 }, GenericGFPoly2.prototype.multiplyPoly = function(other) {
@@ -222,20 +222,20 @@ var require_jsQR = __commonJS({
                     throw new Error("Invalid degree less than 0");
                   if (coefficient === 0)
                     return this.field.zero;
-                  for (var size = this.coefficients.length, product = new Uint8ClampedArray(size + degree), i = 0; i < size; i++)
+                  for (var size2 = this.coefficients.length, product = new Uint8ClampedArray(size2 + degree), i = 0; i < size2; i++)
                     product[i] = this.field.multiply(this.coefficients[i], coefficient);
                   return new GenericGFPoly2(this.field, product);
                 }, GenericGFPoly2.prototype.evaluateAt = function(a) {
                   var result = 0;
                   if (a === 0)
                     return this.getCoefficient(0);
-                  var size = this.coefficients.length;
+                  var size2 = this.coefficients.length;
                   if (a === 1)
                     return this.coefficients.forEach(function(coefficient) {
                       result = GenericGF_1.addOrSubtractGF(result, coefficient);
                     }), result;
                   result = this.coefficients[0];
-                  for (var i = 1; i < size; i++)
+                  for (var i = 1; i < size2; i++)
                     result = GenericGF_1.addOrSubtractGF(this.field.multiply(a, result), this.coefficients[i]);
                   return result;
                 }, GenericGFPoly2;
@@ -561,8 +561,8 @@ var require_jsQR = __commonJS({
             (function(ModeByte2) {
               ModeByte2[ModeByte2.Terminator = 0] = "Terminator", ModeByte2[ModeByte2.Numeric = 1] = "Numeric", ModeByte2[ModeByte2.Alphanumeric = 2] = "Alphanumeric", ModeByte2[ModeByte2.Byte = 4] = "Byte", ModeByte2[ModeByte2.Kanji = 8] = "Kanji", ModeByte2[ModeByte2.ECI = 7] = "ECI";
             })(ModeByte || (ModeByte = {}));
-            function decodeNumeric(stream, size) {
-              for (var bytes = [], text8 = "", characterCountSize = [10, 12, 14][size], length = stream.readBits(characterCountSize); length >= 3; ) {
+            function decodeNumeric(stream, size2) {
+              for (var bytes = [], text8 = "", characterCountSize = [10, 12, 14][size2], length = stream.readBits(characterCountSize); length >= 3; ) {
                 var num2 = stream.readBits(10);
                 if (num2 >= 1e3)
                   throw new Error("Invalid numeric value above 999");
@@ -630,8 +630,8 @@ var require_jsQR = __commonJS({
               "/",
               ":"
             ];
-            function decodeAlphanumeric(stream, size) {
-              for (var bytes = [], text8 = "", characterCountSize = [9, 11, 13][size], length = stream.readBits(characterCountSize); length >= 2; ) {
+            function decodeAlphanumeric(stream, size2) {
+              for (var bytes = [], text8 = "", characterCountSize = [9, 11, 13][size2], length = stream.readBits(characterCountSize); length >= 2; ) {
                 var v2 = stream.readBits(11), a = Math.floor(v2 / 45), b2 = v2 % 45;
                 bytes.push(AlphanumericCharacterCodes[a].charCodeAt(0), AlphanumericCharacterCodes[b2].charCodeAt(0)), text8 += AlphanumericCharacterCodes[a] + AlphanumericCharacterCodes[b2], length -= 2;
               }
@@ -641,8 +641,8 @@ var require_jsQR = __commonJS({
               }
               return { bytes, text: text8 };
             }
-            function decodeByte(stream, size) {
-              for (var bytes = [], text8 = "", characterCountSize = [8, 16, 16][size], length = stream.readBits(characterCountSize), i = 0; i < length; i++) {
+            function decodeByte(stream, size2) {
+              for (var bytes = [], text8 = "", characterCountSize = [8, 16, 16][size2], length = stream.readBits(characterCountSize), i = 0; i < length; i++) {
                 var b2 = stream.readBits(8);
                 bytes.push(b2);
               }
@@ -654,15 +654,15 @@ var require_jsQR = __commonJS({
               }
               return { bytes, text: text8 };
             }
-            function decodeKanji(stream, size) {
-              for (var bytes = [], text8 = "", characterCountSize = [8, 10, 12][size], length = stream.readBits(characterCountSize), i = 0; i < length; i++) {
+            function decodeKanji(stream, size2) {
+              for (var bytes = [], text8 = "", characterCountSize = [8, 10, 12][size2], length = stream.readBits(characterCountSize), i = 0; i < length; i++) {
                 var k = stream.readBits(13), c = Math.floor(k / 192) << 8 | k % 192;
                 c < 7936 ? c += 33088 : c += 49472, bytes.push(c >> 8, c & 255), text8 += String.fromCharCode(shiftJISTable_1.shiftJISTable[c]);
               }
               return { bytes, text: text8 };
             }
             function decode(data, version) {
-              for (var _a, _b, _c2, _d, stream = new BitStream_1.BitStream(data), size = version <= 9 ? 0 : version <= 26 ? 1 : 2, result = {
+              for (var _a, _b, _c2, _d, stream = new BitStream_1.BitStream(data), size2 = version <= 9 ? 0 : version <= 26 ? 1 : 2, result = {
                 text: "",
                 bytes: [],
                 chunks: [],
@@ -686,26 +686,26 @@ var require_jsQR = __commonJS({
                     assignmentNumber: -1
                   });
                 else if (mode === ModeByte.Numeric) {
-                  var numericResult = decodeNumeric(stream, size);
+                  var numericResult = decodeNumeric(stream, size2);
                   result.text += numericResult.text, (_a = result.bytes).push.apply(_a, numericResult.bytes), result.chunks.push({
                     type: Mode.Numeric,
                     text: numericResult.text
                   });
                 } else if (mode === ModeByte.Alphanumeric) {
-                  var alphanumericResult = decodeAlphanumeric(stream, size);
+                  var alphanumericResult = decodeAlphanumeric(stream, size2);
                   result.text += alphanumericResult.text, (_b = result.bytes).push.apply(_b, alphanumericResult.bytes), result.chunks.push({
                     type: Mode.Alphanumeric,
                     text: alphanumericResult.text
                   });
                 } else if (mode === ModeByte.Byte) {
-                  var byteResult = decodeByte(stream, size);
+                  var byteResult = decodeByte(stream, size2);
                   result.text += byteResult.text, (_c2 = result.bytes).push.apply(_c2, byteResult.bytes), result.chunks.push({
                     type: Mode.Byte,
                     bytes: byteResult.bytes,
                     text: byteResult.text
                   });
                 } else if (mode === ModeByte.Kanji) {
-                  var kanjiResult = decodeKanji(stream, size);
+                  var kanjiResult = decodeKanji(stream, size2);
                   result.text += kanjiResult.text, (_d = result.bytes).push.apply(_d, kanjiResult.bytes), result.chunks.push({
                     type: Mode.Kanji,
                     bytes: kanjiResult.bytes,
@@ -9288,9 +9288,9 @@ var require_jsQR = __commonJS({
               }
               return { dimension, moduleSize };
             }
-            function countBlackWhiteRunTowardsPoint(origin, end, matrix, length) {
-              var switchPoints = [{ x: Math.floor(origin.x), y: Math.floor(origin.y) }], steep = Math.abs(end.y - origin.y) > Math.abs(end.x - origin.x), fromX, fromY, toX, toY;
-              steep ? (fromX = Math.floor(origin.y), fromY = Math.floor(origin.x), toX = Math.floor(end.y), toY = Math.floor(end.x)) : (fromX = Math.floor(origin.x), fromY = Math.floor(origin.y), toX = Math.floor(end.x), toY = Math.floor(end.y));
+            function countBlackWhiteRunTowardsPoint(origin2, end2, matrix, length) {
+              var switchPoints = [{ x: Math.floor(origin2.x), y: Math.floor(origin2.y) }], steep = Math.abs(end2.y - origin2.y) > Math.abs(end2.x - origin2.x), fromX, fromY, toX, toY;
+              steep ? (fromX = Math.floor(origin2.y), fromY = Math.floor(origin2.x), toX = Math.floor(end2.y), toY = Math.floor(end2.x)) : (fromX = Math.floor(origin2.x), fromY = Math.floor(origin2.y), toX = Math.floor(end2.x), toY = Math.floor(end2.y));
               for (var dx = Math.abs(toX - fromX), dy = Math.abs(toY - fromY), error = Math.floor(-dx / 2), xStep = fromX < toX ? 1 : -1, yStep = fromY < toY ? 1 : -1, currentPixel = !0, x = fromX, y = fromY; x !== toX + xStep; x += xStep) {
                 var realX = steep ? y : x, realY = steep ? x : y;
                 if (matrix.get(realX, realY) !== currentPixel && (currentPixel = !currentPixel, switchPoints.push({ x: realX, y: realY }), switchPoints.length === length + 1))
@@ -9305,8 +9305,8 @@ var require_jsQR = __commonJS({
                 switchPoints[i] && switchPoints[i + 1] ? distances.push(distance(switchPoints[i], switchPoints[i + 1])) : distances.push(0);
               return distances;
             }
-            function countBlackWhiteRun(origin, end, matrix, length) {
-              var _a, rise = end.y - origin.y, run2 = end.x - origin.x, towardsEnd = countBlackWhiteRunTowardsPoint(origin, end, matrix, Math.ceil(length / 2)), awayFromEnd = countBlackWhiteRunTowardsPoint(origin, { x: origin.x - run2, y: origin.y - rise }, matrix, Math.ceil(length / 2)), middleValue = towardsEnd.shift() + awayFromEnd.shift() - 1;
+            function countBlackWhiteRun(origin2, end2, matrix, length) {
+              var _a, rise = end2.y - origin2.y, run2 = end2.x - origin2.x, towardsEnd = countBlackWhiteRunTowardsPoint(origin2, end2, matrix, Math.ceil(length / 2)), awayFromEnd = countBlackWhiteRunTowardsPoint(origin2, { x: origin2.x - run2, y: origin2.y - rise }, matrix, Math.ceil(length / 2)), middleValue = towardsEnd.shift() + awayFromEnd.shift() - 1;
               return (_a = awayFromEnd.concat(middleValue)).concat.apply(_a, towardsEnd);
             }
             function scoreBlackWhiteRun(sequence, ratios) {
@@ -9384,8 +9384,8 @@ var require_jsQR = __commonJS({
               }).map(function(q2) {
                 var x = (q2.top.startX + q2.top.endX + q2.bottom.startX + q2.bottom.endX) / 4, y2 = (q2.top.y + q2.bottom.y + 1) / 2;
                 if (matrix.get(Math.round(x), Math.round(y2))) {
-                  var lengths = [q2.top.endX - q2.top.startX, q2.bottom.endX - q2.bottom.startX, q2.bottom.y - q2.top.y + 1], size = sum(lengths) / lengths.length, score = scorePattern({ x: Math.round(x), y: Math.round(y2) }, [1, 1, 3, 1, 1], matrix);
-                  return { score, x, y: y2, size };
+                  var lengths = [q2.top.endX - q2.top.startX, q2.bottom.endX - q2.bottom.startX, q2.bottom.y - q2.top.y + 1], size2 = sum(lengths) / lengths.length, score = scorePattern({ x: Math.round(x), y: Math.round(y2) }, [1, 1, 3, 1, 1], matrix);
+                  return { score, x, y: y2, size: size2 };
                 }
               }).filter(function(q2) {
                 return !!q2;
@@ -9446,7 +9446,7 @@ var require_jsQR = __commonJS({
               }, alignmentPatterns = alignmentPatternQuads.map(function(q2) {
                 var x = (q2.top.startX + q2.top.endX + q2.bottom.startX + q2.bottom.endX) / 4, y = (q2.top.y + q2.bottom.y + 1) / 2;
                 if (matrix.get(Math.floor(x), Math.floor(y))) {
-                  var lengths = [q2.top.endX - q2.top.startX, q2.bottom.endX - q2.bottom.startX, q2.bottom.y - q2.top.y + 1], size = sum(lengths) / lengths.length, sizeScore = scorePattern({ x: Math.floor(x), y: Math.floor(y) }, [1, 1, 1], matrix), score = sizeScore + distance({ x, y }, expectedAlignmentPattern);
+                  var lengths = [q2.top.endX - q2.top.startX, q2.bottom.endX - q2.bottom.startX, q2.bottom.y - q2.top.y + 1], size2 = sum(lengths) / lengths.length, sizeScore = scorePattern({ x: Math.floor(x), y: Math.floor(y) }, [1, 1, 1], matrix), score = sizeScore + distance({ x, y }, expectedAlignmentPattern);
                   return { x, y, score };
                 }
               }).filter(function(v2) {
@@ -10960,7 +10960,7 @@ function bodyOf(def, paint, flat = !1) {
     return "";
   }
 }
-var eyeMarkup = ([cx, cy, w, h59, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><rect class="bt-eye" x="${-w / 2}" y="${-h59 / 2}" width="${w}" height="${h59}" rx="${w / 2}"/></g>`, happyEyeMarkup = ([cx, cy, w, h59, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><path class="bt-eye-happy" opacity="0" d="M${-w * 0.62} ${h59 * 0.14}Q0 ${-h59 * 0.42} ${w * 0.62} ${h59 * 0.14}" fill="none" stroke="#000" stroke-width="${w * 0.5}" stroke-linecap="round"/></g>`, maskBox = (size) => `maskUnits="userSpaceOnUse" x="${-size}" y="${-size}" width="${size * 3}" height="${size * 3}"`, holes = (def, eyes) => `<rect x="${-def.size}" y="${-def.size}" width="${def.size * 3}" height="${def.size * 3}" fill="#fff"/>${eyes}`, MASK_ID = "%MASK%", markSerial = 0, nextMarkSerial = () => markSerial += 1, markupCache = /* @__PURE__ */ new Map();
+var eyeMarkup = ([cx, cy, w, h59, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><rect class="bt-eye" x="${-w / 2}" y="${-h59 / 2}" width="${w}" height="${h59}" rx="${w / 2}"/></g>`, happyEyeMarkup = ([cx, cy, w, h59, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><path class="bt-eye-happy" opacity="0" d="M${-w * 0.62} ${h59 * 0.14}Q0 ${-h59 * 0.42} ${w * 0.62} ${h59 * 0.14}" fill="none" stroke="#000" stroke-width="${w * 0.5}" stroke-linecap="round"/></g>`, maskBox = (size2) => `maskUnits="userSpaceOnUse" x="${-size2}" y="${-size2}" width="${size2 * 3}" height="${size2 * 3}"`, holes = (def, eyes) => `<rect x="${-def.size}" y="${-def.size}" width="${def.size * 3}" height="${def.size * 3}" fill="#fff"/>${eyes}`, MASK_ID = "%MASK%", markSerial = 0, nextMarkSerial = () => markSerial += 1, markupCache = /* @__PURE__ */ new Map();
 function characterMarkup(shape, color) {
   let key = `${shape}|${color}`, markup = markupCache.get(key);
   if (markup === void 0) {
@@ -10969,7 +10969,7 @@ function characterMarkup(shape, color) {
   }
   return markup;
 }
-var svgUrl = (inner, size) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}">${inner}</svg>`)}")`, maskCache = /* @__PURE__ */ new Map();
+var svgUrl = (inner, size2) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size2} ${size2}">${inner}</svg>`)}")`, maskCache = /* @__PURE__ */ new Map();
 function maskOf(shape) {
   let mask = maskCache.get(shape);
   if (mask === void 0) {
@@ -11307,10 +11307,10 @@ function registerShape(id3, shape) {
   if (typeof shape?.body != "function" || typeof shape.body("#000") != "string") throw new Error("A shape needs body(paint) returning SVG markup");
   let at2 = shape.eyes?.at;
   if (!Array.isArray(at2) || at2.length !== 2 || !at2.every(isPoint)) throw new Error("A shape needs eyes.at: two [x, y] points");
-  let size = Number.isFinite(shape.size) && shape.size > 0 ? shape.size : 100, pick3 = (key, fallback) => Number.isFinite(shape.eyes[key]) ? shape.eyes[key] : fallback, eyes = at2.map(([x, y]) => [x, y, pick3("w", size * 0.1), pick3("h", size * 0.23), pick3("tilt", -27)]), previous = SHAPES[id3];
+  let size2 = Number.isFinite(shape.size) && shape.size > 0 ? shape.size : 100, pick3 = (key, fallback) => Number.isFinite(shape.eyes[key]) ? shape.eyes[key] : fallback, eyes = at2.map(([x, y]) => [x, y, pick3("w", size2 * 0.1), pick3("h", size2 * 0.23), pick3("tilt", -27)]), previous = SHAPES[id3];
   SHAPES[id3] = {
     label: String(shape.label ?? id3),
-    size,
+    size: size2,
     body: shape.body,
     eyes,
     ...typeof shape.wrap == "string" ? { wrap: shape.wrap } : {}
@@ -11335,7 +11335,7 @@ var allThemes = () => ({ ...THEMES, ...customThemes }), MESSAGE_WIDTH = { min: 5
 
 // modules/bot-runtime/vendor/ds-bot/src/shared/mentions.js
 var ALL_WORDS = ["all", "everyone", "所有人", "全体"], USER_NAMES = ["user", "you"];
-var NAME_GOES_ON = /^(?:[a-z0-9_\-/\\]|\.[a-z0-9_-])/i, ADDRESS_BEFORE = /[a-z0-9_./]/i, LITERAL = /```[\s\S]*?(?:```|$)|`[^`\n]*`|\[[^\]\n]*\]\([^)\s]*(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\)/g, fitsAt = (text8, at2, word) => text8.slice(at2, at2 + word.length).toLowerCase() === word.toLowerCase() && !NAME_GOES_ON.test(text8.slice(at2 + word.length)), overlaps = (spans, start, end) => spans.some((span) => start < span.end && span.start < end);
+var NAME_GOES_ON = /^(?:[a-z0-9_\-/\\]|\.[a-z0-9_-])/i, ADDRESS_BEFORE = /[a-z0-9_./]/i, LITERAL = /```[\s\S]*?(?:```|$)|`[^`\n]*`|\[[^\]\n]*\]\([^)\s]*(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\)/g, fitsAt = (text8, at2, word) => text8.slice(at2, at2 + word.length).toLowerCase() === word.toLowerCase() && !NAME_GOES_ON.test(text8.slice(at2 + word.length)), overlaps = (spans, start, end2) => spans.some((span) => start < span.end && span.start < end2);
 function nameProblem(name) {
   let text8 = String(name ?? "").trim();
   if (text8 === "") return "A Bot needs a name";
@@ -11348,9 +11348,9 @@ function referenceSpans(text8, labels3 = []) {
   for (let label of [...labels3].sort((a, b2) => b2.length - a.length)) {
     let mention = `@${label}`;
     for (let at2 = text8.indexOf(mention); at2 !== -1; at2 = text8.indexOf(mention, at2 + 1)) {
-      let end = at2 + mention.length;
-      if (!(at2 > 0 && ADDRESS_BEFORE.test(text8[at2 - 1]) || NAME_GOES_ON.test(text8.slice(end)) || overlaps(spans, at2, end))) {
-        spans.push({ start: at2, end, label });
+      let end2 = at2 + mention.length;
+      if (!(at2 > 0 && ADDRESS_BEFORE.test(text8[at2 - 1]) || NAME_GOES_ON.test(text8.slice(end2)) || overlaps(spans, at2, end2))) {
+        spans.push({ start: at2, end: end2, label });
         break;
       }
     }
@@ -11366,8 +11366,8 @@ function mentionSpans(text8, bots, { references = [] } = {}) {
     if (at2 > 0 && ADDRESS_BEFORE.test(value[at2 - 1]) || overlaps(skip, at2, at2 + 1)) continue;
     let bot = byLength.find((candidate) => fitsAt(value, at2 + 1, candidate.name)), all = bot ? void 0 : ALL_WORDS.find((word) => fitsAt(value, at2 + 1, word));
     if (!bot && !all) continue;
-    let end = at2 + 1 + (bot ? bot.name.length : all.length);
-    spans.push(bot ? { start: at2, end, bot } : { start: at2, end, all: !0 }), at2 = end - 1;
+    let end2 = at2 + 1 + (bot ? bot.name.length : all.length);
+    spans.push(bot ? { start: at2, end: end2, bot } : { start: at2, end: end2, all: !0 }), at2 = end2 - 1;
   }
   return spans;
 }
@@ -11547,10 +11547,10 @@ var import_react = require("react");
 
 // modules/bot-runtime/vendor/ds-bot/src/client/model-portrait-eyes.js
 var PORTRAIT_RIGS = Object.freeze({
-  chatgpt: { eyes: [[81, 126, 122, 151], [141, 118, 176, 145]], greeting: "bow", pace: 1.15, backdrop: "#eddffe" },
+  chatgpt: { eyes: [[81, 126, 122, 151], [141, 118, 176, 145]], neck: 184, greeting: "bow", pace: 1.15, backdrop: "#eddffe" },
   claude: { eyes: [[79, 116, 118, 143], [139, 109, 175, 138]], greeting: "bow", pace: 1.06, backdrop: "#fff0e6" },
-  deepseek: { eyes: [[84, 119, 123, 149], [139, 113, 177, 144]], greeting: "greet", pace: 0.91, backdrop: "#d6ecfd" },
-  doubao: { eyes: [[74, 113, 113, 141], [132, 105, 170, 134]], greeting: "perk", pace: 0.88, backdrop: "#dffcfd" },
+  deepseek: { eyes: [[84, 119, 123, 149], [139, 113, 177, 144]], neck: 182, greeting: "greet", pace: 0.91, backdrop: "#d6ecfd" },
+  doubao: { eyes: [[74, 113, 113, 141], [132, 105, 170, 134]], neck: 181, greeting: "perk", pace: 0.88, backdrop: "#dffcfd" },
   ernie: { eyes: [[81, 128, 120, 154], [139, 120, 175, 147]], greeting: "bow", pace: 1.1, backdrop: "#dee9fe" },
   gemini: { eyes: [[81, 127, 120, 155], [137, 120, 173, 150]], greeting: "peek", pace: 0.95, backdrop: "#dfdefe" },
   glm: { eyes: [[83, 126, 123, 154], [140, 119, 177, 148]], greeting: "bow", pace: 1.12, backdrop: "#d7e2f9" },
@@ -11563,9 +11563,9 @@ var PORTRAIT_RIGS = Object.freeze({
   minimax: { eyes: [[79, 121, 120, 157], [138, 115, 177, 148]], greeting: "perk", pace: 0.88, backdrop: "#fee5e2" },
   mistral: { eyes: [[82, 127, 125, 153], [140, 119, 177, 147]], greeting: "greet", pace: 0.97, backdrop: "#ffeadb" },
   perplexity: { eyes: [[83, 121, 120, 151], [138, 116, 173, 145]], greeting: "peek", pace: 1.12, backdrop: "#e1fbf4" },
-  qwen: { eyes: [[82, 119, 121, 146], [140, 111, 178, 140]], greeting: "peek", pace: 1.06, backdrop: "#ebdefe" },
+  qwen: { eyes: [[82, 119, 121, 146], [140, 111, 178, 140]], neck: 174, greeting: "peek", pace: 1.06, backdrop: "#ebdefe" },
   rwkv: { eyes: [[81, 129, 122, 157], [138, 120, 174, 148]], greeting: "greet", pace: 1, backdrop: "#ebe0fd" },
-  stepfun: { eyes: [[83, 115, 123, 144], [138, 108, 176, 136]], greeting: "perk", pace: 0.95, backdrop: "#d0eafe" }
+  stepfun: { eyes: [[83, 115, 123, 144], [138, 108, 176, 136]], neck: 176, greeting: "perk", pace: 0.95, backdrop: "#d0eafe" }
 }), PORTRAIT_SIZE = 256, patchesByRig = /* @__PURE__ */ new WeakMap(), smoothstep = (t2) => t2 * t2 * (3 - 2 * t2), unit = (value) => Math.max(0, Math.min(1, value));
 function palette(source, width, height, top, bottom) {
   let sample = (x, y) => {
@@ -11591,90 +11591,205 @@ function eyePatches(image, rig) {
   });
   return patchesByRig.set(rig, patches), patches;
 }
-function paintEye({ width, height, top, bottom, slant, source, skin, lash }, frame, amount) {
-  frame.set(source);
+function eyeColumns({ width, top, bottom, slant }) {
   let half = (width - 1) / 2;
+  return Array.from({ length: width }, (_2, x) => {
+    let edge = Math.abs((x - half) / half), arc = Math.sqrt(1 - edge * edge), slope = (x - half) * slant, start = top + slope + (1 - arc) * (bottom - top) * 0.38, end2 = bottom + slope - (1 - arc) * (bottom - top) * 0.5;
+    return { start, end: end2, arc, side: smoothstep(unit((1 - edge) * 8)) };
+  });
+}
+function shiftGaze({ width, height, source, columns: columns2 }, frame, gazeX, gazeY) {
+  frame.set(source);
   for (let x = 0; x < width; x++) {
-    let edge = Math.abs((x - half) / half), arc = Math.sqrt(1 - edge * edge), slope = (x - half) * slant, start = top + slope + (1 - arc) * (bottom - top) * 0.38, end = bottom + slope - (1 - arc) * (bottom - top) * 0.5, hinge = start + (end - start) * 0.62, upper = start + (hinge - start) * amount, lower = end + (hinge + 1.8 * arc - end) * amount, side = smoothstep(unit((1 - edge) * 8));
-    for (let y = Math.max(0, Math.floor(start - 3)); y <= Math.min(height - 1, Math.ceil(end + 3)); y++) {
-      let feather = side * smoothstep(unit(Math.min((y - start + 3) / 3, (end + 3 - y) / 3))), index = (y * width + x) * 4, line = unit((1.4 - Math.abs(y - hinge)) / 0.8) * unit((amount - 0.72) / 0.28) * side, eyeOffset = -1;
-      y >= upper && y <= lower && (eyeOffset = (Math.round(start + (end - start) * (y - upper) / Math.max(1, lower - upper)) * width + x) * 4);
-      let blend = feather * unit(amount * 4);
+    let { start, end: end2, arc } = columns2[x];
+    for (let y = Math.max(0, Math.ceil(start)); y <= Math.min(height - 1, Math.floor(end2)); y++) {
+      let weight = arc * arc * smoothstep(unit(Math.min(y - start, end2 - y) / 7)), sx = Math.max(0, Math.min(width - 1.01, x - gazeX * weight * 5)), sy = Math.max(0, Math.min(height - 1.01, y - gazeY * weight * 3.4)), col = Math.floor(sx), row = Math.floor(sy), dx = sx - col, dy = sy - row, above = (row * width + col) * 4, below = above + width * 4, index = (y * width + x) * 4;
       for (let channel = 0; channel < 3; channel++) {
-        let sample = (eyeOffset === -1 ? skin[channel] : source[eyeOffset + channel]) * (1 - line) + lash[channel] * line;
+        let upper = source[above + channel] * (1 - dx) + source[above + 4 + channel] * dx, lower = source[below + channel] * (1 - dx) + source[below + 4 + channel] * dx;
+        frame[index + channel] = upper * (1 - dy) + lower * dy;
+      }
+    }
+  }
+}
+function closeEye({ width, height, columns: columns2, skin, lash }, source, frame, amount) {
+  frame.set(source);
+  for (let x = 0; x < width; x++) {
+    let { start, end: end2, arc, side } = columns2[x], hinge = start + (end2 - start) * 0.62, upper = start + (hinge - start) * amount, lower = end2 + (hinge + 1.8 * arc - end2) * amount;
+    for (let y = Math.max(0, Math.floor(start - 3)); y <= Math.min(height - 1, Math.ceil(end2 + 3)); y++) {
+      let feather = side * smoothstep(unit(Math.min((y - start + 3) / 3, (end2 + 3 - y) / 3))), index = (y * width + x) * 4, line = unit((1.4 - Math.abs(y - hinge)) / 0.8) * unit((amount - 0.72) / 0.28) * side, visible = smoothstep(unit(Math.min(y - upper, lower - y) + 0.62)), sy = Math.max(0, Math.min(height - 1.01, start + (end2 - start) * unit((y - upper) / Math.max(1, lower - upper)))), row = Math.floor(sy), eyeOffset = (row * width + x) * 4, lowerOffset = eyeOffset + width * 4, blend = feather * smoothstep(unit(amount * 3.6));
+      for (let channel = 0; channel < 3; channel++) {
+        let upperColor = source[eyeOffset + channel], eyeColor = upperColor + (source[lowerOffset + channel] - upperColor) * (sy - row), sample = (skin[channel] + (eyeColor - skin[channel]) * visible) * (1 - line) + lash[channel] * line;
         frame[index + channel] = source[index + channel] * (1 - blend) + sample * blend;
       }
     }
   }
 }
-function makeBlinkPainter(canvas, image, rig) {
+function makeEyePainter(canvas, image, rig) {
   if (!image?.complete || image.naturalWidth !== PORTRAIT_SIZE || image.naturalHeight !== PORTRAIT_SIZE) return null;
   let ctx = canvas?.getContext("2d"), patches = ctx && eyePatches(image, rig);
   if (!patches) return null;
   ctx.clearRect(0, 0, PORTRAIT_SIZE, PORTRAIT_SIZE);
-  let frames = patches.map(({ width, height }) => ctx.createImageData(width, height));
-  return (amount) => {
-    if (canvas.hidden = amount === 0, !canvas.hidden)
-      for (let [index, patch] of patches.entries())
-        paintEye(patch, frames[index].data, amount), ctx.putImageData(frames[index], patch.x, patch.y);
+  let buffers = patches.map((patch) => ({
+    patch: { ...patch, columns: eyeColumns(patch) },
+    frame: ctx.createImageData(patch.width, patch.height),
+    shifted: new Uint8ClampedArray(patch.source.length)
+  }));
+  return (x, y, leftLid, rightLid) => {
+    if (canvas.hidden = x === 0 && y === 0 && leftLid === 0 && rightLid === 0, !canvas.hidden)
+      for (let [index, { patch, frame, shifted }] of buffers.entries()) {
+        let lid = index === 0 ? leftLid : rightLid, source = patch.source;
+        (x || y) && (shiftGaze(patch, shifted, x, y), source = shifted), lid ? closeEye(patch, source, frame.data, lid) : frame.data.set(source), ctx.putImageData(frame, patch.x, patch.y);
+      }
+  };
+}
+
+// modules/bot-runtime/vendor/ds-bot/src/client/model-portrait-art.js
+var size = PORTRAIT_SIZE, smooth = (value) => {
+  let t2 = Math.max(0, Math.min(1, value));
+  return t2 * t2 * (3 - 2 * t2);
+};
+function triangle(a, b2, c) {
+  let bx = b2.u - a.u, by = b2.v - a.v, cx = c.u - a.u, cy = c.v - a.v, area = bx * cy - by * cx;
+  return { a, b: b2, c, inv: [cy / area, -by / area, -cx / area, bx / area] };
+}
+function paintTriangle(ctx, source, { a, b: b2, c, inv }) {
+  let bx = b2.x - a.x, by = b2.y - a.y, cx = c.x - a.x, cy = c.y - a.y, xx = bx * inv[0] + cx * inv[1], xy = bx * inv[2] + cx * inv[3], yx = by * inv[0] + cy * inv[1], yy = by * inv[2] + cy * inv[3], centerX = (a.x + b2.x + c.x) / 3, centerY = (a.y + b2.y + c.y) / 3;
+  ctx.save(), ctx.beginPath(), ctx.moveTo(a.x + (a.x - centerX) * 0.035, a.y + (a.y - centerY) * 0.035), ctx.lineTo(b2.x + (b2.x - centerX) * 0.035, b2.y + (b2.y - centerY) * 0.035), ctx.lineTo(c.x + (c.x - centerX) * 0.035, c.y + (c.y - centerY) * 0.035), ctx.closePath(), ctx.clip(), ctx.setTransform(xx, yx, xy, yy, a.x - xx * a.u - xy * a.v, a.y - yx * a.u - yy * a.v), ctx.drawImage(source, 0, 0), ctx.restore();
+}
+function portraitMesh(rig, compact2) {
+  let center = rig.eyes.reduce((total, [left, , right]) => total + (left + right) / 4, 0), neck = rig.neck ?? (rig.eyes[0][3] + rig.eyes[1][3]) / 2 + 39, columns2 = compact2 ? [0, 24, 128, 232, size] : [0, 20, 74, 128, 182, 236, size], rows2 = [0, 15, 59, 103, neck - 32, neck - 14, neck + 9, neck + 30, 239, size], grid = rows2.map((v2) => columns2.map((u) => {
+    let edge = smooth(Math.min(u, v2, size - u, size - v2) / 18), side = smooth((Math.abs(u - center) - 36) / 58), head = (1 - smooth((v2 - neck + 26 + side * 14) / 58)) * edge;
+    return { u, v: v2, x: u, y: v2, dx: u - center, head, headY: v2 - neck, torso: edge, torsoY: v2 - 231 };
+  })), triangles = [];
+  for (let row = 1; row < rows2.length; row++)
+    for (let col = 1; col < columns2.length; col++) {
+      let a = grid[row - 1][col - 1], b2 = grid[row - 1][col], c = grid[row][col], d = grid[row][col - 1];
+      triangles.push(triangle(a, b2, c), triangle(a, c, d));
+    }
+  return { points: grid.flat(), triangles };
+}
+var angle = (degrees) => degrees * Math.PI / 180;
+function makePortraitArt(canvas, image, eyes, rig, compact2) {
+  let mesh = portraitMesh(rig, compact2), ctx, composite;
+  return (head, torso) => {
+    let [hx, hy, hr3] = head, [tx, ty, tr2] = torso;
+    if (!hx && !hy && !hr3 && !tx && !ty && !tr2 || image.naturalWidth !== size || image.naturalHeight !== size) {
+      canvas.hidden = !0;
+      return;
+    }
+    if (ctx ??= canvas.getContext("2d"), !ctx) return;
+    let source = image;
+    if (eyes && !eyes.hidden) {
+      if (!composite) {
+        let buffer = document.createElement("canvas");
+        buffer.width = buffer.height = size, composite = buffer.getContext("2d");
+      }
+      composite && (composite.drawImage(image, 0, 0), composite.drawImage(eyes, 0, 0), source = composite.canvas);
+    }
+    let hSin = Math.sin(angle(hr3)), hCos = Math.cos(angle(hr3)) - 1, tSin = Math.sin(angle(tr2)), tCos = Math.cos(angle(tr2)) - 1;
+    for (let vertex of mesh.points) {
+      let { u, v: v2, dx, head: head2, headY, torso: torso2, torsoY } = vertex;
+      vertex.x = u + head2 * (hx + dx * hCos - headY * hSin) + torso2 * (tx + dx * tCos - torsoY * tSin), vertex.y = v2 + head2 * (hy + dx * hSin + headY * hCos) + torso2 * (ty + dx * tSin + torsoY * tCos);
+    }
+    ctx.drawImage(source, 0, 0);
+    for (let tri of mesh.triangles) paintTriangle(ctx, source, tri);
+    canvas.hidden = !1;
   };
 }
 
 // modules/bot-runtime/vendor/ds-bot/src/client/model-portrait.js
 var states = {
-  idle: { pose: [0, 0, 0], clips: ["breathe", "glance", "tilt"], interval: [3700, 6700] },
-  thinking: { pose: [0, -1.7, -4.5], clips: ["ponder", "glance"], interval: [1700, 3e3] },
-  searching: { pose: [0, -0.6, 0], clips: ["scan", "glance"], interval: [1150, 1850] },
-  working: { pose: [0, 1.2, 0], clips: ["nod", "focus"], interval: [1300, 2200] },
-  sending: { pose: [0.7, 0, 2], clips: ["send", "nod"], interval: [1400, 2350] },
-  orbit: { pose: [0, 0, 1], clips: ["scan", "breathe"], interval: [2e3, 3200] },
-  waiting: { pose: [0, 0.6, -1.5], clips: ["breathe", "tilt"], interval: [3700, 5900] },
-  alert: { pose: [0, -0.8, 4], clips: ["listen"], interval: null },
+  idle: { pose: [0, 0, 0], clips: ["glance", "tilt"], interval: [4200, 7100] },
+  thinking: { pose: [-0.23, -0.7, -1.8], eyes: [0.28, -0.46, 0.06], clips: ["ponder", "glance"], interval: [2400, 3900] },
+  searching: { pose: [0, -0.45, 0], clips: ["scan", "glance"], interval: [2050, 3100] },
+  working: { pose: [0, 0.65, 0.25], eyes: [0, 0.21, 0.09], clips: ["nod", "focus"], interval: [2400, 3700] },
+  sending: { pose: [0.4, -0.1, 0.85], eyes: [0.18, -0.1, 0], clips: ["send", "nod"], interval: [2400, 3700] },
+  orbit: { pose: [0, -0.2, 0.5], clips: ["scan", "tilt"], interval: [2800, 4600] },
+  waiting: { pose: [0, 0.4, -0.75], eyes: [0, 0.1, 0.06], clips: ["tilt", "glance"], interval: [4400, 6800] },
+  alert: { pose: [0, -0.8, 2.2], clips: ["listen"], interval: null },
   done: { pose: [0, 0, 0], clips: ["settle"], interval: null }
 }, clips = {
-  breathe: { duration: 1440, points: [[0.4, 0, -1.7, 0, 1.008, 1.029], [0.57, 0, -1.7, 0, 1.008, 1.029]] },
-  glance: { duration: 1180, points: [[0.29, 3.1, -0.8, 6], [0.61, 3.1, -0.8, 6]] },
-  tilt: { duration: 1240, points: [[0.35, 1.2, -0.8, 6.5], [0.65, 1.2, -0.8, 6.5]] },
-  ponder: { duration: 1240, points: [[0.3, 0, -3, 3.5], [0.72, 0, -3, 3.5]] },
-  scan: { duration: 1180, points: [
-    [0.18, -3.6, -0.6, -7.5],
-    [0.37, -3.6, -0.6, -7.5],
-    [0.61, 3.6, -0.6, 7.5],
-    [0.8, 3.6, -0.6, 7.5]
-  ] },
-  nod: { duration: 860, points: [
-    [0.2, 0, -1.1, 0, 0.99, 1.017],
-    [0.43, 0, 3.5, 0, 1.026, 0.952],
-    [0.56, 0, 3.5, 0, 1.026, 0.952],
-    [0.8, 0, -0.8, 0, 1, 1.012]
-  ] },
-  focus: { duration: 940, points: [[0.3, 0, 1.5, 0, 1.045, 1.045], [0.62, 0, 1.5, 0, 1.045, 1.045]] },
-  send: { duration: 790, points: [[0.2, -1.4, 0.3, -1.3], [0.5, 3.9, -0.7, 6.1], [0.67, 3.9, -0.7, 6.1]] },
-  listen: { duration: 790, points: [[0.32, 0, -2.6, 3.6, 1.028, 1.038], [0.59, 0, -2.6, 3.6, 1.028, 1.038]] },
-  settle: { duration: 790, points: [[0.27, 0, 2.3, 0, 1.028, 0.958], [0.55, 0, -0.9, 0, 0.989, 1.02]] },
-  greet: { duration: 980, points: [
-    [0.17, 0, 2.1, -1.2, 1.029, 0.956],
-    [0.43, 1.2, -5, 7.6, 0.99, 1.059],
-    [0.61, 1.2, -5, 7.6, 0.99, 1.059],
-    [0.8, 0.15, 1.1, -0.8, 1.014, 0.988]
-  ] },
-  bow: { duration: 1060, points: [
-    [0.19, 0, -1.8, -1.3, 0.993, 1.023],
-    [0.42, 0.6, 4.7, 3, 1.035, 0.942],
-    [0.64, 0.6, 4.7, 3, 1.035, 0.942],
-    [0.83, 0, -0.9, 0, 1, 1.016]
-  ] },
-  peek: { duration: 1100, points: [
-    [0.23, -1.3, 0.5, -2.1],
-    [0.43, 3.5, -0.9, 8.3],
-    [0.66, 3.5, -0.9, 8.3]
-  ] },
-  perk: { duration: 940, points: [
-    [0.15, 0, 2.7, 0, 1.033, 0.95],
-    [0.38, 0.8, -4.8, 4.8, 0.988, 1.062],
-    [0.58, 0.8, -4.8, 4.8, 0.988, 1.062],
-    [0.81, 0, 1, -1, 1.016, 0.982]
-  ] }
+  glance: {
+    duration: 1010,
+    head: [[0.33, 1.3, -0.35, 2.6], [0.65, 0.85, -0.12, 1.8]],
+    eyes: [[0.15, 0.73, -0.17, 0], [0.55, 0.64, -0.13, 0], [0.85, 0, 0, 0]]
+  },
+  tilt: {
+    duration: 1340,
+    head: [[0.34, 0.44, 0.25, 2.6], [0.68, 0.28, 0.15, 1.6]],
+    eyes: [[0.2, 0.34, 0.14, 0.08], [0.57, 0.24, 0.1, 0.09]]
+  },
+  ponder: {
+    duration: 1390,
+    head: [[0.36, 0.2, -1.7, 1.8], [0.67, 0.3, -0.9, 1.35]],
+    eyes: [[0.22, 0.2, -0.45, 0.06], [0.68, 0.19, -0.33, 0.05]]
+  },
+  scan: {
+    duration: 1390,
+    head: [[0.24, -1.2, -0.33, -2.8], [0.65, 1.45, -0.25, 3.2], [0.81, 0.7, 0.05, 1.35]],
+    eyes: [[0.13, -0.93, 0.07, 0.05], [0.32, -0.68, 0.04, 0.04], [0.47, 0.92, -0.05, 0.03], [0.74, 0.72, -0.02, 0.03]]
+  },
+  nod: { duration: 780, head: [[0.23, 0, -0.74, 0.15], [0.52, 0.21, 3.4, 0.9], [0.78, 0.05, 0.46, 0.24]] },
+  focus: {
+    duration: 940,
+    head: [[0.39, 0.2, 1.2, 0.85], [0.65, 0.1, 0.95, 0.42]],
+    eyes: [[0.2, 0, 0.23, 0.12], [0.64, 0, 0.18, 0.1]]
+  },
+  send: {
+    duration: 850,
+    head: [[0.21, -0.66, 0.27, -0.92], [0.51, 1.25, -1, 2.7], [0.72, 0.8, -0.45, 1.8]],
+    eyes: [[0.13, -0.2, 0.12, 0.04], [0.37, 0.61, -0.21, 0], [0.61, 0.49, -0.13, 0]]
+  },
+  listen: {
+    duration: 940,
+    head: [[0.36, 0.34, -1.7, 1.7], [0.7, 0.2, -0.56, 0.87]],
+    eyes: [[0.18, 0.44, -0.25, 0], [0.6, 0.33, -0.2, 0]]
+  },
+  settle: { duration: 900, head: [[0.35, 0, 1.5, 0.26], [0.65, 0, -0.39, -0.14]], blink: 0.25 },
+  greet: {
+    duration: 1180,
+    head: [
+      [0.17, -0.15, 0.82, -0.85],
+      [0.46, 0.95, -3, 4.8],
+      [0.69, 0.65, -1.45, 3.2],
+      [0.89, 0.06, 0.33, -0.25]
+    ],
+    eyes: [[0.12, 0, 0.22, 0.07], [0.38, 0.27, -0.29, 0], [0.69, 0.23, -0.2, 0]],
+    blink: 0.15
+  },
+  bow: {
+    duration: 1200,
+    head: [
+      [0.19, -0.15, -1.05, -0.48],
+      [0.48, 0.58, 4.6, 1.94],
+      [0.7, 0.25, 2.3, 1.1],
+      [0.89, 0.06, -0.43, -0.13]
+    ],
+    eyes: [[0.14, 0, -0.18, 0], [0.46, 0.12, 0.38, 0.08], [0.67, 0.07, 0.23, 0.06]],
+    blink: 0.33
+  },
+  peek: {
+    duration: 1230,
+    head: [
+      [0.21, -0.55, 0.35, -1.55],
+      [0.51, 2.1, -1.15, 5.05],
+      [0.72, 1.28, -0.5, 3.6],
+      [0.91, -0.12, 0.03, -0.41]
+    ],
+    eyes: [[0.14, -0.29, 0.12, 0.05], [0.37, 0.83, -0.17, 0], [0.64, 0.59, -0.11, 0]],
+    blink: 0.19
+  },
+  perk: {
+    duration: 1110,
+    head: [
+      [0.17, 0.08, 1.3, -0.2],
+      [0.4, 0.49, -3.8, 3.65],
+      [0.66, 0.36, -1.46, 2.28],
+      [0.89, -0.03, 0.27, -0.22]
+    ],
+    eyes: [[0.13, 0, 0.27, 0.08], [0.34, 0.27, -0.49, 0], [0.59, 0.22, -0.38, 0]],
+    blink: 0.11
+  }
 }, reducedQuery = "(prefers-reduced-motion: reduce)", listeners = /* @__PURE__ */ new Set(), stopWatchingMotion;
 function motionSetting() {
   return typeof document > "u" || document.hidden || window.matchMedia?.(reducedQuery).matches ? "off" : document.body?.dataset.btMotion ?? "normal";
@@ -11704,95 +11819,168 @@ function watchViewport(node, onChange) {
     viewportObserver.unobserve(node), intersections.delete(node), intersections.size === 0 && (viewportObserver.disconnect(), viewportObserver = void 0);
   };
 }
-var ease = "cubic-bezier(.32,.04,.26,1)", clamp = (value) => Math.max(-1, Math.min(1, value));
-function poseTransform([x, y, roll, sx = 1, sy = 1], strength, side = 1, zoom = 1) {
-  return `translate(${x * strength * side}%,${y * strength}%) rotate(${roll * strength * side}deg) scale(${zoom + (sx - 1) * strength},${zoom + (sy - 1) * strength})`;
+var clamp = (value) => Math.max(-1, Math.min(1, value)), unit2 = (value) => Math.max(0, Math.min(1, value)), smooth2 = (value) => value * value * (3 - 2 * value), zero = [0, 0, 0], origin = [0, ...zero], end = [1, ...zero];
+function cueAt(points, progress) {
+  if (!points || progress <= 0 || progress >= 1) return zero;
+  let next = points.findIndex(([offset]) => offset >= progress), from = points[next < 0 ? points.length - 1 : next - 1] ?? origin, to = points[next] ?? end, mix = (progress - from[0]) / (to[0] - from[0]);
+  return zero.map((_2, index) => from[index + 1] + (to[index + 1] - from[index + 1]) * mix);
 }
-function ModelPortrait({ entry, botId, state, size, gaze, pokeable, onError }) {
-  let root = (0, import_react.useRef)(null), gesture = (0, import_react.useRef)(null), picture = (0, import_react.useRef)(null), eyelids = (0, import_react.useRef)(null), interact = (0, import_react.useRef)(null), setting = (0, import_react.useSyncExternalStore)(watchMotion, motionSetting, () => "off"), [visible, setVisible] = (0, import_react.useState)(!1);
-  (0, import_react.useEffect)(() => watchViewport(root.current, setVisible), []);
-  let active2 = visible && setting !== "off", canInteract = active2 && setting !== "quiet", rig = PORTRAIT_RIGS[entry.id], motion = states[state] ?? states.idle, compact2 = size <= 44, strength = (compact2 ? 0.8 : 1) * (setting === "quiet" ? 0.7 : 1);
-  (0, import_react.useEffect)(() => {
-    if (!active2 || !rig) return;
-    let node = gesture.current, rootNode = root.current, timer, animation, blinkFrame, paint, lastClip, side = fnv1a(botId) % 2 ? 1 : -1, pace = rig.pace * (compact2 ? 1.15 : 1), blink = () => {
-      if (blinkFrame) return;
-      try {
-        paint ??= makeBlinkPainter(eyelids.current, picture.current, rig);
-      } catch {
-        return;
+function spring() {
+  let value = zero.slice(), velocity = zero.slice();
+  return {
+    value,
+    step(target, dt2, rate) {
+      let decay = Math.exp(-rate * dt2), moving = !1;
+      for (let i = 0; i < value.length; i++) {
+        let distance = value[i] - target[i], speed = velocity[i] + rate * distance;
+        value[i] = target[i] + (distance + speed * dt2) * decay, velocity[i] = (velocity[i] - rate * speed * dt2) * decay, Math.abs(value[i] - target[i]) > 3e-3 || Math.abs(velocity[i]) > 0.035 ? moving = !0 : (value[i] = target[i], velocity[i] = 0);
       }
-      if (!paint) return;
-      let start = performance.now(), duration = 255 * Math.min(pace, 1.2), draw = (time2) => {
-        let position = Math.min(1, Math.max(0, (time2 - start) / duration)), lid = position < 0.32 ? position / 0.32 : Math.min(1, (1 - position) / 0.5);
-        paint(lid * lid * (3 - 2 * lid)), blinkFrame = position < 1 ? requestAnimationFrame(draw) : void 0;
-      };
-      blinkFrame = requestAnimationFrame(draw);
-    }, play = (name) => {
-      if (typeof node.animate != "function") return;
-      let { duration, points } = clips[name], startingPose = animation?.playState === "running" ? getComputedStyle(node).transform : "none";
-      animation?.cancel();
-      let frames = [
-        { offset: 0, transform: startingPose, easing: ease },
-        ...points.map(([offset, ...pose]) => ({ offset, transform: poseTransform(pose, strength, side), easing: ease })),
-        { offset: 1, transform: "none" }
-      ];
-      animation = node.animate(frames, { duration: duration * pace }), side = -side;
-    }, rest = motion.interval, schedule = (fraction = Math.random(), first = !1) => {
-      let [low, high] = rest, delay = (first && state === "idle" && !compact2 ? 1050 + 1100 * fraction : low + (high - low) * fraction) * pace * (setting === "lively" && state === "idle" ? 0.78 : 1);
-      timer = setTimeout(() => {
-        let choices = motion.clips.filter((name) => name !== lastClip);
-        lastClip = choices[Math.floor(Math.random() * choices.length)], play(lastClip), (state === "idle" || state === "waiting" || Math.random() < 0.4) && blink(), schedule();
-      }, delay);
-    };
-    if (state !== "idle" && (lastClip = motion.clips[0], play(lastClip)), setting !== "quiet" && rest) {
-      let phase = fnv1a(`${botId}:${entry.id}`) % 1e3 / 1e3;
-      schedule(phase, !0);
+      return moving;
     }
-    return canInteract && (interact.current = () => {
-      play(rig.greeting), blink();
-    }), () => {
-      interact.current = null, clearTimeout(timer), animation?.cancel(), blinkFrame && cancelAnimationFrame(blinkFrame), paint?.(0), rootNode.style.removeProperty("--bt-portrait-x"), rootNode.style.removeProperty("--bt-portrait-y");
+  };
+}
+var blinkAt = (progress) => smooth2(unit2(Math.min(progress / 0.34, (1 - progress) / 0.62)));
+function createPortraitTrack({ art, canvas, image, rig, pace, strength, phase, compact: compact2, expressive }) {
+  let paintArt = makePortraitArt(art, image, canvas, rig, compact2), head = spring(), torso = spring(), eyes = spring(), breath = expressive && !compact2, painter, frame, lastFrame, lastPaint, cue, blinkStart, pointer, wasBusy, base = states.idle, direction = 1, blinkDuration = 186 * Math.min(pace, 1.16), draw = (time2) => {
+    frame = void 0;
+    let dt2 = lastFrame === void 0 ? 0.016 : Math.min(0.065, Math.max(1e-3, (time2 - lastFrame) / 1e3));
+    lastFrame = time2;
+    let progress = cue ? (time2 - cue.start) / cue.duration : 1.2, [px, py] = pointer ?? zero, [bx, by, br3] = base.pose, side = cue?.side ?? 1, [hx, hy, hr3] = cueAt(cue?.clip.head, progress), [tx, ty, tr2] = cueAt(cue?.clip.head, (progress - 0.08) / 1.12), movingHead = head.step([
+      (bx * direction + hx * side + px * 1.15) * strength,
+      (by + hy + py * 1.65) * strength,
+      (br3 * direction + hr3 * side + px * 1.8) * strength
+    ], dt2, 22 / pace), movingTorso = torso.step([
+      (bx * direction + tx * side + px * 0.63) * strength * 0.37,
+      (by + ty) * strength * 0.6 + py * 0.3,
+      (br3 * direction + tr2 * side + px * 1.2) * strength * 0.39
+    ], dt2, 12 / pace), movingEyes = !1;
+    if (expressive) {
+      let [ex, ey, lid] = base.eyes ?? zero, [cueX, cueY, cueLid] = cueAt(cue?.clip.eyes, progress), weight = pointer ? 0.29 : 1;
+      movingEyes = eyes.step([
+        clamp(px * 0.97 + (ex * direction + cueX * side) * weight),
+        clamp(py * 0.97 + (ey + cueY) * weight),
+        unit2(lid + cueLid)
+      ], dt2, pointer ? 39 : 30);
+    }
+    let blinkOffset = cue?.clip.blink, cueBlink = blinkOffset === void 0 ? 1 / 0 : (time2 - cue.start - cue.duration * blinkOffset) / blinkDuration, idleBlink = blinkStart === void 0 ? 1 / 0 : (time2 - blinkStart) / blinkDuration, busy = !!cue || blinkStart !== void 0 || movingHead || movingTorso || movingEyes;
+    if (busy || wasBusy || lastPaint === void 0 || breath && time2 - lastPaint >= 32) {
+      let [x, y, lid] = eyes.value, left = expressive ? Math.max(lid, blinkAt(idleBlink), blinkAt(cueBlink)) : 0, right = expressive ? Math.max(lid, blinkAt(idleBlink - 0.027), blinkAt(cueBlink - 0.027)) : 0;
+      (x || y || left || right) && (painter ??= makeEyePainter(canvas, image, rig)), painter?.(x, y, left, right);
+      let inhale = breath ? Math.sin(time2 / (720 * pace) + phase * 2 * Math.PI) : 0, [a, b2, c] = head.value, [d, e, f] = torso.value;
+      paintArt([a, b2 - inhale * 0.09, c], [d, e + inhale * 0.85, f + inhale * 0.12]), lastPaint = time2;
+    }
+    wasBusy = busy, progress >= 1.2 && (cue = void 0), idleBlink >= 1.03 && (blinkStart = void 0), busy || breath ? queue() : lastFrame = void 0;
+  };
+  function queue() {
+    frame === void 0 && (frame = requestAnimationFrame(draw));
+  }
+  let load = () => {
+    lastPaint = void 0, queue();
+  };
+  return image.addEventListener("load", load), {
+    point(position) {
+      pointer = position, queue();
+    },
+    pose(motion, side) {
+      base = motion, direction = side, queue();
+    },
+    play(clip, side) {
+      cue = clip && { clip, side, start: performance.now(), duration: clip.duration * pace }, queue();
+    },
+    blink() {
+      blinkStart = performance.now(), queue();
+    },
+    stop() {
+      image.removeEventListener("load", load), frame !== void 0 && cancelAnimationFrame(frame), painter?.(0, 0, 0, 0), art.hidden = !0;
+    }
+  };
+}
+function ModelPortrait({ entry, botId, state, size: size2, gaze, pokeable, onError }) {
+  let root = (0, import_react.useRef)(null), picture = (0, import_react.useRef)(null), eyelids = (0, import_react.useRef)(null), art = (0, import_react.useRef)(null), driver = (0, import_react.useRef)(null), currentState = (0, import_react.useRef)(state), setting = (0, import_react.useSyncExternalStore)(watchMotion, motionSetting, () => "off"), [visible, setVisible] = (0, import_react.useState)(!1);
+  (0, import_react.useEffect)(() => watchViewport(root.current, setVisible), []);
+  let active2 = visible && setting !== "off", canInteract = active2 && setting !== "quiet", rig = PORTRAIT_RIGS[entry.id], compact2 = size2 <= 44, strength = (compact2 ? 0.82 : 1) * (setting === "quiet" ? 0.58 : 1), phase = fnv1a(`${botId}:${entry.id}`) % 1e3 / 1e3;
+  (0, import_react.useEffect)(() => {
+    currentState.current = state, driver.current?.setState(state);
+  }, [state]), (0, import_react.useEffect)(() => {
+    gaze || driver.current?.point();
+  }, [gaze]), (0, import_react.useEffect)(() => {
+    if (!active2 || !rig) return;
+    let initialSide = phase < 0.5 ? -1 : 1, timer, blinkTimer, lastClip, state2, pointing, side = initialSide, pace = rig.pace * (compact2 ? 1.13 : 1) * (setting === "lively" ? 0.92 : 1), track = createPortraitTrack({
+      art: art.current,
+      canvas: eyelids.current,
+      image: picture.current,
+      rig,
+      pace,
+      strength,
+      phase,
+      compact: compact2,
+      expressive: canInteract
+    }), play = (clip) => {
+      track.play(clip, side), side = -side;
+    }, schedule = (fraction = Math.random(), first = !1) => {
+      let motion = states[state2];
+      if (!canInteract || !motion.interval) return;
+      let [low, high] = motion.interval, delay = (first && state2 === "idle" && !compact2 ? 2200 + 1400 * fraction : low + (high - low) * fraction) * pace * (setting === "lively" && state2 === "idle" ? 0.76 : 1);
+      timer = setTimeout(() => {
+        if (!pointing || state2 !== "idle") {
+          let choices = motion.clips.filter((name) => name !== lastClip);
+          lastClip = choices[Math.floor(Math.random() * choices.length)], play(clips[lastClip]);
+        }
+        schedule();
+      }, delay);
+    }, scheduleBlink = (fraction) => {
+      let delay = (2850 + 3050 * fraction) * pace * (setting === "lively" ? 0.82 : 1);
+      blinkTimer = setTimeout(() => {
+        track.blink(), scheduleBlink(Math.random());
+      }, delay);
+    }, setState = (next) => {
+      let name = Object.hasOwn(states, next) ? next : "idle";
+      if (state2 === name) return;
+      state2 = name, clearTimeout(timer);
+      let motion = states[state2];
+      track.pose(motion, initialSide), lastClip = state2 === "idle" ? void 0 : motion.clips[0], track.play(clips[lastClip], initialSide), schedule(phase, !0);
     };
-  }, [active2, botId, canInteract, compact2, entry.id, motion, rig, setting, state, strength]);
+    return driver.current = {
+      setState,
+      point(position) {
+        pointing = !!position, track.point(position);
+      },
+      greet() {
+        clearTimeout(timer), clearTimeout(blinkTimer), scheduleBlink(0.32 + Math.random() * 0.68), play(clips[rig.greeting]), schedule();
+      }
+    }, setState(currentState.current), canInteract && scheduleBlink(phase), () => {
+      driver.current = null, clearTimeout(timer), clearTimeout(blinkTimer), track.stop();
+    };
+  }, [active2, canInteract, compact2, phase, rig, setting, strength]);
   let pointAt = (event) => {
     if (event.pointerType === "touch") return;
-    let node = event.currentTarget, box = node.getBoundingClientRect();
-    node.style.setProperty("--bt-portrait-x", clamp((event.clientX - box.left - box.width / 2) / (box.width / 2)).toFixed(2)), node.style.setProperty("--bt-portrait-y", clamp((event.clientY - box.top - box.height / 2) / (box.height / 2)).toFixed(2));
-  }, clearPoint = (event) => {
-    event.currentTarget.style.removeProperty("--bt-portrait-x"), event.currentTarget.style.removeProperty("--bt-portrait-y");
-  };
-  return (0, import_react.createElement)("span", {
-    ref: root,
-    className: "bt-model-portrait",
-    "data-portrait": entry.id,
-    style: { backgroundColor: rig?.backdrop },
-    "data-portrait-motion": active2 ? setting : void 0,
-    onPointerMove: canInteract && gaze ? pointAt : void 0,
-    onPointerLeave: canInteract && gaze ? clearPoint : void 0,
-    onClick: canInteract && pokeable ? () => interact.current?.() : void 0
-  }, (0, import_react.createElement)(
+    let box = event.currentTarget.getBoundingClientRect(), x = clamp((event.clientX - box.left) / box.width * 2 - 1), y = clamp((event.clientY - box.top) / box.height * 2 - 1), radius = Math.max(1, Math.hypot(x, y));
+    driver.current?.point([x / radius, y / radius]);
+  }, clearPoint = () => driver.current?.point();
+  return (0, import_react.createElement)(
     "span",
-    { className: "bt-portrait-look" },
-    (0, import_react.createElement)(
-      "span",
-      { className: "bt-portrait-pose", style: { transform: active2 ? poseTransform(motion.pose, strength, 1, 1.045) : "none" } },
-      (0, import_react.createElement)(
-        "span",
-        { ref: gesture, className: "bt-portrait-gesture" },
-        (0, import_react.createElement)("img", { ref: picture, src: entry.image, alt: "", draggable: !1, onError }),
-        (0, import_react.createElement)("canvas", { ref: eyelids, width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, hidden: !0 })
-      )
-    )
-  ));
+    {
+      ref: root,
+      className: "bt-model-portrait",
+      "data-portrait": entry.id,
+      style: { backgroundColor: rig?.backdrop },
+      "data-portrait-motion": active2 ? setting : void 0,
+      "data-portrait-breathing": canInteract && !compact2 ? "" : void 0,
+      onPointerMove: canInteract && gaze ? pointAt : void 0,
+      onPointerLeave: canInteract && gaze ? clearPoint : void 0,
+      onPointerCancel: canInteract && gaze ? clearPoint : void 0,
+      onClick: canInteract && pokeable ? () => driver.current?.greet() : void 0
+    },
+    (0, import_react.createElement)("img", { ref: picture, src: entry.image, alt: "", draggable: !1, onError }),
+    (0, import_react.createElement)("canvas", { ref: eyelids, className: "bt-portrait-eyes", width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, hidden: !0 }),
+    (0, import_react.createElement)("canvas", { ref: art, className: "bt-portrait-art", width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, hidden: !0 })
+  );
 }
 var MODEL_PORTRAIT_CSS = `
 .bt-model-portrait{display:block;position:relative;width:100%;height:100%;overflow:hidden;border-radius:50%;isolation:isolate}
-.bt-model-portrait :is(.bt-portrait-pose,.bt-portrait-look,.bt-portrait-gesture){display:block;position:absolute;inset:0;transform-origin:50% 64%}
 .bt-model-portrait img,.bt-model-portrait canvas{position:absolute;inset:0;width:100%;height:100%}
 .bt-model-portrait canvas{pointer-events:none}
-.bt-model-portrait[data-portrait-motion] .bt-portrait-pose{transition:transform .4s cubic-bezier(.21,.68,.29,1)}
-.bt-model-portrait[data-portrait-motion] .bt-portrait-look{transition:transform .22s ease-out;transform:translate(calc(var(--bt-portrait-x,0)*2.1%),calc(var(--bt-portrait-y,0)*1.65%)) rotate(calc(var(--bt-portrait-x,0)*3.5deg))}
-@media(prefers-reduced-motion:reduce){.bt-model-portrait *{transform:none!important;animation:none!important;transition:none!important}}
+@media(prefers-reduced-motion:reduce){.bt-model-portrait canvas{display:none!important}}
 `;
 
 // modules/bot-runtime/vendor/ds-bot/src/client/motion.js
@@ -11813,12 +12001,12 @@ function springEasing(stiffness, damping) {
     if (zeta >= 1) return 1 - (1 + w0 * t2) * Math.exp(-w0 * t2);
     let wd = w0 * Math.sqrt(1 - zeta * zeta);
     return 1 - Math.exp(-zeta * w0 * t2) * (Math.cos(wd * t2) + zeta * w0 / wd * Math.sin(wd * t2));
-  }, end = 0.05;
-  for (; end < 2 && Math.abs(1 - at2(end)) > 1e-3; ) end += 0.01;
-  let points = Array.from({ length: 25 }, (_2, index) => (index === 24 ? 1 : at2(end * index / 24)).toFixed(4));
-  return { duration: Math.round(end * 1e3), easing: `linear(${points.join(",")})`, stiffness, damping };
+  }, end2 = 0.05;
+  for (; end2 < 2 && Math.abs(1 - at2(end2)) > 1e-3; ) end2 += 0.01;
+  let points = Array.from({ length: 25 }, (_2, index) => (index === 24 ? 1 : at2(end2 * index / 24)).toFixed(4));
+  return { duration: Math.round(end2 * 1e3), easing: `linear(${points.join(",")})`, stiffness, damping };
 }
-var SPRING_SHAPE = springEasing(400, 31.2), SPRING_TAP = springEasing(900, 48), SPRING_LIST = springEasing(484, 35.2), SPRING_STRETCH = springEasing(320, 20), SPRING_POP = springEasing(500, 22), SPRING_LEAD = springEasing(784, 48.2), SPRING_TRAIL = springEasing(289, 29.2), QUICK_EDGES = { lead: springEasing(900, 51), trail: springEasing(400, 34) }, spring = (curve, ...properties) => properties.map((property) => `${property} ${curve.duration}ms ${curve.easing}`).join(",");
+var SPRING_SHAPE = springEasing(400, 31.2), SPRING_TAP = springEasing(900, 48), SPRING_LIST = springEasing(484, 35.2), SPRING_STRETCH = springEasing(320, 20), SPRING_POP = springEasing(500, 22), SPRING_LEAD = springEasing(784, 48.2), SPRING_TRAIL = springEasing(289, 29.2), QUICK_EDGES = { lead: springEasing(900, 51), trail: springEasing(400, 34) }, spring2 = (curve, ...properties) => properties.map((property) => `${property} ${curve.duration}ms ${curve.easing}`).join(",");
 function liveSprings(apply4) {
   let values = /* @__PURE__ */ new Map(), frame = 0, last = 0, read = () => Object.fromEntries([...values].map(([key, value]) => [key, value.x])), step = (now) => {
     let dt2 = Math.min(0.5, Math.max(1e-3, (now - last) / 1e3));
@@ -11854,9 +12042,9 @@ function useGlide(key, { axis = "x", selector = CHOSEN, lead = SPRING_LEAD, trai
     key: void 0,
     node: null,
     observer: null,
-    springs: liveSprings(({ start, end }) => {
+    springs: liveSprings(({ start, end: end2 }) => {
       let knob = thumb.current;
-      knob && (knob.style.transform = axis === "x" ? `translateX(${start}px)` : `translateY(${start}px)`, knob.style[axis === "x" ? "width" : "height"] = `${Math.max(0, end - start)}px`);
+      knob && (knob.style.transform = axis === "x" ? `translateX(${start}px)` : `translateY(${start}px)`, knob.style[axis === "x" ? "width" : "height"] = `${Math.max(0, end2 - start)}px`);
     })
   });
   let place = (jump) => {
@@ -11867,11 +12055,11 @@ function useGlide(key, { axis = "x", selector = CHOSEN, lead = SPRING_LEAD, trai
       knob.dataset.hidden = "";
       return;
     }
-    let start = axis === "x" ? chosen.offsetLeft : chosen.offsetTop, end = start + (axis === "x" ? chosen.offsetWidth : chosen.offsetHeight), { springs } = own.current, before = springs.target(), hidden = knob.dataset.hidden !== void 0;
-    if (jump && !hidden && before?.start === start && before?.end === end && container.dataset.glide !== void 0) return;
+    let start = axis === "x" ? chosen.offsetLeft : chosen.offsetTop, end2 = start + (axis === "x" ? chosen.offsetWidth : chosen.offsetHeight), { springs } = own.current, before = springs.target(), hidden = knob.dataset.hidden !== void 0;
+    if (jump && !hidden && before?.start === start && before?.end === end2 && container.dataset.glide !== void 0) return;
     delete knob.dataset.hidden;
     let forward = before === null || start >= before.start;
-    springs.set({ start, end }, forward ? { start: trail, end: lead } : { start: lead, end: trail }, jump || hidden || before === null || reducedMotion()), container.dataset.glide = "";
+    springs.set({ start, end: end2 }, forward ? { start: trail, end: lead } : { start: lead, end: trail }, jump || hidden || before === null || reducedMotion()), container.dataset.glide = "";
   };
   return (0, import_react2.useLayoutEffect)(() => {
     let state = own.current, node = box.current;
@@ -12129,9 +12317,9 @@ html[data-bt-collapsing] [class*="_frame"]:has(>[class*="_sidebarCol"]){transiti
 .bt-pill:hover{background:color-mix(in srgb,var(--bt-main),#777 9%)}
 .bt-pill:active{transform:scale(.965)}
 .bt-pill-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
-.bt-pill-mem{flex:none;display:inline-flex;width:0;margin-left:-8px;overflow:hidden;transition:${spring(SPRING_SHAPE, "width", "margin-left")}}
-.bt-pill[data-memory=updated] .bt-pill-mem{width:var(--bt-mem-w);margin-left:0;transition:${spring(SPRING_STRETCH, "width", "margin-left")}}
-.bt-pill-mem-in{flex:none;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:var(--bt-ink-2);font-size:13px;font-weight:500;opacity:0;filter:blur(6px);transform:translateX(-8px);transition:opacity .14s ease,filter .18s ease,${spring(SPRING_SHAPE, "transform")}}
+.bt-pill-mem{flex:none;display:inline-flex;width:0;margin-left:-8px;overflow:hidden;transition:${spring2(SPRING_SHAPE, "width", "margin-left")}}
+.bt-pill[data-memory=updated] .bt-pill-mem{width:var(--bt-mem-w);margin-left:0;transition:${spring2(SPRING_STRETCH, "width", "margin-left")}}
+.bt-pill-mem-in{flex:none;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:var(--bt-ink-2);font-size:13px;font-weight:500;opacity:0;filter:blur(6px);transform:translateX(-8px);transition:opacity .14s ease,filter .18s ease,${spring2(SPRING_SHAPE, "transform")}}
 .bt-pill-mem-in::before{content:"";flex:none;width:1px;height:14px;margin-right:4px;background:var(--bt-line-2)}
 .bt-pill[data-memory=updated] .bt-pill-mem-in{opacity:1;filter:none;transform:none;transition-delay:70ms}
 .bt-pill-mem-ico{flex:none;display:inline-flex;width:16px;height:16px;color:var(--bt-accent)}
@@ -12183,7 +12371,7 @@ button.bt-lead{border:0;background:none;padding:0;cursor:pointer}
 .bt-group-name:has(>.bt-lead){display:flex;align-items:center;margin:0 0 2px;font-size:13px;line-height:22px;font-weight:600;color:var(--bt-ink)}
 .bt-group-name>.bt-lead{margin:0 8px 0 0}
 .bt-group-time,.bt-group-took{margin-left:6px;font-size:11px;line-height:16px;font-weight:400;color:var(--bt-ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
-.bt-x{border:0;background:none;color:var(--bt-ink-2);cursor:pointer;width:24px;height:24px;border-radius:6px;font-size:16px;line-height:24px;padding:0;transition:background-color .12s ease,color .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-x{border:0;background:none;color:var(--bt-ink-2);cursor:pointer;width:24px;height:24px;border-radius:6px;font-size:16px;line-height:24px;padding:0;transition:background-color .12s ease,color .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-x:hover{background:var(--bt-hover);color:var(--bt-ink)}
 
 .bt-q{margin:0 auto 8px;width:100%;max-width:var(--dsh-chat-content-width,748px);display:flex;flex-direction:column;gap:12px;--bt-q-edge:color-mix(in srgb,var(--bt-ink) 10%,transparent);--bt-q-rule:color-mix(in srgb,var(--bt-ink) 8%,transparent);--bt-q-rule-2:color-mix(in srgb,var(--bt-ink) 5%,transparent);background:var(--bt-card);box-shadow:0 1px 3px rgba(20,20,20,.04),inset 0 0 0 1px var(--bt-q-edge);border-radius:16px;padding:14px 16px;box-sizing:border-box;color:var(--bt-ink);font-family:var(--bt-font);animation:bt-q-in ${SPRING_SHAPE.duration}ms ${SPRING_SHAPE.easing} backwards,bt-veil-in .2s ease-out backwards}
@@ -12194,7 +12382,7 @@ body[data-ds-dark-theme] .bt-q{--bt-q-edge:rgba(255,255,255,.16);--bt-q-rule:rgb
 .bt-q-text{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
 .bt-q-title{margin:0;font-size:15px;line-height:22px;font-weight:600;overflow-wrap:anywhere}
 .bt-q-detail{font-size:13px;line-height:18px;color:var(--bt-ink-2)}
-.bt-q-x{flex:none;width:20px;height:20px;border:0;padding:0;border-radius:6px;background:none;color:var(--bt-ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background-color .12s ease,color .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-q-x{flex:none;width:20px;height:20px;border:0;padding:0;border-radius:6px;background:none;color:var(--bt-ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background-color .12s ease,color .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-q-x svg{width:14px;height:14px}
 .bt-q-x:hover{background:var(--bt-hover);color:var(--bt-ink)}
 .bt-q-x:focus-visible,.bt-q-opt:focus-visible{outline:2px solid var(--bt-accent);outline-offset:-2px}
@@ -12235,7 +12423,7 @@ button.bt-q-opt:active{background:var(--bt-active)}
 .bt-q-input{flex:1;width:100%;min-width:0;max-height:120px;margin:0;padding:0;border:0;outline:none;background:transparent;color:var(--bt-ink);font:inherit;font-size:14px;line-height:20px;resize:none;overflow-y:hidden;white-space:pre-wrap;overflow-wrap:anywhere}
 .bt-q-input:not(:placeholder-shown){field-sizing:content}
 .bt-q-input::placeholder{color:var(--bt-ink-3)}
-.bt-q-submit,.bt-q-btn{flex:none;height:36px;padding:0 14px;border:0;border-radius:999px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .12s ease,background-color .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-q-submit,.bt-q-btn{flex:none;height:36px;padding:0 14px;border:0;border-radius:999px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .12s ease,background-color .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-q-submit{background:var(--bt-accent);color:var(--bt-accent-ink,#fff);animation:bt-q-submit-in ${SPRING_TAP.duration}ms ${SPRING_TAP.easing} backwards,bt-veil-in .16s ease-out backwards}
 @keyframes bt-q-submit-in{from{transform:translateX(8px) scale(.9)}}
 .bt-q-submit:hover:not(:disabled){opacity:.86}
@@ -12424,10 +12612,10 @@ html[data-windows-titlebar]:not([data-fullscreen]) :is(.bt-pane,.bt-panel)::befo
 .bt-shape-row{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
 .bt-shape{position:relative;aspect-ratio:1;border:0;border-radius:10px;background:none;color:var(--bt-ink);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .bt-shape:hover{background:var(--bt-hover)}
-.bt-shape .bt-ring{position:absolute;left:50%;top:50%;width:36px;height:36px;translate:-50% -50%;overflow:visible;opacity:0;scale:.82;pointer-events:none;transition:opacity .14s ease,${spring(SPRING_POP, "scale")}}
+.bt-shape .bt-ring{position:absolute;left:50%;top:50%;width:36px;height:36px;translate:-50% -50%;overflow:visible;opacity:0;scale:.82;pointer-events:none;transition:opacity .14s ease,${spring2(SPRING_POP, "scale")}}
 .bt-shape[aria-pressed=true] .bt-ring{opacity:1;scale:1}
 .bt-colors{display:grid;grid-template-columns:repeat(6,1fr);justify-items:center;gap:6px;padding-top:6px;border-top:.5px solid var(--bt-line)}
-.bt-color{width:26px;height:26px;border-radius:50%;border:2px solid transparent;padding:2.5px;background:none;cursor:pointer;box-sizing:border-box;transition:border-color .14s ease,${spring(SPRING_TAP, "scale")}}
+.bt-color{width:26px;height:26px;border-radius:50%;border:2px solid transparent;padding:2.5px;background:none;cursor:pointer;box-sizing:border-box;transition:border-color .14s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-color[aria-pressed=true] span{animation:bt-check-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
 .bt-color span{display:block;width:100%;height:100%;border-radius:50%}
 .bt-color[aria-pressed=true]{border-color:var(--bt-ink)}
@@ -12636,7 +12824,7 @@ body[data-bt-layout=flat] .bt-tools::after{display:none}
 .bt-tool:active{background:var(--bt-active)}
 .bt-tool:focus-visible{outline:2px solid var(--bt-accent);outline-offset:-2px}
 .bt-react-strip{position:fixed;z-index:60;pointer-events:auto;display:flex;gap:2px;padding:4px;border-radius:999px;background:var(--bt-glass-bg);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);border:.5px solid var(--bt-glass-rim);box-shadow:var(--bt-glass-shadow);transform:translate(-50%,-100%);transform-origin:bottom center;animation:bt-pop-lift ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .14s ease-out}
-.bt-react-strip button{width:32px;height:32px;border:0;border-radius:50%;background:none;font-size:18px;line-height:1;cursor:pointer;transition:background-color .12s ease,${spring(SPRING_POP, "transform")};animation:bt-check-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing} backwards}
+.bt-react-strip button{width:32px;height:32px;border:0;border-radius:50%;background:none;font-size:18px;line-height:1;cursor:pointer;transition:background-color .12s ease,${spring2(SPRING_POP, "transform")};animation:bt-check-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing} backwards}
 .bt-react-strip button:nth-child(2){animation-delay:20ms}
 .bt-react-strip button:nth-child(3){animation-delay:40ms}
 .bt-react-strip button:nth-child(4){animation-delay:60ms}
@@ -12644,7 +12832,7 @@ body[data-bt-layout=flat] .bt-tools::after{display:none}
 .bt-react-strip button:hover{background:var(--bt-hover);transform:scale(1.15)}
 .bt-react-strip button:active{transform:scale(.92)}
 .bt-reacts{display:flex;gap:4px;margin-top:4px}
-.bt-react{height:22px;min-width:30px;padding:0 6px;border-radius:999px;border:.5px solid var(--bt-line-2);background:var(--bt-main);font-size:13px;line-height:20px;cursor:pointer;animation:bt-react-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing};transition:background-color .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-react{height:22px;min-width:30px;padding:0 6px;border-radius:999px;border:.5px solid var(--bt-line-2);background:var(--bt-main);font-size:13px;line-height:20px;cursor:pointer;animation:bt-react-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing};transition:background-color .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-react:hover{background:var(--bt-hover)}
 .bt-react:active{scale:.92}
 @keyframes bt-react-pop{from{transform:scale(.6);opacity:0}}
@@ -12749,12 +12937,12 @@ body[data-ds-dark-theme] .bt-theme-chip i{background:var(--da)}
 .bt-range input{flex:1;min-width:0;height:20px;margin:0;background:none;-webkit-appearance:none;appearance:none;cursor:pointer}
 .bt-range input::-webkit-slider-runnable-track{height:4px;border-radius:999px;background:linear-gradient(to right,var(--bt-accent) var(--bt-fill),var(--bt-active) var(--bt-fill))}
 .bt-range input::-moz-range-track{height:4px;border-radius:999px;background:linear-gradient(to right,var(--bt-accent) var(--bt-fill),var(--bt-active) var(--bt-fill))}
-.bt-range input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;margin-top:-6px;border:0;border-radius:50%;corner-shape:round;background:var(--bt-card);box-shadow:inset 0 0 0 .5px var(--bt-line-2),0 1px 3px rgba(0,0,0,.08);transition:${spring(SPRING_TAP, "scale")}}
+.bt-range input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;margin-top:-6px;border:0;border-radius:50%;corner-shape:round;background:var(--bt-card);box-shadow:inset 0 0 0 .5px var(--bt-line-2),0 1px 3px rgba(0,0,0,.08);transition:${spring2(SPRING_TAP, "scale")}}
 .bt-range input::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:var(--bt-card);box-shadow:inset 0 0 0 .5px var(--bt-line-2),0 1px 3px rgba(0,0,0,.08)}
 .bt-range input:active::-webkit-slider-thumb{scale:1.15}
 .bt-range input:focus-visible{outline:2px solid var(--bt-accent);outline-offset:2px;border-radius:999px}
 .bt-range output{flex:none;width:38px;text-align:right;font-size:13px;color:var(--bt-ink-2);font-variant-numeric:tabular-nums}
-.bt-seg button{position:relative;z-index:1;flex:1;height:30px;border:0;border-radius:8px;background:none;font:inherit;font-size:13px;color:var(--bt-ink-2);cursor:pointer;transition:background-color .15s ease,color .15s ease,box-shadow .15s ease,${spring(SPRING_TAP, "scale")}}
+.bt-seg button{position:relative;z-index:1;flex:1;height:30px;border:0;border-radius:8px;background:none;font:inherit;font-size:13px;color:var(--bt-ink-2);cursor:pointer;transition:background-color .15s ease,color .15s ease,box-shadow .15s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-seg button[aria-pressed=true]{background:var(--bt-card);color:var(--bt-ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .bt-seg button:disabled{opacity:.4;cursor:default}
 .bt-seg button:active:not(:disabled){scale:.96}
@@ -12841,7 +13029,7 @@ body[data-ds-dark-theme] .bt-theme-chip i{background:var(--da)}
 .bt-mem-ask:focus-within{border-color:var(--bt-ink-3);box-shadow:0 4px 20px rgba(0,0,0,.1)}
 .bt-mem-input{flex:1;min-width:0;border:0;background:none;outline:none;color:var(--bt-ink);font:inherit;font-size:15px;line-height:22px;padding:0}
 .bt-mem-input::placeholder{color:var(--bt-ink-3)}
-.bt-mem-send{flex:none;width:36px;height:36px;border-radius:50%;border:0;background:var(--bt-ink);color:var(--bt-main);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:opacity .15s ease,${spring(SPRING_TAP, "scale")}}
+.bt-mem-send{flex:none;width:36px;height:36px;border-radius:50%;border:0;background:var(--bt-ink);color:var(--bt-main);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:opacity .15s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-mem-send:disabled{opacity:.22;cursor:default}
 .bt-mem-send:not(:disabled):active{scale:.92}
 .bt-mem-send>*{animation:bt-check-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
@@ -12866,7 +13054,7 @@ body[data-ds-dark-theme] .bt-theme-chip i{background:var(--da)}
 .bt-panel-view>.bt-drawer-body[data-move=tab]{animation:bt-veil-in .2s ease-out}
 .bt-drawer-name-input{animation:bt-veil-in .16s ease-out}
 .bt-pop-in{display:inline-flex;animation:bt-check-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
-:is(.bt-soft,.bt-send,.bt-icon-btn,.bt-settings-close,.bt-mini,.bt-tab,.bt-nc-send,.bt-avedit-tab,.bt-shape,.bt-pick,.bt-swatch,.bt-palette-clear){transition:background-color .12s ease,color .12s ease,border-color .12s ease,opacity .12s ease,${spring(SPRING_TAP, "scale")}}
+:is(.bt-soft,.bt-send,.bt-icon-btn,.bt-settings-close,.bt-mini,.bt-tab,.bt-nc-send,.bt-avedit-tab,.bt-shape,.bt-pick,.bt-swatch,.bt-palette-clear){transition:background-color .12s ease,color .12s ease,border-color .12s ease,opacity .12s ease,${spring2(SPRING_TAP, "scale")}}
 :is(.bt-icon-btn,.bt-settings-close,.bt-nc-send,.bt-shape,.bt-swatch,.bt-color,.bt-x,.bt-q-x,.bt-palette-clear):active:not(:disabled){scale:.9}
 :is(.bt-soft,.bt-send,.bt-mini,.bt-tab,.bt-avedit-tab,.bt-pick,.bt-q-submit,.bt-q-btn):active:not(:disabled){scale:.96}
 @media (prefers-reduced-motion:reduce){.bt-thumb{transition:none}.bt-panel-view>[data-move],.bt-drawer-name-input,.bt-veil,.bt-pop-in,.bt-token,.bt-drop,.bt-newchat,.bt-option-hint,.bt-connector-form,.bt-settings-head>*{animation:none}}
@@ -13017,7 +13205,7 @@ body[data-bt-goal] [class*="_scroll"]:has(> [class*="_column"]){padding-top:calc
 }
 @keyframes bt-fade-in{from{opacity:0}to{opacity:1}}
 @keyframes bt-fade-out{from{opacity:1}to{opacity:0}}
-[data-composer-card]{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;gap:0!important;min-height:44px!important;border-radius:22px!important;padding:7.5px!important;box-sizing:border-box;background:var(--bt-glass-bg)!important;-webkit-backdrop-filter:blur(20px) saturate(180%)!important;backdrop-filter:blur(20px) saturate(180%)!important;border:.5px solid var(--bt-glass-rim)!important;box-shadow:var(--bt-glass-shadow),0 0 0 1px rgba(228,228,228,.04)!important;transition:border-color .15s ease,background-color .15s ease,${spring(SPRING_SHAPE, "border-radius")}!important}
+[data-composer-card]{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;gap:0!important;min-height:44px!important;border-radius:22px!important;padding:7.5px!important;box-sizing:border-box;background:var(--bt-glass-bg)!important;-webkit-backdrop-filter:blur(20px) saturate(180%)!important;backdrop-filter:blur(20px) saturate(180%)!important;border:.5px solid var(--bt-glass-rim)!important;box-shadow:var(--bt-glass-shadow),0 0 0 1px rgba(228,228,228,.04)!important;transition:border-color .15s ease,background-color .15s ease,${spring2(SPRING_SHAPE, "border-radius")}!important}
 [data-composer-card]:hover,[data-composer-card]:focus-within{border-color:color-mix(in srgb,var(--bt-ink) 30%,transparent)!important}
 [data-composer-card]:has(> [data-slot="conversation.input.attachments"] *),[data-composer-card]:has([data-composer-input] br + *),[data-composer-card]:has([data-composer-input] > :nth-child(2)){border-radius:18px!important}
 [class*="_root"]:has(> [data-composer-card]){padding:0 11px 13px 16px!important}
@@ -13038,10 +13226,10 @@ body[data-bt-goal] [class*="_scroll"]:has(> [class*="_column"]){padding-top:calc
 [data-composer-placeholder]::before{content:var(--bt-placeholder,"Message")!important;display:block!important;font-size:14px!important;line-height:24px!important;color:color-mix(in srgb,var(--bt-ink) 36%,transparent)!important}
 /* The team's "+" (ComposerPlus) takes the seat of the shell's command-menu button. */
 [data-composer-card] button[class*="_add"]{display:none!important}
-.bt-plus{flex:none;width:28px;height:28px;padding:0;border:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,transparent);box-shadow:inset 0 0 0 .5px var(--bt-line);color:var(--bt-ink-2);cursor:pointer;transition:background-color .15s ease,color .15s ease,${spring(SPRING_TAP, "scale")}}
+.bt-plus{flex:none;width:28px;height:28px;padding:0;border:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,transparent);box-shadow:inset 0 0 0 .5px var(--bt-line);color:var(--bt-ink-2);cursor:pointer;transition:background-color .15s ease,color .15s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-plus:hover,.bt-plus[aria-expanded=true]{background:color-mix(in srgb,var(--bt-ink) 10%,transparent);color:var(--bt-ink)}
 .bt-plus:active{scale:.9}
-.bt-plus svg{width:14px;height:14px;transition:${spring(SPRING_POP, "rotate")}}
+.bt-plus svg{width:14px;height:14px;transition:${spring2(SPRING_POP, "rotate")}}
 .bt-plus[aria-expanded=true] svg{rotate:45deg}
 .bt-plus-menu{min-width:180px}
 [data-composer-card] [class*="_tools"]{gap:0!important}
@@ -13050,14 +13238,14 @@ body[data-bt-goal] [class*="_scroll"]:has(> [class*="_column"]){padding-top:calc
 [data-composer-card] [class*="_trailing"]{gap:8px!important}
 /* No display here: DSH hides these controls with [hidden] while the Bot works. */
 [data-composer-card] [class*="_standardControls"]{align-items:center!important;gap:8px!important}
-[data-composer-card] button[class*="_primary"]{width:28px!important;height:28px!important;background:var(--bt-accent)!important;color:var(--bt-accent-ink,#fff)!important;border-radius:50%!important;transition:opacity .15s ease,${spring(SPRING_TAP, "scale")};animation:bt-icon-swap ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
+[data-composer-card] button[class*="_primary"]{width:28px!important;height:28px!important;background:var(--bt-accent)!important;color:var(--bt-accent-ink,#fff)!important;border-radius:50%!important;transition:opacity .15s ease,${spring2(SPRING_TAP, "scale")};animation:bt-icon-swap ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
 [data-composer-card] button[class*="_primary"]:hover:not(:disabled){opacity:.9}
 [data-composer-card] button[class*="_primary"]:active:not(:disabled){scale:.9}
 @keyframes bt-icon-swap{from{opacity:0;transform:scale(.5) rotate(-30deg)}}
 [data-composer-card] button[class*="_primary"] svg{width:14px;height:14px}
 [data-composer-card] button[class*="_primary"]:disabled{display:none!important}
 [data-composer-dock]{display:none!important}
-.bt-mic,.bt-voice{flex:none;width:28px;height:28px;border-radius:50%;border:0;padding:0;display:inline-grid;place-items:center;cursor:pointer;transition:background-color .15s ease,color .15s ease,${spring(SPRING_TAP, "scale")}}
+.bt-mic,.bt-voice{flex:none;width:28px;height:28px;border-radius:50%;border:0;padding:0;display:inline-grid;place-items:center;cursor:pointer;transition:background-color .15s ease,color .15s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-mic{background:color-mix(in srgb,var(--bt-ink) 5%,transparent);box-shadow:inset 0 0 0 .5px var(--bt-line);color:var(--bt-ink-2)}
 .bt-mic:hover{background:color-mix(in srgb,var(--bt-ink) 10%,transparent);color:var(--bt-ink)}
 .bt-mic[aria-pressed=true]{background:#ff3e51;color:#fff;animation:bt-mic-pulse 1.4s ease-in-out infinite}
@@ -13111,7 +13299,7 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-q-dock .bt-q{margin:0 auto 8px}
 [class*="_toBottomSlot"]{justify-content:center!important;padding-right:0!important}
 [data-conversation-scroll] [class*="_toBottomSlot"]{bottom:calc(var(--dsh-composer-height,152px) + 8px)!important}
-[class*="_toBottomSlot"]>button{width:36px!important;height:36px!important;margin-top:-36px!important;background:var(--bt-glass-bg)!important;-webkit-backdrop-filter:blur(16px) saturate(180%)!important;backdrop-filter:blur(16px) saturate(180%)!important;color:var(--bt-ink)!important;box-shadow:var(--bt-glass-shadow)!important;animation:bt-tobottom-in ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .16s ease-out;transition:background-color .12s ease,${spring(SPRING_TAP, "scale")}}
+[class*="_toBottomSlot"]>button{width:36px!important;height:36px!important;margin-top:-36px!important;background:var(--bt-glass-bg)!important;-webkit-backdrop-filter:blur(16px) saturate(180%)!important;backdrop-filter:blur(16px) saturate(180%)!important;color:var(--bt-ink)!important;box-shadow:var(--bt-glass-shadow)!important;animation:bt-tobottom-in ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .16s ease-out;transition:background-color .12s ease,${spring2(SPRING_TAP, "scale")}}
 [class*="_toBottomSlot"]>button:active{scale:.9}
 [class*="_toBottomSlot"]>button:hover{background:color-mix(in srgb,var(--bt-ink) 4%,var(--bt-main))!important}
 [class*="_toBottomSlot"]>button svg{display:none}
@@ -13302,7 +13490,7 @@ function useGaze(ref2, enabled) {
   }, [enabled]);
 }
 var FIDGETS = ["hop", "sway", "stretch", "look"];
-function BotMark({ bot, look: given, size = 36, state = "idle", live = !1, gaze = !1, pokeable = !1, label }) {
+function BotMark({ bot, look: given, size: size2 = 36, state = "idle", live = !1, gaze = !1, pokeable = !1, label }) {
   let look = given ?? lookOf(bot), ref2 = (0, import_react4.useRef)(null), maskId = (0, import_react4.useRef)("");
   maskId.current === "" && (maskId.current = `bt-mark-${nextMarkSerial()}`);
   let [poked, setPoked] = (0, import_react4.useState)(!1), [broken, setBroken] = (0, import_react4.useState)(""), image = look.image && look.image !== broken ? look.image : void 0, portrait = live && image ? modelAvatarOf(image) : void 0, markState = STATES.includes(state) ? state : "idle";
@@ -13316,7 +13504,7 @@ function BotMark({ bot, look: given, size = 36, state = "idle", live = !1, gaze 
     "data-fidget": live ? FIDGETS[fnv1a(`${bot?.id ?? ""}:fidget`) % FIDGETS.length] : void 0,
     "data-gaze": gaze ? "" : void 0,
     "data-poke": pokeable ? "" : void 0,
-    style: { width: size, height: size, ...live ? { "--bt-delay": `${-(fnv1a(String(bot?.id ?? "")) % 5e3) / 1e3}s`, "--bt-fidget-delay": `${-(fnv1a(`${bot?.id ?? ""}:when`) % 9e3) / 1e3}s` } : {} },
+    style: { width: size2, height: size2, ...live ? { "--bt-delay": `${-(fnv1a(String(bot?.id ?? "")) % 5e3) / 1e3}s`, "--bt-fidget-delay": `${-(fnv1a(`${bot?.id ?? ""}:when`) % 9e3) / 1e3}s` } : {} },
     role: label ? "img" : void 0,
     "aria-label": label,
     "aria-hidden": label ? void 0 : !0,
@@ -13330,7 +13518,7 @@ function BotMark({ bot, look: given, size = 36, state = "idle", live = !1, gaze 
     entry: portrait,
     botId: bot?.id ?? portrait.id,
     state: markState,
-    size,
+    size: size2,
     gaze,
     pokeable,
     onError: () => setBroken(image)
@@ -13339,10 +13527,10 @@ function BotMark({ bot, look: given, size = 36, state = "idle", live = !1, gaze 
   let box = shapeOf(look.shape).size;
   return (0, import_react4.createElement)("span", common, (0, import_react4.createElement)("svg", { viewBox: `0 0 ${box} ${box}`, dangerouslySetInnerHTML: { __html: characterMarkup(look.shape, look.color).replaceAll(MASK_ID, maskId.current) } }));
 }
-function StarIcon({ size = 8 }) {
+function StarIcon({ size: size2 = 8 }) {
   return (0, import_react4.createElement)(
     "svg",
-    { width: size, height: size, viewBox: "0 0 10 10", "aria-hidden": !0 },
+    { width: size2, height: size2, viewBox: "0 0 10 10", "aria-hidden": !0 },
     (0, import_react4.createElement)("path", { d: "M5 .6l1.3 2.8 3 .3-2.3 2 .7 3L5 7.2 2.3 8.7l.7-3L.7 3.7l3-.3z", fill: "#fff" })
   );
 }
@@ -13370,14 +13558,14 @@ function useSettled(state) {
     return () => clearTimeout(timer);
   }, [state]), settled;
 }
-function BotAvatar({ bot, size, state = "idle", main, admin, badge = !0, live = !0, gaze = !1, pokeable = !1 }) {
+function BotAvatar({ bot, size: size2, state = "idle", main, admin, badge = !0, live = !0, gaze = !1, pokeable = !1 }) {
   let settled = useSettled(state);
-  if (bot === void 0) return (0, import_react4.createElement)(BotMark, { size });
+  if (bot === void 0) return (0, import_react4.createElement)(BotMark, { size: size2 });
   let badgeKind = badge ? state === "alert" ? "alert" : state !== "idle" && state !== "waiting" ? "working" : admin ? "admin" : main ? "main" : null : null;
   return (0, import_react4.createElement)(
     "span",
-    { className: "bt-mark", style: { width: size, height: size, "--bt-size": `${size}px` } },
-    (0, import_react4.createElement)(BotMark, { bot, size, state: settled ? "done" : state, live, gaze, pokeable }),
+    { className: "bt-mark", style: { width: size2, height: size2, "--bt-size": `${size2}px` } },
+    (0, import_react4.createElement)(BotMark, { bot, size: size2, state: settled ? "done" : state, live, gaze, pokeable }),
     badgeKind === "working" ? (0, import_react4.createElement)("span", { className: "bt-badge bt-badge-working", "aria-label": t("Working"), role: "img" }) : null,
     badgeKind === "alert" ? (0, import_react4.createElement)("span", { className: "bt-badge bt-badge-alert", "aria-label": t("Waiting for your answer"), role: "img" }, "?") : null,
     badgeKind === "admin" ? (0, import_react4.createElement)("span", { className: "bt-badge bt-badge-admin", "aria-label": t("Admin"), role: "img" }, (0, import_react4.createElement)(StarIcon)) : null,
@@ -13388,26 +13576,26 @@ function clusterSeats(count2, frame) {
   if (count2 === 1) return [[0, 0, frame]];
   if (count2 === 2) return [[0, 0, frame * 2 / 3], [frame / 3, frame / 3, frame * 2 / 3]];
   if (count2 === 3) {
-    let size = frame * 5 / 9, rest = frame - size;
-    return [[rest / 2, 0, size], [0, rest, size], [rest, rest, size]];
+    let size2 = frame * 5 / 9, rest = frame - size2;
+    return [[rest / 2, 0, size2], [0, rest, size2], [rest, rest, size2]];
   }
   let half = frame / 2;
   return [[0, 0, half], [half, 0, half], [0, half, half], [half, half, half]];
 }
-function RoomAvatar({ room: room2, roster, size = 36 }) {
+function RoomAvatar({ room: room2, roster, size: size2 = 36 }) {
   let members = room2.members.map((id3) => roster.byId[id3]).filter(Boolean), people = members.length === 1 ? [members[0], null] : members, seat = (bot, seatSize, key) => bot ? (0, import_react4.createElement)(BotMark, { key, bot, size: seatSize }) : (0, import_react4.createElement)("span", { key, className: "bt-cluster-you", style: { width: seatSize * 0.92, height: seatSize * 0.92, margin: seatSize * 0.04 } });
-  if (people.length === 0) return (0, import_react4.createElement)(BotMark, { size });
-  if (size <= 20 && people.length > 1)
+  if (people.length === 0) return (0, import_react4.createElement)(BotMark, { size: size2 });
+  if (size2 <= 20 && people.length > 1)
     return (0, import_react4.createElement)(
       "span",
-      { className: "bt-stack", style: { "--bt-stack-size": `${size}px` } },
-      people.slice(0, 3).map((bot, index) => seat(bot, size, bot?.id ?? `you-${index}`)),
+      { className: "bt-stack", style: { "--bt-stack-size": `${size2}px` } },
+      people.slice(0, 3).map((bot, index) => seat(bot, size2, bot?.id ?? `you-${index}`)),
       people.length > 3 ? (0, import_react4.createElement)("span", { className: "bt-stack-more" }, `+${people.length - 3}`) : null
     );
-  let seats = clusterSeats(Math.min(people.length, 4), size), overflow = people.length > 4 ? people.length - 3 : 0, gap = size / 14, rings = seats.map(([x, y, s15]) => ({ cx: x + s15 / 2, cy: y + s15 / 2, r: s15 * 0.48 + gap }));
+  let seats = clusterSeats(Math.min(people.length, 4), size2), overflow = people.length > 4 ? people.length - 3 : 0, gap = size2 / 14, rings = seats.map(([x, y, s15]) => ({ cx: x + s15 / 2, cy: y + s15 / 2, r: s15 * 0.48 + gap }));
   return (0, import_react4.createElement)(
     "span",
-    { className: "bt-cluster", style: { width: size, height: size } },
+    { className: "bt-cluster", style: { width: size2, height: size2 } },
     seats.map(([x, y, s15], index) => {
       let holes2 = rings.slice(index + 1).filter((ring) => Math.hypot(ring.cx - x - s15 / 2, ring.cy - y - s15 / 2) < ring.r + s15 * 0.46).map((ring) => `radial-gradient(circle at ${ring.cx - x}px ${ring.cy - y}px,transparent ${ring.r}px,#000 ${ring.r + 0.5}px)`), style = { left: x, top: y, width: s15, height: s15 };
       if (holes2.length > 0 && Object.assign(style, { WebkitMaskImage: holes2.join(","), maskImage: holes2.join(","), WebkitMaskComposite: "source-in", maskComposite: "intersect" }), overflow > 0 && index === 3)
@@ -13452,18 +13640,18 @@ function PeopleIcon() {
 function ArrowUpIcon() {
   return (0, import_react5.createElement)("svg", { width: 16, height: 16, viewBox: "0 0 20 20", "aria-hidden": !0 }, (0, import_react5.createElement)("path", { d: "M10 16V4M5 9l5-5 5 5", stroke: "currentColor", strokeWidth: 1.8, fill: "none", strokeLinecap: "round", strokeLinejoin: "round" }));
 }
-function MicIcon({ size = 16 }) {
+function MicIcon({ size: size2 = 16 }) {
   return (0, import_react5.createElement)(
     "svg",
-    { width: size, height: size, viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", "aria-hidden": !0 },
+    { width: size2, height: size2, viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", "aria-hidden": !0 },
     (0, import_react5.createElement)("rect", { x: 7, y: 2.5, width: 6, height: 10, rx: 3, fill: "currentColor", stroke: "none" }),
     (0, import_react5.createElement)("path", { d: "M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5" })
   );
 }
-function WaveIcon({ size = 16 }) {
+function WaveIcon({ size: size2 = 16 }) {
   return (0, import_react5.createElement)(
     "svg",
-    { width: size, height: size, viewBox: "0 0 20 20", fill: "currentColor", "aria-hidden": !0 },
+    { width: size2, height: size2, viewBox: "0 0 20 20", fill: "currentColor", "aria-hidden": !0 },
     [[3, 7.5, 5], [6.5, 4.5, 11], [10, 2.5, 15], [13.5, 5.5, 9], [17, 8, 4]].map(([x, y, height]) => (0, import_react5.createElement)("rect", { key: x, x: x - 1, y, width: 2, height, rx: 1 }))
   );
 }
@@ -13821,7 +14009,7 @@ function GoalIsland({ room: room2, goal, view, open, composing, roomWork, roster
 var GOAL_CSS = `
 /* One surface: the pill's own background, border and shadow. The pill row is
    40px, the pod bar 30px; the surface reshapes on SPRING_SHAPE. */
-.bt-island{position:relative;z-index:6;align-self:flex-start;display:flex;flex-direction:column;pointer-events:auto;width:min(380px,calc(100% - 120px));background:var(--bt-glass-bg);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);border:.5px solid var(--bt-glass-rim);border-radius:20px;box-shadow:var(--bt-glass-shadow);color:var(--bt-ink);font-family:inherit;font-size:14px;line-height:20px;box-sizing:border-box;transition:${spring(SPRING_SHAPE, "width", "border-radius")}}
+.bt-island{position:relative;z-index:6;align-self:flex-start;display:flex;flex-direction:column;pointer-events:auto;width:min(380px,calc(100% - 120px));background:var(--bt-glass-bg);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);border:.5px solid var(--bt-glass-rim);border-radius:20px;box-shadow:var(--bt-glass-shadow);color:var(--bt-ink);font-family:inherit;font-size:14px;line-height:20px;box-sizing:border-box;transition:${spring2(SPRING_SHAPE, "width", "border-radius")}}
 .bt-island[data-open]{width:min(560px,calc(100% - 48px));border-radius:18px}
 .bt-island[data-morph]{overflow:hidden}
 .bt-island .bt-pill{width:100%;max-width:none;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;border:0;box-shadow:none;border-radius:20px 20px 0 0}
@@ -13855,7 +14043,7 @@ var GOAL_CSS = `
 /* The track shrinks so 20 stages still fit the bar: each segment is 14px and
    gives up to 3px, the current one 20px. */
 .bt-goal-segs{display:inline-flex;align-items:center;gap:3px;flex:0 1 auto;min-width:0}
-.bt-goal-segs i{display:block;flex:0 1 auto;width:14px;min-width:3px;height:4px;border-radius:999px;background:var(--bt-line-2);transition:${spring(SPRING_SHAPE, "width")},background-color .12s ease}
+.bt-goal-segs i{display:block;flex:0 1 auto;width:14px;min-width:3px;height:4px;border-radius:999px;background:var(--bt-line-2);transition:${spring2(SPRING_SHAPE, "width")},background-color .12s ease}
 .bt-goal-segs i[data-seg=done]{background:var(--bt-green)}
 .bt-goal-segs i[data-seg=current]{width:20px;background:var(--bt-accent)}
 .bt-goal-segs i[data-seg=checking]{width:20px;background:color-mix(in srgb,var(--bt-accent) 60%,transparent)}
@@ -13865,7 +14053,7 @@ var GOAL_CSS = `
 .bt-goal-face+.bt-goal-face{margin-left:-6px}
 .bt-goal-more{font-size:11px;line-height:16px;color:var(--bt-ink-3);margin-left:3px}
 .bt-goal-chev{flex:none;display:inline-flex;color:var(--bt-ink-3)}
-.bt-goal-chev svg{width:14px;height:14px;transition:${spring(SPRING_SHAPE, "transform")}}
+.bt-goal-chev svg{width:14px;height:14px;transition:${spring2(SPRING_SHAPE, "transform")}}
 .bt-goal-bar[aria-expanded=true] .bt-goal-chev svg{transform:rotate(180deg)}
 /* The bar's extras hand off to the open panel and give their room to the label. */
 .bt-island[data-open] .bt-goal-segs,.bt-island[data-open] .bt-goal-faces{display:none}
@@ -13913,7 +14101,7 @@ var GOAL_CSS = `
 .bt-goal-checks{display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:4px 6px;margin-left:-6px;border-radius:6px;font:inherit;font-size:12px;line-height:16px;color:var(--bt-ink-2);cursor:pointer}
 .bt-goal-checks:hover{background:var(--bt-hover)}
 .bt-goal-mchev{display:inline-flex;width:14px;height:14px;color:var(--bt-ink-3)}
-.bt-goal-mchev svg{width:14px;height:14px;transition:${spring(SPRING_SHAPE, "transform")}}
+.bt-goal-mchev svg{width:14px;height:14px;transition:${spring2(SPRING_SHAPE, "transform")}}
 .bt-goal-checks[aria-expanded=true] .bt-goal-mchev svg{transform:rotate(180deg)}
 .bt-goal-facts{display:flex;align-items:center;gap:6px;flex:none;margin-left:auto}
 .bt-goal-danger{color:var(--bt-danger)}
@@ -14384,15 +14572,15 @@ function tokenize(source) {
       continue;
     }
     if (char === '"' || char === "'") {
-      let end = at2 + 1, text8 = "";
-      for (; end < source.length && source[end] !== char; ) {
-        if (source[end] === "\\" && end + 1 < source.length) {
-          text8 += source[end + 1], end += 2;
+      let end2 = at2 + 1, text8 = "";
+      for (; end2 < source.length && source[end2] !== char; ) {
+        if (source[end2] === "\\" && end2 + 1 < source.length) {
+          text8 += source[end2 + 1], end2 += 2;
           continue;
         }
-        text8 += source[end], end += 1;
+        text8 += source[end2], end2 += 1;
       }
-      end >= source.length && fail(`unclosed string at ${at2 + 1}`), tokens.push({ kind: "string", value: text8, at: at2 }), at2 = end + 1;
+      end2 >= source.length && fail(`unclosed string at ${at2 + 1}`), tokens.push({ kind: "string", value: text8, at: at2 }), at2 = end2 + 1;
       continue;
     }
     let operator = OPERATORS.find((op) => source.startsWith(op, at2));
@@ -14931,11 +15119,11 @@ function resolve(value, lookup, fallback = void 0) {
 var asText = (value) => value == null ? "" : show(value);
 
 // node_modules/deep-view/src/react/chart.js
-var PALETTE = ["var(--dv-accent)", "var(--dv-ink-tangerine)", "var(--dv-ink-green)", "var(--dv-ink-violet)", "var(--dv-ink-sky)", "var(--dv-ink-rose)", "var(--dv-ink-yellow)", "var(--dv-ink-cyan)", "var(--dv-ink-magenta)"], colorAt = (index) => PALETTE[index % PALETTE.length], TICK = 10, LABEL = 11, textWidth = (text8, size) => [...String(text8)].reduce((sum, char) => sum + (char.charCodeAt(0) > 11904 ? size : size * 0.58), 0), fit = (text8, room2, size) => {
-  if (textWidth(text8, size) <= room2) return text8;
+var PALETTE = ["var(--dv-accent)", "var(--dv-ink-tangerine)", "var(--dv-ink-green)", "var(--dv-ink-violet)", "var(--dv-ink-sky)", "var(--dv-ink-rose)", "var(--dv-ink-yellow)", "var(--dv-ink-cyan)", "var(--dv-ink-magenta)"], colorAt = (index) => PALETTE[index % PALETTE.length], TICK = 10, LABEL = 11, textWidth = (text8, size2) => [...String(text8)].reduce((sum, char) => sum + (char.charCodeAt(0) > 11904 ? size2 : size2 * 0.58), 0), fit = (text8, room2, size2) => {
+  if (textWidth(text8, size2) <= room2) return text8;
   let out = "";
   for (let char of String(text8)) {
-    if (textWidth(`${out}${char}…`, size) > room2) break;
+    if (textWidth(`${out}${char}…`, size2) > room2) break;
     out += char;
   }
   return out === "" ? "" : `${out}…`;
@@ -14945,12 +15133,12 @@ function formatNumber(value) {
   let abs = Math.abs(value), digits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
   return Number(value.toFixed(digits)).toLocaleString("en-US", { maximumFractionDigits: digits });
 }
-var withUnit = (value, unit2) => unit2 ? unit2 === "%" ? `${formatNumber(value)}%` : `${formatNumber(value)} ${unit2}` : formatNumber(value);
+var withUnit = (value, unit3) => unit3 ? unit3 === "%" ? `${formatNumber(value)}%` : `${formatNumber(value)} ${unit3}` : formatNumber(value);
 function niceTicks(low, high) {
   let lo2 = low, hi2 = high;
   lo2 === hi2 && (lo2 = Math.min(0, lo2), hi2 = hi2 === 0 ? 1 : Math.max(0, hi2)), lo2 === hi2 && (hi2 = lo2 + 1);
-  let raw = (hi2 - lo2) / 4, magnitude = 10 ** Math.floor(Math.log10(raw)), step = [1, 2, 2.5, 5, 10].map((scale) => scale * magnitude).find((candidate) => candidate >= raw), start = Math.floor(lo2 / step + 1e-9) * step, end = Math.ceil(hi2 / step - 1e-9) * step, ticks = [];
-  for (let value = start; value <= end + step / 2; value += step) ticks.push(Number(value.toPrecision(12)));
+  let raw = (hi2 - lo2) / 4, magnitude = 10 ** Math.floor(Math.log10(raw)), step = [1, 2, 2.5, 5, 10].map((scale) => scale * magnitude).find((candidate) => candidate >= raw), start = Math.floor(lo2 / step + 1e-9) * step, end2 = Math.ceil(hi2 / step - 1e-9) * step, ticks = [];
+  for (let value = start; value <= end2 + step / 2; value += step) ticks.push(Number(value.toPrecision(12)));
   return ticks;
 }
 function chartData(node, lookup) {
@@ -14965,30 +15153,30 @@ function chartData(node, lookup) {
   return { kind: node.kind ?? "bar", categories, series, unit: typeof node.unit == "string" ? node.unit : "" };
 }
 var csvCell = (value) => /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-function chartCsv({ categories, series, unit: unit2 }, t2 = (key) => key) {
-  let head = ["", ...series.map((item, index) => item.name || (series.length === 1 ? unit2 || t2("Value") : `${t2("Series")} ${index + 1}`))], rows2 = categories.map((label, at2) => [label, ...series.map((item) => String(item.values[at2]))]);
+function chartCsv({ categories, series, unit: unit3 }, t2 = (key) => key) {
+  let head = ["", ...series.map((item, index) => item.name || (series.length === 1 ? unit3 || t2("Value") : `${t2("Series")} ${index + 1}`))], rows2 = categories.map((label, at2) => [label, ...series.map((item) => String(item.values[at2]))]);
   return [head, ...rows2].map((row) => row.map((cell) => csvCell(String(cell))).join(",")).join(`
 `);
 }
-function valueAxis(values, zero) {
+function valueAxis(values, zero2) {
   let finite4 = values.length > 0 ? values : [0], low = Math.min(...finite4), high = Math.max(...finite4);
-  if (zero) return niceTicks(Math.min(0, low), Math.max(0, high));
+  if (zero2) return niceTicks(Math.min(0, low), Math.max(0, high));
   let pad3 = (high - low) * 0.1 || Math.abs(high) * 0.1 || 1;
   return niceTicks(low - pad3, high + pad3);
 }
-function columns({ categories, series, unit: unit2, kind }, width, active2, shown) {
-  let visible = series.filter((_2, index) => shown[index]), ticks = valueAxis(visible.flatMap((item) => item.values), kind !== "line"), lo2 = ticks[0], hi2 = ticks.at(-1), left = Math.ceil(Math.max(...ticks.map((tick) => textWidth(withUnit(tick, unit2), TICK)))) + 10, top = 8, height = 220, plot = { x: left, y: top, w: Math.max(40, width - left - 4), h: height - top - 24 }, y = (value) => plot.y + plot.h - (value - lo2) / (hi2 - lo2) * plot.h, band = plot.w / categories.length, parts = [];
+function columns({ categories, series, unit: unit3, kind }, width, active2, shown) {
+  let visible = series.filter((_2, index) => shown[index]), ticks = valueAxis(visible.flatMap((item) => item.values), kind !== "line"), lo2 = ticks[0], hi2 = ticks.at(-1), left = Math.ceil(Math.max(...ticks.map((tick) => textWidth(withUnit(tick, unit3), TICK)))) + 10, top = 8, height = 220, plot = { x: left, y: top, w: Math.max(40, width - left - 4), h: height - top - 24 }, y = (value) => plot.y + plot.h - (value - lo2) / (hi2 - lo2) * plot.h, band = plot.w / categories.length, parts = [];
   for (let tick of ticks)
-    parts.push((0, import_react13.createElement)("line", { key: `g${tick}`, className: "dv-chart-grid", x1: plot.x, x2: plot.x + plot.w, y1: y(tick), y2: y(tick) })), parts.push((0, import_react13.createElement)("text", { key: `t${tick}`, className: "dv-chart-tick", x: plot.x - 8, y: y(tick) + 3, textAnchor: "end" }, withUnit(tick, unit2)));
+    parts.push((0, import_react13.createElement)("line", { key: `g${tick}`, className: "dv-chart-grid", x1: plot.x, x2: plot.x + plot.w, y1: y(tick), y2: y(tick) })), parts.push((0, import_react13.createElement)("text", { key: `t${tick}`, className: "dv-chart-tick", x: plot.x - 8, y: y(tick) + 3, textAnchor: "end" }, withUnit(tick, unit3)));
   let points = [];
   if (categories.forEach((label, at2) => {
     let cx = plot.x + band * at2 + band / 2;
     parts.push((0, import_react13.createElement)("text", { key: `c${at2}`, className: "dv-chart-label", x: cx, y: height - 7, textAnchor: "middle" }, fit(label, band - 4, LABEL))), points.push({ x: cx, y: y(Math.max(...visible.map((item) => item.values[at2]), lo2)) });
   }), kind === "bar") {
-    let group = band * 0.72, gap = visible.length > 1 ? 2 : 0, barW = Math.max(2, (group - gap * (visible.length - 1)) / visible.length), zero = y(Math.max(lo2, Math.min(0, hi2)));
+    let group = band * 0.72, gap = visible.length > 1 ? 2 : 0, barW = Math.max(2, (group - gap * (visible.length - 1)) / visible.length), zero2 = y(Math.max(lo2, Math.min(0, hi2)));
     categories.forEach((_2, at2) => {
       visible.forEach((item, row) => {
-        let value = item.values[at2], x = plot.x + band * at2 + (band - group) / 2 + row * (barW + gap), top2 = Math.min(y(value), zero), tall = Math.max(1, Math.abs(y(value) - zero)), r = Math.min(4, barW / 2, tall), d = value >= 0 ? `M${x},${top2 + tall}V${top2 + r}q0,-${r} ${r},-${r}h${barW - 2 * r}q${r},0 ${r},${r}V${top2 + tall}z` : `M${x},${top2}V${top2 + tall - r}q0,${r} ${r},${r}h${barW - 2 * r}q${r},0 ${r},-${r}V${top2}z`;
+        let value = item.values[at2], x = plot.x + band * at2 + (band - group) / 2 + row * (barW + gap), top2 = Math.min(y(value), zero2), tall = Math.max(1, Math.abs(y(value) - zero2)), r = Math.min(4, barW / 2, tall), d = value >= 0 ? `M${x},${top2 + tall}V${top2 + r}q0,-${r} ${r},-${r}h${barW - 2 * r}q${r},0 ${r},${r}V${top2 + tall}z` : `M${x},${top2}V${top2 + tall - r}q0,${r} ${r},${r}h${barW - 2 * r}q${r},0 ${r},-${r}V${top2}z`;
         parts.push((0, import_react13.createElement)("path", { key: `b${at2}-${row}`, className: "dv-chart-mark", "data-dim": active2 !== null && active2 !== at2 ? "" : void 0, d, style: { fill: item.color } }));
       });
     });
@@ -15008,31 +15196,31 @@ function columns({ categories, series, unit: unit2, kind }, width, active2, show
   let hits = categories.map((_2, at2) => ({ x: plot.x + band * at2, y: plot.y, w: band, h: plot.h }));
   return { parts, height, points, hits };
 }
-function rows({ categories, series, unit: unit2 }, width, active2, shown) {
-  let visible = series.filter((_2, index) => shown[index]), ticks = valueAxis(visible.flatMap((item) => item.values), !0), lo2 = ticks[0], hi2 = ticks.at(-1), labelW = Math.min(width * 0.38, Math.ceil(Math.max(...categories.map((label) => textWidth(label, LABEL)))) + 10), valueW = Math.ceil(Math.max(...visible.flatMap((item) => item.values).map((value) => textWidth(withUnit(value, unit2), LABEL)))) + 10, barH = 14, rowH = 10 + visible.length * barH + (visible.length - 1) * 2, top = 4, height = top + rowH * categories.length + 22, plot = { x: labelW, y: top, w: Math.max(40, width - labelW - valueW), h: rowH * categories.length }, x = (value) => plot.x + (value - lo2) / (hi2 - lo2) * plot.w, parts = [];
+function rows({ categories, series, unit: unit3 }, width, active2, shown) {
+  let visible = series.filter((_2, index) => shown[index]), ticks = valueAxis(visible.flatMap((item) => item.values), !0), lo2 = ticks[0], hi2 = ticks.at(-1), labelW = Math.min(width * 0.38, Math.ceil(Math.max(...categories.map((label) => textWidth(label, LABEL)))) + 10), valueW = Math.ceil(Math.max(...visible.flatMap((item) => item.values).map((value) => textWidth(withUnit(value, unit3), LABEL)))) + 10, barH = 14, rowH = 10 + visible.length * barH + (visible.length - 1) * 2, top = 4, height = top + rowH * categories.length + 22, plot = { x: labelW, y: top, w: Math.max(40, width - labelW - valueW), h: rowH * categories.length }, x = (value) => plot.x + (value - lo2) / (hi2 - lo2) * plot.w, parts = [];
   for (let tick of ticks)
-    parts.push((0, import_react13.createElement)("line", { key: `g${tick}`, className: "dv-chart-grid", x1: x(tick), x2: x(tick), y1: plot.y, y2: plot.y + plot.h })), parts.push((0, import_react13.createElement)("text", { key: `t${tick}`, className: "dv-chart-tick", x: x(tick), y: height - 6, textAnchor: "middle" }, withUnit(tick, unit2)));
-  let points = [], zero = x(Math.max(lo2, Math.min(0, hi2)));
+    parts.push((0, import_react13.createElement)("line", { key: `g${tick}`, className: "dv-chart-grid", x1: x(tick), x2: x(tick), y1: plot.y, y2: plot.y + plot.h })), parts.push((0, import_react13.createElement)("text", { key: `t${tick}`, className: "dv-chart-tick", x: x(tick), y: height - 6, textAnchor: "middle" }, withUnit(tick, unit3)));
+  let points = [], zero2 = x(Math.max(lo2, Math.min(0, hi2)));
   categories.forEach((label, at2) => {
     let rowY = plot.y + rowH * at2 + 5;
     parts.push((0, import_react13.createElement)("text", { key: `c${at2}`, className: "dv-chart-label", x: labelW - 10, y: rowY + (rowH - 10) / 2 + 4, textAnchor: "end" }, fit(label, labelW - 12, LABEL))), visible.forEach((item, row) => {
-      let value = item.values[at2], by = rowY + row * (barH + 2), left = Math.min(x(value), zero), long = Math.max(1, Math.abs(x(value) - zero));
-      parts.push((0, import_react13.createElement)("rect", { key: `b${at2}-${row}`, className: "dv-chart-mark", "data-dim": active2 !== null && active2 !== at2 ? "" : void 0, x: left, y: by, width: long, height: barH, rx: Math.min(4, long / 2), style: { fill: item.color } })), parts.push((0, import_react13.createElement)("text", { key: `v${at2}-${row}`, className: "dv-chart-value", x: left + long + 6, y: by + barH - 3 }, withUnit(value, unit2)));
-    }), points.push({ x: Math.max(...visible.map((item) => x(item.values[at2])), zero), y: rowY });
+      let value = item.values[at2], by = rowY + row * (barH + 2), left = Math.min(x(value), zero2), long = Math.max(1, Math.abs(x(value) - zero2));
+      parts.push((0, import_react13.createElement)("rect", { key: `b${at2}-${row}`, className: "dv-chart-mark", "data-dim": active2 !== null && active2 !== at2 ? "" : void 0, x: left, y: by, width: long, height: barH, rx: Math.min(4, long / 2), style: { fill: item.color } })), parts.push((0, import_react13.createElement)("text", { key: `v${at2}-${row}`, className: "dv-chart-value", x: left + long + 6, y: by + barH - 3 }, withUnit(value, unit3)));
+    }), points.push({ x: Math.max(...visible.map((item) => x(item.values[at2])), zero2), y: rowY });
   });
   let hits = categories.map((_2, at2) => ({ x: 0, y: plot.y + rowH * at2, w: width, h: rowH }));
   return { parts, height, points, hits };
 }
 function donut({ categories, series }, width, active2, hover) {
-  let values = (series[0]?.values ?? []).map((value) => Math.max(0, value)), total = values.reduce((sum, value) => sum + value, 0), size = Math.min(180, Math.max(120, width * 0.42)), r = size / 2, inner = r * 0.62, cx = r, cy = r, parts = [], points = [], angle = -Math.PI / 2;
+  let values = (series[0]?.values ?? []).map((value) => Math.max(0, value)), total = values.reduce((sum, value) => sum + value, 0), size2 = Math.min(180, Math.max(120, width * 0.42)), r = size2 / 2, inner = r * 0.62, cx = r, cy = r, parts = [], points = [], angle2 = -Math.PI / 2;
   return values.forEach((value, at2) => {
-    let sweep = total > 0 ? value / total * Math.PI * 2 : 0, end = angle + sweep, mid = angle + sweep / 2;
+    let sweep = total > 0 ? value / total * Math.PI * 2 : 0, end2 = angle2 + sweep, mid = angle2 + sweep / 2;
     if (points.push({ x: cx + Math.cos(mid) * (r - (r - inner) / 2), y: cy + Math.sin(mid) * (r - (r - inner) / 2) }), sweep > 0) {
-      let large = sweep > Math.PI ? 1 : 0, full2 = sweep >= Math.PI * 2 - 1e-6, p = (radius, theta) => `${cx + Math.cos(theta) * radius},${cy + Math.sin(theta) * radius}`, d = full2 ? `M${p(r, angle)}A${r},${r} 0 1 1 ${p(r, angle + Math.PI)}A${r},${r} 0 1 1 ${p(r, angle)}M${p(inner, angle)}A${inner},${inner} 0 1 0 ${p(inner, angle + Math.PI)}A${inner},${inner} 0 1 0 ${p(inner, angle)}z` : `M${p(r, angle)}A${r},${r} 0 ${large} 1 ${p(r, end)}L${p(inner, end)}A${inner},${inner} 0 ${large} 0 ${p(inner, angle)}z`;
+      let large = sweep > Math.PI ? 1 : 0, full2 = sweep >= Math.PI * 2 - 1e-6, p = (radius, theta) => `${cx + Math.cos(theta) * radius},${cy + Math.sin(theta) * radius}`, d = full2 ? `M${p(r, angle2)}A${r},${r} 0 1 1 ${p(r, angle2 + Math.PI)}A${r},${r} 0 1 1 ${p(r, angle2)}M${p(inner, angle2)}A${inner},${inner} 0 1 0 ${p(inner, angle2 + Math.PI)}A${inner},${inner} 0 1 0 ${p(inner, angle2)}z` : `M${p(r, angle2)}A${r},${r} 0 ${large} 1 ${p(r, end2)}L${p(inner, end2)}A${inner},${inner} 0 ${large} 0 ${p(inner, angle2)}z`;
       parts.push((0, import_react13.createElement)("path", { key: `s${at2}`, className: "dv-chart-mark", "data-dim": active2 !== null && active2 !== at2 ? "" : void 0, d, fillRule: "evenodd", style: { fill: colorAt(at2) }, onPointerEnter: () => hover(at2) }));
     }
-    angle = end;
-  }), { parts, height: size, size, points, total, values, categories };
+    angle2 = end2;
+  }), { parts, height: size2, size: size2, points, total, values, categories };
 }
 function useWidth(box, initial) {
   let [width, setWidth] = (0, import_react13.useState)(initial);
@@ -15076,7 +15264,7 @@ var TableIcon = () => (0, import_react13.createElement)(
   (0, import_react13.createElement)("path", { d: "M3 8.5h14M8 8.5V16" })
 );
 function ChartTable({ data }) {
-  let ui3 = useViewUi(), { categories, series, unit: unit2 } = data, heads = series.map((item, index) => item.name || (series.length === 1 ? unit2 || ui3.t("Value") : `${ui3.t("Series")} ${index + 1}`));
+  let ui3 = useViewUi(), { categories, series, unit: unit3 } = data, heads = series.map((item, index) => item.name || (series.length === 1 ? unit3 || ui3.t("Value") : `${ui3.t("Series")} ${index + 1}`));
   return (0, import_react13.createElement)(
     "div",
     { className: "dv-widget-table" },
@@ -15088,13 +15276,13 @@ function ChartTable({ data }) {
         "tr",
         { key: at2 },
         (0, import_react13.createElement)("th", { scope: "row" }, label),
-        series.map((item, index) => (0, import_react13.createElement)("td", { key: index, className: "dv-num" }, withUnit(item.values[at2], series.length === 1 && !item.name ? "" : unit2)))
+        series.map((item, index) => (0, import_react13.createElement)("td", { key: index, className: "dv-num" }, withUnit(item.values[at2], series.length === 1 && !item.name ? "" : unit3)))
       )))
     )
   );
 }
 function WidgetChart({ node, lookup, registerChart, refreshCharts }) {
-  let ui3 = useViewUi(), data = chartData(node, lookup), { kind, categories, series, unit: unit2 } = data, box = (0, import_react13.useRef)(null), svg = (0, import_react13.useRef)(null), width = useWidth(box, 520), [active2, setActive] = (0, import_react13.useState)(null), [hidden, setHidden] = (0, import_react13.useState)([]), [asTable, setAsTable] = (0, import_react13.useState)(!1), [copied, setCopied] = (0, import_react13.useState)(!1), labelId = (0, import_react13.useId)(), menuKey = (0, import_react13.useId)(), table = (0, import_react13.useRef)(asTable);
+  let ui3 = useViewUi(), data = chartData(node, lookup), { kind, categories, series, unit: unit3 } = data, box = (0, import_react13.useRef)(null), svg = (0, import_react13.useRef)(null), width = useWidth(box, 520), [active2, setActive] = (0, import_react13.useState)(null), [hidden, setHidden] = (0, import_react13.useState)([]), [asTable, setAsTable] = (0, import_react13.useState)(!1), [copied, setCopied] = (0, import_react13.useState)(!1), labelId = (0, import_react13.useId)(), menuKey = (0, import_react13.useId)(), table = (0, import_react13.useRef)(asTable);
   table.current = asTable;
   let shown = series.map((_2, index) => !hidden.includes(index)), toggle = (index) => {
     hidden.includes(index) ? setHidden(hidden.filter((item) => item !== index)) : shown.filter(Boolean).length > 1 && setHidden([...hidden, index]);
@@ -15105,7 +15293,7 @@ function WidgetChart({ node, lookup, registerChart, refreshCharts }) {
       return;
     }
     keys[event.key] !== void 0 && (event.preventDefault(), setActive((current) => current === null ? 0 : (current + keys[event.key] + categories.length) % categories.length));
-  }, point = active2 === null ? null : drawn.points[active2], share = (at2) => unit2 === "%" ? withUnit(drawn.values[at2], unit2) : `${withUnit(drawn.values[at2], unit2)} · ${drawn.total > 0 ? Math.round(drawn.values[at2] / drawn.total * 100) : 0}%`, tipRows = active2 === null || isDonut ? [] : series.filter((_2, index) => shown[index]).map((item) => ({ color: item.color, name: item.name, value: withUnit(item.values[active2], unit2) })), copy2 = () => {
+  }, point = active2 === null ? null : drawn.points[active2], share = (at2) => unit3 === "%" ? withUnit(drawn.values[at2], unit3) : `${withUnit(drawn.values[at2], unit3)} · ${drawn.total > 0 ? Math.round(drawn.values[at2] / drawn.total * 100) : 0}%`, tipRows = active2 === null || isDonut ? [] : series.filter((_2, index) => shown[index]).map((item) => ({ color: item.color, name: item.name, value: withUnit(item.values[active2], unit3) })), copy2 = () => {
     navigator.clipboard?.writeText(chartCsv(data, ui3.t)).then(() => {
       setCopied(!0), setTimeout(() => setCopied(!1), 1200);
     });
@@ -15162,7 +15350,7 @@ function WidgetChart({ node, lookup, registerChart, refreshCharts }) {
         onPointerLeave: () => setActive(null)
       },
       drawn.parts,
-      isDonut ? active2 === null ? (0, import_react13.createElement)("text", { className: "dv-chart-center", x: svgWidth / 2, y: drawn.height / 2 + 5, textAnchor: "middle" }, unit2 === "%" ? "" : withUnit(drawn.total, unit2)) : (0, import_react13.createElement)(
+      isDonut ? active2 === null ? (0, import_react13.createElement)("text", { className: "dv-chart-center", x: svgWidth / 2, y: drawn.height / 2 + 5, textAnchor: "middle" }, unit3 === "%" ? "" : withUnit(drawn.total, unit3)) : (0, import_react13.createElement)(
         import_react13.Fragment,
         null,
         (0, import_react13.createElement)("text", { className: "dv-chart-center-name", x: svgWidth / 2, y: drawn.height / 2 - 4, textAnchor: "middle" }, fit(categories[active2], drawn.size * 0.56, LABEL)),
@@ -15531,7 +15719,7 @@ function InputHead({ id: id3, label, value }) {
     value !== void 0 ? (0, import_react15.createElement)("output", { htmlFor: id3, className: "dv-view-input-value" }, value) : null
   );
 }
-var withUnit2 = (value, unit2) => `${asText(value)}${unit2 ? ` ${unit2}` : ""}`, grouped2 = (value) => typeof value == "number" && Number.isFinite(value) ? value.toLocaleString("en-US", { maximumFractionDigits: 6 }) : asText(value);
+var withUnit2 = (value, unit3) => `${asText(value)}${unit3 ? ` ${unit3}` : ""}`, grouped2 = (value) => typeof value == "number" && Number.isFinite(value) ? value.toLocaleString("en-US", { maximumFractionDigits: 6 }) : asText(value);
 function SliderInput({ node, ctx }) {
   let id3 = (0, import_react15.useId)(), value = Number(ctx.values[node.id]), percent3 = node.max > node.min ? (value - node.min) / (node.max - node.min) * 100 : 0;
   return (0, import_react15.createElement)(
@@ -16371,7 +16559,7 @@ var SECRET_CSS = `
 .bt-secret-input[data-masked]{-webkit-text-security:disc}
 .bt-secret-input::placeholder{color:var(--bt-ink-3);font-family:var(--bt-font);letter-spacing:0}
 .bt-secret-scope{position:relative;display:inline-grid;grid-template-columns:1fr 1fr;align-self:flex-start;padding:2px;border-radius:999px;background:var(--bt-hover)}
-.bt-secret-glide{position:absolute;top:2px;bottom:2px;left:2px;width:calc(50% - 2px);border-radius:999px;background:var(--bt-main);box-shadow:0 1px 3px rgba(20,20,20,.08),inset 0 0 0 .5px color-mix(in srgb,var(--bt-ink) 6%,transparent);transition:${spring(SPRING_SHAPE, "transform")}}
+.bt-secret-glide{position:absolute;top:2px;bottom:2px;left:2px;width:calc(50% - 2px);border-radius:999px;background:var(--bt-main);box-shadow:0 1px 3px rgba(20,20,20,.08),inset 0 0 0 .5px color-mix(in srgb,var(--bt-ink) 6%,transparent);transition:${spring2(SPRING_SHAPE, "transform")}}
 .bt-secret-glide[data-at="1"]{transform:translateX(100%)}
 .bt-secret-seg{position:relative;z-index:1;height:28px;padding:0 14px;border:0;border-radius:999px;background:none;color:var(--bt-ink-2);font:inherit;font-size:13px;white-space:nowrap;cursor:pointer;transition:color .16s ease}
 .bt-secret-seg[aria-checked=true]{color:var(--bt-ink);font-weight:500}
@@ -16439,8 +16627,8 @@ var thinkingStep = (steps) => steps.find(thinkingLive), thinkingLive = (step) =>
   if (text8[0] !== "<") return text8;
   if ("<signature>".startsWith(text8)) return "";
   if (!text8.startsWith("<signature>")) return text8;
-  let end = text8.indexOf("</signature>");
-  return end === -1 ? "" : text8.slice(end + 12).replace(/^(\r?\n)+/, "");
+  let end2 = text8.indexOf("</signature>");
+  return end2 === -1 ? "" : text8.slice(end2 + 12).replace(/^(\r?\n)+/, "");
 }, stepReasoning = (step) => step.blocks.filter((block) => block.kind === "reasoning").map((block) => visibleReasoning(block.text)).join(`
 `).trim();
 
@@ -16498,9 +16686,9 @@ var FOLD_AT = { chars: 1500, lines: 25 }, FOLD_HUGE = { chars: 2e4, lines: 1 / 0
   let marker = CLOSE.exec(line)?.[1];
   return marker !== void 0 && marker[0] === open[0] && marker.length >= open.length;
 };
-function cutAt(text8, end) {
-  let code = text8.charCodeAt(end - 1);
-  return text8.slice(0, code >= 55296 && code <= 56319 ? end - 1 : end);
+function cutAt(text8, end2) {
+  let code = text8.charCodeAt(end2 - 1);
+  return text8.slice(0, code >= 55296 && code <= 56319 ? end2 - 1 : end2);
 }
 function moreLines(text8, max) {
   let lines = 1;
@@ -16603,9 +16791,9 @@ function turnContaining(seq, turns) {
   for (let turn of turns.values()) {
     let start = seqNum(turn?.start);
     if (start === void 0 || seq < start) continue;
-    let end = seqNum(turn?.end);
-    if (end !== void 0) {
-      if (seq > end || start < closedStart) continue;
+    let end2 = seqNum(turn?.end);
+    if (end2 !== void 0) {
+      if (seq > end2 || start < closedStart) continue;
       closed2 = turn, closedStart = start;
       continue;
     }
@@ -18297,9 +18485,9 @@ function TeamSidebar(props) {
       for (let col of columns2)
         col.style.removeProperty("margin-left"), col.style.removeProperty("transition");
       column.style.removeProperty("--bt-lc-w"), delete column.dataset.folding, chatRoom.hold(!1);
-    }, ends = ["pointerup", "pointercancel", "lostpointercapture"], onEnd = (end) => {
+    }, ends = ["pointerup", "pointercancel", "lostpointercapture"], onEnd = (end2) => {
       if (!done) {
-        done = !0, end.type === "pointerup" && track(end.clientX), grip.removeEventListener("pointermove", onMove);
+        done = !0, end2.type === "pointerup" && track(end2.clientX), grip.removeEventListener("pointermove", onMove);
         for (let name of ends) grip.removeEventListener(name, onEnd);
         if (setDrag(null), last === null) {
           finish();
@@ -18771,8 +18959,8 @@ var RETURN_CSS = `
 .bt-return .bt-mark{--bt-ink-deepseek:#4D6BFE}
 .bt-return-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 `;
-function BrandMark({ size = 24 }) {
-  return (0, import_react23.createElement)("span", { className: "bt-brand-whale" }, (0, import_react23.createElement)(BotMark, { look: MAIN_LOOK, size }));
+function BrandMark({ size: size2 = 24 }) {
+  return (0, import_react23.createElement)("span", { className: "bt-brand-whale" }, (0, import_react23.createElement)(BotMark, { look: MAIN_LOOK, size: size2 }));
 }
 function BrandName() {
   return (0, import_react23.createElement)("span", { style: { fontWeight: 600, fontSize: 14 } }, "DS Bot");
@@ -19113,7 +19301,7 @@ function menuIcons(roster) {
   return (row) => {
     if (!row.bot) return PeopleIcon;
     let id3 = row.bot.id;
-    return marks.has(id3) || marks.set(id3, ({ size = 14 }) => (0, import_react25.createElement)(BotMark, { bot: roster.getSnapshot().byId[id3] ?? row.bot, size })), marks.get(id3);
+    return marks.has(id3) || marks.set(id3, ({ size: size2 = 14 }) => (0, import_react25.createElement)(BotMark, { bot: roster.getSnapshot().byId[id3] ?? row.bot, size: size2 })), marks.get(id3);
   };
 }
 function ComposerPlus({ sessionId, inputActions, useInput, useRoster, actions }) {
@@ -19988,7 +20176,7 @@ var MODEL_CSS = `
 .bt-model-copy{display:flex;flex-direction:column;min-width:0}
 .bt-model-name{font-size:13px;line-height:18px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-model-provider{font-size:11px;line-height:14px;color:var(--bt-ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bt-model-caret{flex:none;color:var(--bt-ink-3);transition:${spring(SPRING_SHAPE, "transform")}}
+.bt-model-caret{flex:none;color:var(--bt-ink-3);transition:${spring2(SPRING_SHAPE, "transform")}}
 .bt-model-trigger[aria-expanded=true] .bt-model-caret{transform:rotate(180deg)}
 .bt-model-menu{overflow-y:auto;scrollbar-width:thin}
 .bt-model-group{flex:none;padding:8px 8px 2px;font-size:11px;line-height:14px;font-weight:500;color:var(--bt-ink-3);text-transform:none}
@@ -20607,7 +20795,7 @@ function inAnHour() {
 }
 var KINDS = [["at", "Once"], ["daily", "Every day"], ["weekly", "Every week"], ["every", "Repeat"]], UNITS = [["minutes", 1, "minutes"], ["hours", 60, "hours"], ["days", 1440, "days"]];
 function TaskForm({ roster, actions, start, onDone, onCancel }) {
-  let [target, setTarget] = (0, import_react31.useState)(start ?? roster.bots[0]?.id ?? ""), [title, setTitle] = (0, import_react31.useState)(""), [prompt, setPrompt] = (0, import_react31.useState)(""), [kind, setKind] = (0, import_react31.useState)("daily"), [at2, setAt] = (0, import_react31.useState)(inAnHour), [time2, setTime] = (0, import_react31.useState)("09:00"), [weekdays, setWeekdays] = (0, import_react31.useState)([1, 2, 3, 4, 5]), [count2, setCount] = (0, import_react31.useState)(1), [unit2, setUnit] = (0, import_react31.useState)("hours"), [busy, setBusy] = (0, import_react31.useState)(!1), [error, setError] = (0, import_react31.useState)(""), timing = () => kind === "at" ? { kind, at: new Date(at2).toISOString() } : kind === "every" ? { kind, minutes: Math.round(Number(count2) * UNITS.find(([id3]) => id3 === unit2)[1]) } : { kind, time: time2, timeZone: localZone(), ...kind === "weekly" ? { weekdays } : {} }, submit = (event) => {
+  let [target, setTarget] = (0, import_react31.useState)(start ?? roster.bots[0]?.id ?? ""), [title, setTitle] = (0, import_react31.useState)(""), [prompt, setPrompt] = (0, import_react31.useState)(""), [kind, setKind] = (0, import_react31.useState)("daily"), [at2, setAt] = (0, import_react31.useState)(inAnHour), [time2, setTime] = (0, import_react31.useState)("09:00"), [weekdays, setWeekdays] = (0, import_react31.useState)([1, 2, 3, 4, 5]), [count2, setCount] = (0, import_react31.useState)(1), [unit3, setUnit] = (0, import_react31.useState)("hours"), [busy, setBusy] = (0, import_react31.useState)(!1), [error, setError] = (0, import_react31.useState)(""), timing = () => kind === "at" ? { kind, at: new Date(at2).toISOString() } : kind === "every" ? { kind, minutes: Math.round(Number(count2) * UNITS.find(([id3]) => id3 === unit3)[1]) } : { kind, time: time2, timeZone: localZone(), ...kind === "weekly" ? { weekdays } : {} }, submit = (event) => {
     if (event.preventDefault(), busy) return;
     setBusy(!0), setError("");
     let when4;
@@ -20671,7 +20859,7 @@ function TaskForm({ roster, actions, start, onDone, onCancel }) {
           (0, import_react31.createElement)("input", { className: "bt-input bt-task-count", type: "number", min: 1, value: count2, "aria-label": t("How many"), onChange: (event) => setCount(event.target.value) }),
           (0, import_react31.createElement)(
             "select",
-            { className: "bt-select bt-task-unit", value: unit2, "aria-label": t("Unit"), onChange: (event) => setUnit(event.target.value) },
+            { className: "bt-select bt-task-unit", value: unit3, "aria-label": t("Unit"), onChange: (event) => setUnit(event.target.value) },
             UNITS.map(([id3, , label]) => (0, import_react31.createElement)("option", { key: id3, value: id3 }, t(label)))
           )
         ) : null
@@ -21597,10 +21785,10 @@ function modelHint(bot, roster) {
   let shown = modelOf(bot, roster);
   return shown === void 0 ? t("Pick the model this Bot runs on.") : !shown.served && (roster.models ?? []).length > 0 ? t("This model is not available now. Pick another one.") : bot.appliedModel && bot.appliedModel === bot.model ? t("Every message of this Bot runs on it.") : t("Applies from the next message.");
 }
-function ShapeRing({ shape, size }) {
+function ShapeRing({ shape, size: size2 }) {
   let maskId = (0, import_react35.useRef)("");
   maskId.current === "" && (maskId.current = `bt-ring-${nextMarkSerial()}`);
-  let def = shapeOf(shape), unit2 = def.size / size, markup = `<defs><mask id="${maskId.current}" ${maskBox(def.size)}>${holes(def, `<g stroke="#000" stroke-width="${6 * unit2}" stroke-linejoin="round">${bodyOf(def, "#000", !0)}</g>`)}</mask></defs><g mask="url(#${maskId.current})" stroke="currentColor" stroke-width="${8 * unit2}" stroke-linejoin="round">${bodyOf(def, "currentColor", !0)}</g>`;
+  let def = shapeOf(shape), unit3 = def.size / size2, markup = `<defs><mask id="${maskId.current}" ${maskBox(def.size)}>${holes(def, `<g stroke="#000" stroke-width="${6 * unit3}" stroke-linejoin="round">${bodyOf(def, "#000", !0)}</g>`)}</mask></defs><g mask="url(#${maskId.current})" stroke="currentColor" stroke-width="${8 * unit3}" stroke-linejoin="round">${bodyOf(def, "currentColor", !0)}</g>`;
   return (0, import_react35.createElement)("svg", { className: "bt-ring", viewBox: `0 0 ${def.size} ${def.size}`, "aria-hidden": !0, dangerouslySetInnerHTML: { __html: markup } });
 }
 function CharacterGrid({ look, hasPhoto = !1, onShape, onColor }) {
@@ -21891,7 +22079,7 @@ label.bt-bs-row{cursor:text}
 .bt-switch[aria-checked=true]{background:var(--bt-accent)}
 .bt-switch:disabled{opacity:.45;cursor:default}
 .bt-switch:focus-visible{outline:2px solid var(--bt-accent);outline-offset:2px}
-.bt-switch-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:${spring(SPRING_SHAPE, "transform")},${spring(SPRING_TAP, "width")}}
+.bt-switch-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:${spring2(SPRING_SHAPE, "transform")},${spring2(SPRING_TAP, "width")}}
 .bt-switch[aria-checked=true] .bt-switch-knob{transform:translateX(16px)}
 .bt-switch:active:not(:disabled) .bt-switch-knob{width:21px}
 .bt-switch[aria-checked=true]:active:not(:disabled) .bt-switch-knob{transform:translateX(11px)}
@@ -22334,11 +22522,11 @@ function useMicLevel(enabled) {
       stream = media, audio = new AudioContext();
       let analyser = audio.createAnalyser();
       analyser.fftSize = 256, audio.createMediaStreamSource(media).connect(analyser);
-      let data = new Uint8Array(analyser.frequencyBinCount), smooth = 0, tick = () => {
+      let data = new Uint8Array(analyser.frequencyBinCount), smooth3 = 0, tick = () => {
         analyser.getByteTimeDomainData(data);
         let sum = 0;
         for (let value of data) sum += ((value - 128) / 128) ** 2;
-        smooth = smooth * 0.8 + Math.min(1, Math.sqrt(sum / data.length) * 4) * 0.2, setLevel(Math.round(smooth * 100) / 100), frame = requestAnimationFrame(tick);
+        smooth3 = smooth3 * 0.8 + Math.min(1, Math.sqrt(sum / data.length) * 4) * 0.2, setLevel(Math.round(smooth3 * 100) / 100), frame = requestAnimationFrame(tick);
       };
       tick();
     }).catch(() => {
@@ -22388,7 +22576,7 @@ function VoiceMode({ sessionId, roster, actions, useSessions, useSessionStatus }
     phase !== "listening" && dictation.stop();
   }, [phase]), (0, import_react39.useEffect)(() => {
     if (!speech || !catalog || !listen) return;
-    let own = turn.current, capture = null, frame = 0, stopped = !1, smooth = 0, detect = turnDetector(), limit = Math.max(1, catalog.maxDurationSeconds - 1) * 1e3, finish = async (current) => {
+    let own = turn.current, capture = null, frame = 0, stopped = !1, smooth3 = 0, detect = turnDetector(), limit = Math.max(1, catalog.maxDurationSeconds - 1) * 1e3, finish = async (current) => {
       setPhase("transcribing");
       try {
         let wave = await current.finish(catalog.maxDurationSeconds), text8 = wave ? await transcribeWave(speech, catalog, wave, new AbortController().signal) : "";
@@ -22407,7 +22595,7 @@ function VoiceMode({ sessionId, roster, actions, useSessions, useSessionStatus }
       capture = opened;
       let began2 = performance.now(), tick = () => {
         let now = performance.now(), level2 = capture.level();
-        smooth = smooth * 0.8 + level2 * 0.2, setServiceLevel(Math.round(smooth * 100) / 100);
+        smooth3 = smooth3 * 0.8 + level2 * 0.2, setServiceLevel(Math.round(smooth3 * 100) / 100);
         let state = detect(level2, now);
         if (state === "done" || state === "speech" && now - began2 >= limit) {
           let current = capture;
@@ -22868,22 +23056,22 @@ var RANGES = [
 ], hourMs = (key) => Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)), Number(key.slice(11, 13)) || 0), dayKey = (ms2) => new Date(ms2).toISOString().slice(0, 10), hourKey = (ms2) => new Date(ms2).toISOString().slice(0, 13).replace("T", " "), mondayOf = (ms2) => ms2 - (new Date(ms2).getUTCDay() + 6) % 7 * 864e5;
 function spanRange(from, to) {
   to < from && ([from, to] = [to, from]);
-  let days = Math.round((hourMs(to) - hourMs(from)) / 864e5) + 1, unit2 = days <= 2 ? "hour" : days <= 62 ? "day" : days <= 182 ? "week" : "month", range = { id: "custom", unit: unit2, from, to, days }, count2 = spanBuckets(range).length, stride = unit2 === "hour" ? 6 : [1, 2, 3, 5, 7, 10, 14].find((step) => count2 / step <= 12) ?? Math.ceil(count2 / 12);
+  let days = Math.round((hourMs(to) - hourMs(from)) / 864e5) + 1, unit3 = days <= 2 ? "hour" : days <= 62 ? "day" : days <= 182 ? "week" : "month", range = { id: "custom", unit: unit3, from, to, days }, count2 = spanBuckets(range).length, stride = unit3 === "hour" ? 6 : [1, 2, 3, 5, 7, 10, 14].find((step) => count2 / step <= 12) ?? Math.ceil(count2 / 12);
   return { ...range, count: count2, stride };
 }
 function spanBuckets(range) {
-  let first = hourMs(range.from), end = hourMs(range.to) + 864e5, buckets = [];
+  let first = hourMs(range.from), end2 = hourMs(range.to) + 864e5, buckets = [];
   if (range.unit === "hour" || range.unit === "day") {
     let step = range.unit === "hour" ? 36e5 : 864e5;
-    for (let start = first; start < end; start += step) buckets.push({ start, end: start + step, key: range.unit === "hour" ? hourKey(start) : dayKey(start) });
+    for (let start = first; start < end2; start += step) buckets.push({ start, end: start + step, key: range.unit === "hour" ? hourKey(start) : dayKey(start) });
   } else if (range.unit === "week")
-    for (let monday = mondayOf(first); monday < end; monday += 7 * 864e5)
-      buckets.push({ start: Math.max(monday, first), end: Math.min(monday + 7 * 864e5, end), key: dayKey(monday) });
+    for (let monday = mondayOf(first); monday < end2; monday += 7 * 864e5)
+      buckets.push({ start: Math.max(monday, first), end: Math.min(monday + 7 * 864e5, end2), key: dayKey(monday) });
   else {
     let year = new Date(first).getUTCFullYear();
-    for (let month = new Date(first).getUTCMonth(); Date.UTC(year, month, 1) < end; month += 1) {
+    for (let month = new Date(first).getUTCMonth(); Date.UTC(year, month, 1) < end2; month += 1) {
       let start = Date.UTC(year, month, 1);
-      buckets.push({ start: Math.max(start, first), end: Math.min(Date.UTC(year, month + 1, 1), end), key: dayKey(start).slice(0, 7) });
+      buckets.push({ start: Math.max(start, first), end: Math.min(Date.UTC(year, month + 1, 1), end2), key: dayKey(start).slice(0, 7) });
     }
   }
   return buckets;
@@ -22895,10 +23083,10 @@ function spanOf(range, now) {
   return { buckets: buckets.slice(range.count), from: hourKey(buckets[range.count].start), to: now, before: hourKey(buckets[0].start) };
 }
 function bucketsOf(range, now) {
-  let end = hourMs(now), today = end - end % 864e5, buckets = [];
+  let end2 = hourMs(now), today = end2 - end2 % 864e5, buckets = [];
   for (let back = range.count * 2 - 1; back >= 0; back -= 1) {
     let start;
-    range.unit === "hour" ? start = end - back * 36e5 : range.unit === "day" ? start = today - back * 864e5 : range.unit === "week" ? start = mondayOf(today) - back * 7 * 864e5 : start = Date.UTC(new Date(end).getUTCFullYear(), new Date(end).getUTCMonth() - back, 1), buckets.push({ start, key: range.unit === "hour" ? hourKey(start) : range.unit === "month" ? dayKey(start).slice(0, 7) : dayKey(start) });
+    range.unit === "hour" ? start = end2 - back * 36e5 : range.unit === "day" ? start = today - back * 864e5 : range.unit === "week" ? start = mondayOf(today) - back * 7 * 864e5 : start = Date.UTC(new Date(end2).getUTCFullYear(), new Date(end2).getUTCMonth() - back, 1), buckets.push({ start, key: range.unit === "hour" ? hourKey(start) : range.unit === "month" ? dayKey(start).slice(0, 7) : dayKey(start) });
   }
   return buckets;
 }
@@ -22938,8 +23126,8 @@ function trimmed(value) {
   return text8.includes(".") ? text8.replace(/\.?0+$/, "") : text8;
 }
 function compact(count2) {
-  for (let [size, unit2] of [[1e9, "B"], [1e6, "M"], [1e3, "K"]])
-    if (count2 >= size * 0.9995) return `${trimmed(count2 / size)}${unit2}`;
+  for (let [size2, unit3] of [[1e9, "B"], [1e6, "M"], [1e3, "K"]])
+    if (count2 >= size2 * 0.9995) return `${trimmed(count2 / size2)}${unit3}`;
   return String(Math.round(count2));
 }
 function percent2(part, whole) {
@@ -22949,13 +23137,13 @@ function percent2(part, whole) {
 }
 
 // modules/bot-runtime/vendor/ds-bot/src/client/usage-page.js
-var HEAT_WEEKS = 53, TOP_SERIES = 7, RING_R = 42, RING = 2 * Math.PI * RING_R, rangeLabel = (id3) => ({ "24h": t("24 hours"), "7d": t("7 days"), "30d": t("30 days"), "12w": t("12 weeks"), "12m": t("12 months") })[id3], unitLabel = (unit2) => ({ hour: t("Per hour"), day: t("Per day"), week: t("Per week"), month: t("Per month") })[unit2], MODEL_INKS = ["deepseek", "tangerine", "green", "violet", "sky", "rose", "yellow", "cyan", "magenta", "brown"], PARTS = [["output", 1], ["input", 0.6], ["cacheRead", 0.32]], partLabel = (part) => ({ output: t("Output"), input: t("Input"), cacheRead: t("Cache hit") })[part], soften = (paint, strength = 1) => {
+var HEAT_WEEKS = 53, TOP_SERIES = 7, RING_R = 42, RING = 2 * Math.PI * RING_R, rangeLabel = (id3) => ({ "24h": t("24 hours"), "7d": t("7 days"), "30d": t("30 days"), "12w": t("12 weeks"), "12m": t("12 months") })[id3], unitLabel = (unit3) => ({ hour: t("Per hour"), day: t("Per day"), week: t("Per week"), month: t("Per month") })[unit3], MODEL_INKS = ["deepseek", "tangerine", "green", "violet", "sky", "rose", "yellow", "cyan", "magenta", "brown"], PARTS = [["output", 1], ["input", 0.6], ["cacheRead", 0.32]], partLabel = (part) => ({ output: t("Output"), input: t("Input"), cacheRead: t("Cache hit") })[part], soften = (paint, strength = 1) => {
   let mix = (color) => `color-mix(in srgb, ${color} ${Math.round(88 * strength)}%, var(--bt-card))`;
   return paint.startsWith("linear-gradient(") ? paint.replace(/#[0-9a-f]{6}/gi, mix) : mix(paint);
 }, full = (count2) => new Intl.NumberFormat(dateLocale()).format(Math.round(count2)), hitRate = (sum) => percent2(sum.cacheRead, sum.input + sum.cacheRead), dates = (options) => new Intl.DateTimeFormat(dateLocale(), { timeZone: "UTC", ...options }), hourText = (ms2) => `${String(new Date(ms2).getUTCHours()).padStart(2, "0")}:00`, yearOf = (ms2) => new Date(ms2).getUTCFullYear();
 function spanText(from, to) {
-  let start = hourMs(from), end = hourMs(to), year = (/* @__PURE__ */ new Date()).getFullYear(), format = dates(yearOf(start) !== year || yearOf(end) !== year ? { year: "numeric", month: "short", day: "numeric" } : { month: "short", day: "numeric" });
-  return from === to ? format.format(start) : `${format.format(start)} – ${format.format(end)}`;
+  let start = hourMs(from), end2 = hourMs(to), year = (/* @__PURE__ */ new Date()).getFullYear(), format = dates(yearOf(start) !== year || yearOf(end2) !== year ? { year: "numeric", month: "short", day: "numeric" } : { month: "short", day: "numeric" });
+  return from === to ? format.format(start) : `${format.format(start)} – ${format.format(end2)}`;
 }
 var daysText = (count2) => count2 === 1 ? t("1 day") : t("{count} days", { count: count2 }), lastText = (range) => range.from ? spanText(range.from, range.to) : t("Last {range}", { range: rangeLabel(range.id) });
 function compareText(range) {
@@ -22981,12 +23169,12 @@ function useTween(value) {
     return frame = requestAnimationFrame(step), () => cancelAnimationFrame(frame);
   }, [value]), shown;
 }
-var glyphBox = (size, icon2) => (0, import_react43.createElement)("span", { className: "bt-us-glyph", style: { width: size, height: size } }, (0, import_react43.createElement)(icon2));
-function ModelGlyph({ name, paint, size }) {
+var glyphBox = (size2, icon2) => (0, import_react43.createElement)("span", { className: "bt-us-glyph", style: { width: size2, height: size2 } }, (0, import_react43.createElement)(icon2));
+function ModelGlyph({ name, paint, size: size2 }) {
   return (0, import_react43.createElement)("span", {
     className: "bt-us-model",
     "aria-hidden": !0,
-    style: { width: size, height: size, fontSize: Math.round(size * 0.42), background: `color-mix(in srgb, ${paint} 20%, var(--bt-card))`, color: `color-mix(in srgb, ${paint} 72%, var(--bt-ink))` }
+    style: { width: size2, height: size2, fontSize: Math.round(size2 * 0.42), background: `color-mix(in srgb, ${paint} 20%, var(--bt-card))`, color: `color-mix(in srgb, ${paint} 72%, var(--bt-ink))` }
   }, (name.match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase());
 }
 function ownerFace(owner, roster) {
@@ -22998,7 +23186,7 @@ function ownerFace(owner, roster) {
       sub: owner.deleted ? t("Deleted") : role.toLowerCase() === name.toLowerCase() ? "" : role,
       paint: paintCss(colorOf(bot)),
       stops: GRADIENTS[colorOf(bot)],
-      glyph: (size) => (0, import_react43.createElement)(BotAvatar, { bot, size, badge: !1, live: !1 })
+      glyph: (size2) => (0, import_react43.createElement)(BotAvatar, { bot, size: size2, badge: !1, live: !1 })
     };
   }
   if (owner.kind === "room") {
@@ -23008,7 +23196,7 @@ function ownerFace(owner, roster) {
       name: owner.name || t("Deleted group chat"),
       sub: owner.deleted ? t("Deleted") : t("Group chat"),
       paint: "var(--bt-us-rest)",
-      glyph: (size) => room2 ? (0, import_react43.createElement)(RoomAvatar, { room: room2, roster, size }) : glyphBox(size, ChatsIcon)
+      glyph: (size2) => room2 ? (0, import_react43.createElement)(RoomAvatar, { room: room2, roster, size: size2 }) : glyphBox(size2, ChatsIcon)
     };
   }
   return owner.kind === "agent" ? {
@@ -23016,8 +23204,8 @@ function ownerFace(owner, roster) {
     name: owner.name || "DSH Agent",
     sub: owner.deleted ? t("Deleted") : "",
     paint: "var(--bt-us-rest)",
-    glyph: (size) => glyphBox(size, ChatsIcon)
-  } : { kind: "other", name: t("Other"), sub: "", paint: "var(--bt-us-rest)", glyph: (size) => glyphBox(size, ChatsIcon) };
+    glyph: (size2) => glyphBox(size2, ChatsIcon)
+  } : { kind: "other", name: t("Other"), sub: "", paint: "var(--bt-us-rest)", glyph: (size2) => glyphBox(size2, ChatsIcon) };
 }
 function kindLabel(kind, botFocus) {
   return { chat: botFocus ? t("Own chat") : t("Conversations"), group: t("Group chats"), compaction: t("Compaction and handoff"), image: t("Image reading"), memory: t("Memory"), "session-title": t("Titles"), btw: t("Side chat"), side: t("Side chat"), other: t("Other") }[kind] ?? kind;
@@ -23369,7 +23557,7 @@ function UsagePage({ roster, actions, focusId }) {
     for (let row of view.rows) lifetime.set(row[2], (lifetime.get(row[2]) ?? 0) + tokensOf(row));
     let modelPaint = new Map([...lifetime].sort((a, b2) => b2[1] - a[1]).map(([model], rank) => [model, `var(--bt-ink-${MODEL_INKS[rank % MODEL_INKS.length]})`])), models2 = view.models.map((model, at2) => {
       let name = model.name || model.model || t("Unknown model"), paint = modelPaint.get(at2) ?? "var(--bt-us-rest)";
-      return { kind: "model", name, sub: model.providerName ?? model.provider, paint, glyph: (size) => (0, import_react43.createElement)(ModelGlyph, { name, paint, size }) };
+      return { kind: "model", name, sub: model.providerName ?? model.provider, paint, glyph: (size2) => (0, import_react43.createElement)(ModelGlyph, { name, paint, size: size2 }) };
     }), ownerAt2 = focus?.kind === "owner" ? view.owners.findIndex((owner) => owner.key === focus.key) : -1, modelAt = focus?.kind === "model" ? view.models.findIndex((model) => model.key === focus.key) : -1, isBot2 = (at2) => ["bot", "agent"].includes(view.owners[at2]?.kind), all2 = summarize(view, range, void 0, (row) => by === "bot" ? isBot2(row[1]) ? `o${row[1]}` : "rest" : `m${row[2]}`), keep2 = ownerAt2 >= 0 ? (row) => row[1] === ownerAt2 : modelAt >= 0 ? (row) => row[2] === modelAt : () => !0, face2 = ownerAt2 >= 0 ? faces2[ownerAt2] : modelAt >= 0 ? models2[modelAt] : null, part2 = face2 ? summarize(view, range, keep2) : all2, activeDays2 = /* @__PURE__ */ new Set(), first = view.now;
     for (let row of view.rows)
       row[0] < first && (first = row[0]), keep2(row) && tokensOf(row) > 0 && activeDays2.add(row[0].slice(0, 10));
@@ -23776,8 +23964,8 @@ function BrowserPage({ roster, actions, run: run2, Section, Row: Row3 }) {
     let now = Date.now(), until;
     if (duration === "hour") until = now + 3600 * 1e3;
     else if (duration === "today") {
-      let end = new Date(now);
-      end.setHours(23, 59, 59, 999), until = end.getTime();
+      let end2 = new Date(now);
+      end2.setHours(23, 59, 59, 999), until = end2.getTime();
     } else duration === "week" && (until = now + 10080 * 60 * 1e3);
     let grant = { site: siteValue(site), kinds: [...kinds], ...until !== void 0 ? { until } : {} };
     setBusy(!0), run2(actions.updateBot(selectedBot.id, {
@@ -24972,7 +25160,7 @@ function useMemberWork(room2, useWork) {
 }
 var MEMBER_CSS = `
 .bt-mw-dock{display:flex;justify-content:center;margin:0 auto 8px;pointer-events:none}
-.bt-mw-pill{pointer-events:auto;position:relative;display:inline-flex;align-items:center;flex:none;box-sizing:border-box;height:32px;max-width:100%;padding:0;border:0;border-radius:999px;overflow:hidden;background:var(--bt-main);box-shadow:0 0 0 .5px var(--bt-line-2),0 2px 8px -2px rgba(0,0,0,.12);color:var(--bt-ink-2);font:inherit;font-size:13px;line-height:18px;cursor:pointer;animation:bt-mw-in ${SPRING_SHAPE.duration}ms ${SPRING_SHAPE.easing} backwards,bt-veil-in .18s ease-out backwards;transition:background-color .12s ease,${spring(SPRING_SHAPE, "width")},${spring(SPRING_TAP, "scale")}}
+.bt-mw-pill{pointer-events:auto;position:relative;display:inline-flex;align-items:center;flex:none;box-sizing:border-box;height:32px;max-width:100%;padding:0;border:0;border-radius:999px;overflow:hidden;background:var(--bt-main);box-shadow:0 0 0 .5px var(--bt-line-2),0 2px 8px -2px rgba(0,0,0,.12);color:var(--bt-ink-2);font:inherit;font-size:13px;line-height:18px;cursor:pointer;animation:bt-mw-in ${SPRING_SHAPE.duration}ms ${SPRING_SHAPE.easing} backwards,bt-veil-in .18s ease-out backwards;transition:background-color .12s ease,${spring2(SPRING_SHAPE, "width")},${spring2(SPRING_TAP, "scale")}}
 .bt-mw-pill:hover{background:color-mix(in srgb,var(--bt-ink) 4%,var(--bt-main))}
 .bt-mw-pill:active{scale:.97}
 .bt-mw-dock[data-leaving] .bt-mw-pill{animation:bt-mw-out .16s cubic-bezier(.4,0,1,1) forwards;pointer-events:none}
@@ -25011,7 +25199,7 @@ body[data-ds-dark-theme] .bt-mw-ask{color:#f0b84a}
 .bt-member-time{flex:none;margin-left:.3em;font-variant-numeric:tabular-nums}
 .bt-member-state.bt-mw-ask{color:#b7791f}
 body[data-ds-dark-theme] .bt-member-state.bt-mw-ask{color:#f0b84a}
-.bt-member-stop{flex:none;height:26px;padding:0 11px;border:0;border-radius:13px;background:var(--bt-main);box-shadow:inset 0 0 0 .5px var(--bt-line-2);color:var(--bt-ink-2);font:inherit;font-size:12px;cursor:pointer;transition:background-color .12s ease,color .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-member-stop{flex:none;height:26px;padding:0 11px;border:0;border-radius:13px;background:var(--bt-main);box-shadow:inset 0 0 0 .5px var(--bt-line-2);color:var(--bt-ink-2);font:inherit;font-size:12px;cursor:pointer;transition:background-color .12s ease,color .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-member-stop:hover{background:var(--bt-active);color:var(--bt-ink)}
 .bt-member-stop:active:not(:disabled){scale:.94}
 .bt-member-stop:disabled{opacity:.5;cursor:default}
@@ -26000,8 +26188,8 @@ function BotPanel({ pane, leaving, room: room2, overlay, roster, actions, useSes
     let onMove = (move) => {
       next = fitWidth(from.width + from.x - move.clientX, range), panel.style.width = `${next}px`, columns2.length === 0 && chatRoom.setRight(next);
       for (let column of columns2) column.style.setProperty("margin-right", `${next}px`, "important");
-    }, ends = ["pointerup", "pointercancel", "lostpointercapture"], onEnd = (end) => {
-      end.type === "pointerup" && onMove(end), grip.removeEventListener("pointermove", onMove);
+    }, ends = ["pointerup", "pointercancel", "lostpointercapture"], onEnd = (end2) => {
+      end2.type === "pointerup" && onMove(end2), grip.removeEventListener("pointermove", onMove);
       for (let name of ends) grip.removeEventListener(name, onEnd);
       chatRoom.setRight(next);
       for (let column of columns2)
@@ -26244,9 +26432,9 @@ function readPage(limits) {
     if (el2.localName !== "input" && el2.localName !== "textarea") return !1;
     let auto = String(el2.getAttribute("autocomplete") || "").toLowerCase();
     return el2.type === "password" || /(^|\s)(cc-|one-time-code)/.test(auto) || SECRET_HINT.test(`${el2.getAttribute("name") || ""} ${el2.id || ""}`);
-  }, keep = (text9, end = "") => text9 === "" ? "" : (stash.push(text9), `
+  }, keep = (text9, end2 = "") => text9 === "" ? "" : (stash.push(text9), `
 
-${stash.length - 1}${end}
+${stash.length - 1}${end2}
 
 `), expand = (text9) => text9.replace(/\u0001(\d+)[\u0002\u0003]/g, (_2, index) => expand(stash[Number(index)])), flow = (text9) => text9.split(`
 `).map((line) => line.replace(/[ \t\f\v\u00a0\u2028\u2029]+/g, " ").trim().replace(/^· /, "")).join(`
@@ -26452,7 +26640,7 @@ ${"#".repeat(Math.min(6, Number(level) || 2))} ${title}${mark}
 `).map((line) => line ? `> ${line}` : ">").join(`
 `)) : "";
     }
-    let end = body2.trimEnd().length, marked = mark ? `${body2.slice(0, end)}${mark}${body2.slice(end)}` : body2;
+    let end2 = body2.trimEnd().length, marked = mark ? `${body2.slice(0, end2)}${mark}${body2.slice(end2)}` : body2;
     return ctx.pre && !BLOCK_DISPLAY.test(display) ? marked : keepsSpace && BLOCK_DISPLAY.test(display) && tag !== "pre" ? keep(expand(marked).replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, `
 
 `).replace(/^\n+|\s+$/g, ""), "") : BLOCK_DISPLAY.test(display) ? `
@@ -26932,10 +27120,10 @@ function proposalPlacement(proposal, turns) {
   if (!Number.isFinite(proposal?.at) || typeof turns?.values != "function") return { kind: "dock" };
   let latest, before;
   for (let location2 of turns.values()) {
-    let end = location2?.end?.time;
-    if (location2?.status !== "closed" || !Number.isFinite(end)) continue;
-    let later = (target) => target === void 0 || end > target.end.time || end === target.end.time && location2.turn > target.turn;
-    later(latest) && (latest = location2), end <= proposal.at && later(before) && (before = location2);
+    let end2 = location2?.end?.time;
+    if (location2?.status !== "closed" || !Number.isFinite(end2)) continue;
+    let later = (target) => target === void 0 || end2 > target.end.time || end2 === target.end.time && location2.turn > target.turn;
+    later(latest) && (latest = location2), end2 <= proposal.at && later(before) && (before = location2);
   }
   let turn = (before ?? latest)?.turn;
   return turn === void 0 ? { kind: "dock" } : { kind: "turn", turn };
@@ -27153,7 +27341,7 @@ var LEARNING_CSS = `
 .bt-learning-more:hover{background:var(--bt-hover);color:var(--bt-ink)}
 .bt-learning-more:focus-visible{outline:2px solid var(--bt-accent);outline-offset:2px}
 .bt-learning-why{margin:0;font-size:12px;line-height:17px;color:var(--bt-ink-2)}
-.bt-learning-btn{flex:none;display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 16px;border:0;border-radius:999px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:background-color .12s ease,opacity .12s ease,${spring(SPRING_TAP, "scale")}}
+.bt-learning-btn{flex:none;display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 16px;border:0;border-radius:999px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:background-color .12s ease,opacity .12s ease,${spring2(SPRING_TAP, "scale")}}
 .bt-learning-btn svg{width:15px;height:15px}
 .bt-learning-decline{background:transparent;box-shadow:inset 0 0 0 1px var(--bt-line-2);color:var(--bt-ink)}
 .bt-learning-decline:hover:not(:disabled){background:var(--bt-hover)}
@@ -40631,7 +40819,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.81.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.81.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -41504,8 +41692,8 @@ var money2 = (value) => value == null ? "价格待配置" : `$${Number(value).to
   value.allowManualReassign,
   ...Object.keys(ADAPTIVE_DEFAULTS).map((key) => value[key] ?? ADAPTIVE_DEFAULTS[key])
 ]);
-function RouterPanelIcon({ size = 20, active: active2 = !1 }) {
-  return /* @__PURE__ */ import_react62.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" }, /* @__PURE__ */ import_react62.default.createElement("path", { d: "M7 6.5h7M7 17.5h7M15 6.5v11", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" }), /* @__PURE__ */ import_react62.default.createElement("circle", { cx: "5", cy: "6.5", r: "2", fill: active2 ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react62.default.createElement("circle", { cx: "5", cy: "17.5", r: "2", fill: active2 ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react62.default.createElement("circle", { cx: "17", cy: "12", r: "3", fill: active2 ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.7" }));
+function RouterPanelIcon({ size: size2 = 20, active: active2 = !1 }) {
+  return /* @__PURE__ */ import_react62.default.createElement("svg", { width: size2, height: size2, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" }, /* @__PURE__ */ import_react62.default.createElement("path", { d: "M7 6.5h7M7 17.5h7M15 6.5v11", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" }), /* @__PURE__ */ import_react62.default.createElement("circle", { cx: "5", cy: "6.5", r: "2", fill: active2 ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react62.default.createElement("circle", { cx: "5", cy: "17.5", r: "2", fill: active2 ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react62.default.createElement("circle", { cx: "17", cy: "12", r: "3", fill: active2 ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.7" }));
 }
 function RouteList({ routes, query }) {
   let filtered = routes.filter((route) => `${route.providerName} ${route.provider} ${route.name} ${route.model}`.toLowerCase().includes(query.toLowerCase()));
@@ -43266,13 +43454,13 @@ var import_react64 = __toESM(require("react"), 1), paths = {
   play: ["m8 4 12 8-12 8Z"],
   lock: ["M5 10h14v11H5Zm3 0V7a4 4 0 0 1 8 0v3m-4 4v3"]
 };
-function UiIcon({ name, size = 18, className = "", ...props }) {
+function UiIcon({ name, size: size2 = 18, className = "", ...props }) {
   return /* @__PURE__ */ import_react64.default.createElement(
     "svg",
     {
       className: `bp-icon ${className}`,
-      width: size,
-      height: size,
+      width: size2,
+      height: size2,
       viewBox: "0 0 24 24",
       fill: "none",
       stroke: "currentColor",
@@ -44657,7 +44845,7 @@ function BotBindingEditor({ bot, record: record3, accounts, dispatch, busy, host
 
 // apps/integration-client/library-panel.jsx
 var import_react71 = __toESM(require("react"), 1);
-var MAX_UPLOAD_BYTES = 16 * 1024 * 1024, textFile = (name) => /\.(?:txt|md|markdown|csv|tsv|json|ya?ml|xml|html|log|m?js|ts|py)$/iu.test(name) || !name.includes("."), bytesLabel = (size) => size >= 1024 * 1024 ? `${(size / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(size / 1024)} KB`, fileBase64 = (file) => new Promise((resolve2, reject) => {
+var MAX_UPLOAD_BYTES = 16 * 1024 * 1024, textFile = (name) => /\.(?:txt|md|markdown|csv|tsv|json|ya?ml|xml|html|log|m?js|ts|py)$/iu.test(name) || !name.includes("."), bytesLabel = (size2) => size2 >= 1024 * 1024 ? `${(size2 / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(size2 / 1024)} KB`, fileBase64 = (file) => new Promise((resolve2, reject) => {
   let reader = new FileReader();
   reader.onerror = () => reject(new Error("文件读取失败。")), reader.onload = () => resolve2(String(reader.result).split(",")[1] ?? ""), reader.readAsDataURL(file);
 });
@@ -45792,7 +45980,7 @@ var rootOf2 = (machine) => typeof machine?.roots?.[0] == "string" ? machine.root
 function DesktopViewer({ botId, machines, openSession, renewSession, closeSession, saveRoutine, transport }) {
   let [machineId, setMachineId] = (0, import_react80.useState)(machines[0]?.machineId ?? machines[0]?.id ?? ""), [displayId, setDisplayId] = (0, import_react80.useState)(""), [displays, setDisplays] = (0, import_react80.useState)([]), [state, setState] = (0, import_react80.useState)({ status: "idle", mode: "watch" }), [expanded, setExpanded] = (0, import_react80.useState)(!1), [stats, setStats] = (0, import_react80.useState)({ fps: 0, width: 0, height: 0 }), [text8, setText] = (0, import_react80.useState)(""), [toolsOpen, setToolsOpen] = (0, import_react80.useState)(!1), [keyboardBusy, setKeyboardBusy] = (0, import_react80.useState)(!1), [keyboardError, setKeyboardError] = (0, import_react80.useState)(""), [fit2, setFit] = (0, import_react80.useState)(!0), [fullscreen, setFullscreen] = (0, import_react80.useState)(!1), [metadata, setMetadata] = (0, import_react80.useState)({}), recorderRef = (0, import_react80.useRef)(null);
   recorderRef.current || (recorderRef.current = createAcknowledgedRoutineRecorder());
-  let recorder = recorderRef.current, canvasRef = (0, import_react80.useRef)(null), largeRef = (0, import_react80.useRef)(null), streamRef = (0, import_react80.useRef)(null), ticketRef = (0, import_react80.useRef)(null), pendingStop = (0, import_react80.useRef)(null), stopAttempt = (0, import_react80.useRef)(null), connecting = (0, import_react80.useRef)(!1), generation = (0, import_react80.useRef)(0), pendingFrame = (0, import_react80.useRef)(null), drawing = (0, import_react80.useRef)(!1), surface = (0, import_react80.useRef)(null), size = (0, import_react80.useRef)({ width: 0, height: 0 }), rate = (0, import_react80.useRef)({ at: performance.now(), count: 0 }), renewTimer = (0, import_react80.useRef)(null), moveTimer = (0, import_react80.useRef)(null), pendingMove = (0, import_react80.useRef)(null), [canControl, setCanControl] = (0, import_react80.useState)(!1), touches = (0, import_react80.useRef)(null);
+  let recorder = recorderRef.current, canvasRef = (0, import_react80.useRef)(null), largeRef = (0, import_react80.useRef)(null), streamRef = (0, import_react80.useRef)(null), ticketRef = (0, import_react80.useRef)(null), pendingStop = (0, import_react80.useRef)(null), stopAttempt = (0, import_react80.useRef)(null), connecting = (0, import_react80.useRef)(!1), generation = (0, import_react80.useRef)(0), pendingFrame = (0, import_react80.useRef)(null), drawing = (0, import_react80.useRef)(!1), surface = (0, import_react80.useRef)(null), size2 = (0, import_react80.useRef)({ width: 0, height: 0 }), rate = (0, import_react80.useRef)({ at: performance.now(), count: 0 }), renewTimer = (0, import_react80.useRef)(null), moveTimer = (0, import_react80.useRef)(null), pendingMove = (0, import_react80.useRef)(null), [canControl, setCanControl] = (0, import_react80.useState)(!1), touches = (0, import_react80.useRef)(null);
   touches.current || (touches.current = createDesktopTouchTracker());
   let viewerRef = (0, import_react80.useRef)(null), dialogRef = (0, import_react80.useRef)(null), expandButton = (0, import_react80.useRef)(null), toolsButton = (0, import_react80.useRef)(null), keyboardPending = (0, import_react80.useRef)(!1), stateRef = (0, import_react80.useRef)(state);
   stateRef.current = state;
@@ -45804,7 +45992,7 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
     options.keepTouches || touches.current.clear(), pendingMove.current = null, streamRef.current?.releaseInput()?.catch(() => {
     });
   }, []), stop = (0, import_react80.useCallback)(async () => {
-    recorder.invalidate("ROUTINE_DESKTOP_DISCONNECTED"), generation.current++, clearTimeout(renewTimer.current), renewTimer.current = null, setKeyboardBusy(!1), keyboardPending.current = !1, moveTimer.current !== null && cancelAnimationFrame(moveTimer.current), moveTimer.current = null, pendingMove.current = null, pendingFrame.current = null, touches.current.clear(), size.current = { width: 0, height: 0 }, streamRef.current?.close(), streamRef.current = null;
+    recorder.invalidate("ROUTINE_DESKTOP_DISCONNECTED"), generation.current++, clearTimeout(renewTimer.current), renewTimer.current = null, setKeyboardBusy(!1), keyboardPending.current = !1, moveTimer.current !== null && cancelAnimationFrame(moveTimer.current), moveTimer.current = null, pendingMove.current = null, pendingFrame.current = null, touches.current.clear(), size2.current = { width: 0, height: 0 }, streamRef.current?.close(), streamRef.current = null;
     let ticket = ticketRef.current;
     if (ticketRef.current = null, ticket && (pendingStop.current = { botId, sessionId: ticket.sessionId, close: closeRef.current }), pendingStop.current) {
       if (stopAttempt.current) return stopAttempt.current;
@@ -45838,7 +46026,7 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
         let frame = pendingFrame.current.shift(), bitmap = await createImageBitmap(new Blob([frame.bytes], { type: "image/jpeg" }));
         try {
           if (active2 !== generation.current) break;
-          (!size.current.width || !size.current.height) && (size.current = { width: bitmap.width, height: bitmap.height });
+          (!size2.current.width || !size2.current.height) && (size2.current = { width: bitmap.width, height: bitmap.height });
           let width = frame.info?.frameWidth ?? bitmap.width, height = frame.info?.frameHeight ?? bitmap.height, region = frame.info?.region;
           surface.current || (surface.current = document.createElement("canvas"));
           let base = surface.current;
@@ -45852,7 +46040,7 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
           rate.current.count++;
           let at2 = performance.now(), elapsed = at2 - rate.current.at;
           elapsed >= 1e3 && (setStats({
-            ...size.current,
+            ...size2.current,
             frameWidth: width,
             frameHeight: height,
             fps: Math.round(rate.current.count * 1e3 / elapsed)
@@ -45894,7 +46082,7 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
             onReleaseAcknowledged: (meta) => recorder.releaseAcknowledged(meta),
             onReleaseFailure: (meta) => recorder.releaseFailed(meta),
             onMetadata: (value) => {
-              active2 === generation.current && (value.displays && setDisplays(value.displays), value.width && value.height && (size.current = { width: value.width, height: value.height }), setMetadata((before) => {
+              active2 === generation.current && (value.displays && setDisplays(value.displays), value.width && value.height && (size2.current = { width: value.width, height: value.height }), setMetadata((before) => {
                 let next = { ...before, ...value };
                 return recorder.metadataChanged(next), next;
               }));
@@ -45954,7 +46142,7 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
   let point = (event) => {
     let rect = event.currentTarget.getBoundingClientRect();
     try {
-      return framePoint({ clientX: event.clientX - rect.left, clientY: event.clientY - rect.top, rect, frame: size.current });
+      return framePoint({ clientX: event.clientX - rect.left, clientY: event.clientY - rect.top, rect, frame: size2.current });
     } catch {
       return null;
     }
@@ -46062,7 +46250,7 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
       "aria-label": "远程桌面，取得控制权后可用鼠标键盘操作",
       "data-control": state.mode === "control",
       className: big ? "bp-stream-canvas bp-stream-large" : "bp-stream-canvas",
-      style: !fit2 && size.current.width ? { width: size.current.width, maxWidth: "none", maxHeight: "none" } : void 0,
+      style: !fit2 && size2.current.width ? { width: size2.current.width, maxWidth: "none", maxHeight: "none" } : void 0,
       onPointerMove: (event) => pointer(event, "move"),
       onPointerDown: (event) => pointer(event, "down"),
       onPointerUp: (event) => pointer(event, "up"),
@@ -46643,12 +46831,12 @@ var import_react85 = __toESM(require("react"), 1);
 // apps/integration-client/web-panel-model.mjs
 var WEB_PANEL_SANDBOX = "allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads", WEB_PANEL_REFERRER_POLICY = "no-referrer";
 var CONTROL = /[\u0000-\u001f\u007f-\u009f]/, byteLength = (text8) => {
-  let size = 0;
+  let size2 = 0;
   for (let index = 0; index < text8.length; index++) {
     let point = text8.codePointAt(index);
-    point < 128 ? size += 1 : point < 2048 ? size += 2 : point < 65536 ? size += 3 : (size += 4, index++);
+    point < 128 ? size2 += 1 : point < 2048 ? size2 += 2 : point < 65536 ? size2 += 3 : (size2 += 4, index++);
   }
-  return size;
+  return size2;
 };
 function validateWebPanelDraft(input, embeddingOrigin = "") {
   let name = typeof input?.name == "string" ? input.name.trim() : "", raw = typeof input?.url == "string" ? input.url.trim() : "";
@@ -46661,9 +46849,9 @@ function validateWebPanelDraft(input, embeddingOrigin = "") {
   }
   return url.protocol !== "http:" && url.protocol !== "https:" ? { ok: !1, error: "url" } : url.username || url.password || !url.hostname ? { ok: !1, error: "url" } : byteLength(raw) > 2048 ? { ok: !1, error: "url" } : embeddingOrigin && sameOrigin(url, embeddingOrigin) ? { ok: !1, error: "self" } : { ok: !0, name, url: url.href };
 }
-function sameOrigin(url, origin) {
+function sameOrigin(url, origin2) {
   try {
-    return new URL(origin).origin === url.origin;
+    return new URL(origin2).origin === url.origin;
   } catch {
     return !1;
   }
@@ -46682,10 +46870,10 @@ function clientOrigin(location2 = globalThis.location) {
     return "";
   }
 }
-function isSelfOrigin(url, origin) {
-  if (!origin) return !1;
+function isSelfOrigin(url, origin2) {
+  if (!origin2) return !1;
   try {
-    return new URL(url).origin === new URL(origin).origin;
+    return new URL(url).origin === new URL(origin2).origin;
   } catch {
     return !1;
   }
@@ -46771,7 +46959,7 @@ function WebPanelPins({ panels = [], activeId, onSelect, busy = !1 }) {
   ))))) : null;
 }
 function WebPanelBoard({ productApi, dispatch, busy = !1, snapshot, available = !0, onLeave, selectedId: drivenId, onSelect }) {
-  let { status, items, revision, limits, reason, nextAction } = panelsOf(snapshot), [ownId, setOwnId] = (0, import_react85.useState)(null), [reloads, setReloads] = (0, import_react85.useState)(0), [probes, setProbes] = (0, import_react85.useState)({}), [draft2, setDraft] = (0, import_react85.useState)(null), [draftError, setDraftError] = (0, import_react85.useState)(""), [notice, setNotice] = (0, import_react85.useState)(""), [error, setError] = (0, import_react85.useState)(""), [frame, setFrame] = (0, import_react85.useState)("loading"), origin = clientOrigin(), leave = (0, import_react85.useRef)(onLeave);
+  let { status, items, revision, limits, reason, nextAction } = panelsOf(snapshot), [ownId, setOwnId] = (0, import_react85.useState)(null), [reloads, setReloads] = (0, import_react85.useState)(0), [probes, setProbes] = (0, import_react85.useState)({}), [draft2, setDraft] = (0, import_react85.useState)(null), [draftError, setDraftError] = (0, import_react85.useState)(""), [notice, setNotice] = (0, import_react85.useState)(""), [error, setError] = (0, import_react85.useState)(""), [frame, setFrame] = (0, import_react85.useState)("loading"), origin2 = clientOrigin(), leave = (0, import_react85.useRef)(onLeave);
   leave.current = onLeave;
   let selectedId = typeof drivenId == "string" && drivenId ? drivenId : ownId, select = (0, import_react85.useCallback)((id3) => {
     setOwnId(id3), setReloads(0), setFrame("loading"), typeof onSelect == "function" && onSelect(id3);
@@ -46812,7 +47000,7 @@ function WebPanelBoard({ productApi, dispatch, busy = !1, snapshot, available = 
     panel && (setDraft({ id: panel.id, name: panel.name, url: panel.url }), setDraftError(""));
   }, save = async () => {
     if (!draft2) return;
-    let check = validateWebPanelDraft(draft2, origin);
+    let check = validateWebPanelDraft(draft2, origin2);
     if (!check.ok) {
       setDraftError(actionError({ code: check.error === "self" ? "WEB_PANEL_SELF_URL" : check.error === "name" ? "WEB_PANEL_NAME" : "WEB_PANEL_URL" }).text);
       return;
@@ -46825,7 +47013,7 @@ function WebPanelBoard({ productApi, dispatch, busy = !1, snapshot, available = 
     let ids = movedOrder(items, panelId, delta);
     if (!ids) return;
     await run2("webPanels.order", { ids, expectedRevision: revision }) && setNotice("顺序已保存。");
-  }, probe = probes[panel?.id] ?? null, verdict = available ? framingMessage(probe) : { tone: "idle", text: "" }, refused = probe?.state === "done" && probe.framing === "blocked", selfFramed = !!(panel && isSelfOrigin(panel.url, origin));
+  }, probe = probes[panel?.id] ?? null, verdict = available ? framingMessage(probe) : { tone: "idle", text: "" }, refused = probe?.state === "done" && probe.framing === "blocked", selfFramed = !!(panel && isSelfOrigin(panel.url, origin2));
   return status !== "available" ? /* @__PURE__ */ import_react85.default.createElement("section", { className: "bp-webpanel", "aria-label": "固定网页面板" }, /* @__PURE__ */ import_react85.default.createElement("header", { className: "bp-webpanel-bar" }, /* @__PURE__ */ import_react85.default.createElement("h2", null, "固定网页面板")), /* @__PURE__ */ import_react85.default.createElement("p", { className: "bp-webpanel-note", role: "status" }, status === "blocked" ? reason || "宿主尚未提供固定网页面板目录。" : "当前连接暂时无法读取固定网页面板。恢复连接后会在这里显示。"), status === "blocked" && nextAction && /* @__PURE__ */ import_react85.default.createElement("p", { className: "bp-webpanel-note bp-webpanel-note-quiet" }, "下一步：", nextAction)) : /* @__PURE__ */ import_react85.default.createElement("section", { className: "bp-webpanel", "aria-label": "固定网页面板" }, /* @__PURE__ */ import_react85.default.createElement("header", { className: "bp-webpanel-bar" }, /* @__PURE__ */ import_react85.default.createElement("h2", null, "固定网页面板"), /* @__PURE__ */ import_react85.default.createElement("span", { className: "bp-webpanel-count", "aria-label": `已固定 ${items.length} 个，上限 ${limits?.maxPanels ?? 6} 个` }, items.length, " / ", limits?.maxPanels ?? 6), /* @__PURE__ */ import_react85.default.createElement("button", { type: "button", className: "bp-webpanel-button", disabled: busy || !available || full2, onClick: startAdd }, /* @__PURE__ */ import_react85.default.createElement(UiIcon, { name: "plus", size: 15 }), /* @__PURE__ */ import_react85.default.createElement("span", null, "新增固定页面"))), notice && /* @__PURE__ */ import_react85.default.createElement("p", { className: "bp-webpanel-note bp-webpanel-note-ok", role: "status" }, notice), error && /* @__PURE__ */ import_react85.default.createElement("p", { className: "bp-webpanel-note bp-webpanel-note-bad", role: "alert" }, error), !available && /* @__PURE__ */ import_react85.default.createElement("p", { className: "bp-webpanel-note" }, "当前连接暂不能修改固定页面。"), !items.length && /* @__PURE__ */ import_react85.default.createElement("p", { className: "bp-webpanel-note" }, "还没有固定页面。把常用的本地仪表盘或看板固定在这里，之后在侧栏一键打开。"), /* @__PURE__ */ import_react85.default.createElement("div", { className: "bp-webpanel-body" }, items.length > 0 && /* @__PURE__ */ import_react85.default.createElement("aside", { className: "bp-webpanel-list", "aria-label": "已固定的页面" }, /* @__PURE__ */ import_react85.default.createElement("ul", null, items.map((entry, index) => /* @__PURE__ */ import_react85.default.createElement("li", { key: entry.id, className: entry.id === selectedId ? "is-active" : "" }, /* @__PURE__ */ import_react85.default.createElement(
     "button",
     {
