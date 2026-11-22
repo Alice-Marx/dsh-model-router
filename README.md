@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**GitHub release 0.81.1 · npm 0.81.1 · Windows Remote Agent 0.1.3**
+**GitHub release 0.82.0 · npm 0.82.0 · Windows Remote Agent 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -63,11 +63,11 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 | Connection | Configuration | Purpose |
 | --- | --- | --- |
 | API models | Add a provider or compatible API connection with its endpoint, separate credentials and model capacities. | OpenAI, Anthropic and Google Gemini protocols, plus Ollama; uses API funding settings. |
-| Subscription accounts | On a Windows Host, go to **AI connections → Subscription accounts** and authorize your ChatGPT / Codex account. | Syncs the account's text models for subscription-funded chat. Set the Bot's call allowance before chatting. |
+| Subscription accounts | On the local Host, go to **AI connections → Subscription accounts → Continue with ChatGPT**. | Authorize ChatGPT plan usage and sync the account’s text models. Choose an account model and set the Bot's subscription call allowance before chatting. |
 | Native CLI chat | Select a driver, verify its executable/version and optional entry script, then save the connection's own account and model ID. | Retains a native CLI session under the Bot's saved route and funding configuration. |
 | Official execution tools | Choose **Install and sign in** in Bot settings, complete the vendor login, recheck readiness and save the tool binding. | Grants supported file, command and other execution capabilities alongside a chat model from another provider. |
 
-DS Bot manages subscription accounts through the official [Codex App Server](https://learn.chatgpt.com/docs/app-server). Use **Official tools** in the app to install or repair Codex if prompted. Complete authorization on the official sign-in page, then select an account model under the Bot's **Models & tools** settings. DS Bot stores each account's credentials in a protected local directory and shows when a conversation has been verified. Older subscription records indicate where to reauthorize and select a new model route.
+The full Bot edition uses OpenAI’s [Sign in with ChatGPT](https://developers.openai.com/siwc/token-sharing-open-source) for direct ChatGPT plan access. Complete authorization in a browser on the Host computer, then select the account model in the Bot’s **Models & tools** settings. The Host stores each account’s grant locally. You can reconnect or sign out in **Subscription accounts**, and manage the provider’s allowance under [ChatGPT usage](https://chatgpt.com/settings/usage). The direct route supports text chat in both Bot runtimes. On Windows, the **ChatGPT / Codex** option continues to use the official [Codex App Server](https://learn.chatgpt.com/docs/app-server).
 
 CLI chat drivers include Claude Code, Codex, Pi, Step Code, Muse Code, Antigravity, Grok, Gemini, Kimi Code, Droid, Cursor, OpenCode, Qwen, Hermes, Cline, Copilot, Command Code, DeepSeek ACP and custom ACP. Availability depends on the local installation, account and model access. Connection states distinguish configuration, required attention and a verified conversation.
 
@@ -84,8 +84,8 @@ Bot calls through saved loopback connections share one running inference per loc
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.81.1`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.81.1`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.82.0`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.82.0`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -93,10 +93,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.81.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.82.0
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.81.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.82.0
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.

@@ -64,6 +64,7 @@ import { createDataEngine } from './bot-data-engine.mjs'
 import { createProductDataAccess } from './data-product-access.mjs'
 import { inspectProductBinding } from './binding-product.mjs'
 import { openAiProviders } from './ai-providers.mjs'
+import { createChatGptPlanCredentials } from './chatgpt-plan-credentials.mjs'
 import { openSubscriptionAccounts } from './subscription-accounts.mjs'
 import { inspectProductBotProfile, saveProductBotProfile } from './bot-profile.mjs'
 import { openUiHostNamespace } from './ui-host-namespace.mjs'
@@ -485,7 +486,8 @@ export function startBotProduct(ctx, options = {}) {
   const modelFrames = createModelFrameStore()
   const loopFunding = new WeakMap()
   const sessionLoopFrame = createSessionLoopFrameResolver({ sessionFor: id => ctx.get('sessions')?.get?.(id), isLoopRequest: isAgentLoopRequest,
-    allowUnbounded: request => engineProfiles.some(profile => profile.provider === request.provider && profile.model === request.model) })
+    allowUnbounded: request => subscriptionAccounts?.isDirect(request.provider)
+      || engineProfiles.some(profile => profile.provider === request.provider && profile.model === request.model) })
   let conversationEngines
   const engineCredentialStamps = new Map()
   const engineLeaseId = `native-${randomUUID()}`
@@ -607,6 +609,7 @@ export function startBotProduct(ctx, options = {}) {
     refreshing = true
     try {
       aiProviders?.sync()
+      subscriptionAccounts?.sync()
       await syncConversationProfiles()
       await publishRoutes((await catalog()).map(route => `${route.provider}/${route.model}`))
     }
@@ -992,6 +995,7 @@ export function startBotProduct(ctx, options = {}) {
         onChanged: async () => { product?.rt.dropCatalog(); await publishRoutes(routes); botSettings?.refresh() } })
       ctx.provide?.('botAiProviders', aiProviders)
       subscriptionAccounts = openSubscriptionAccounts({ Database, file: storageFile, root: join(dirname(storageFile), 'subscription-accounts'), now,
+        llm: ctx.llm, chatGptPlan: options.chatGptPlan ?? createChatGptPlanCredentials({ credentials: () => ctx.get?.('credentials'), now }),
         ...(options.subscriptionBackend ? { backend: options.subscriptionBackend } : {}),
         checkProfiles: profiles => normalizeConversationEngines([...configuredEngineProfiles, ...cliProviders.profiles(), ...profiles]),
         usedBy: route => (product?.lifecycle.committedBots() ?? []).filter(bot => bot.model?.startsWith(route + '/')
@@ -1276,7 +1280,8 @@ export function startBotProduct(ctx, options = {}) {
           const maxTokens = config.maxTokens === undefined ? quote.maxOutputTokens : Math.min(config.maxTokens, quote.maxOutputTokens)
           return { ...config, maxTokens }
         },
-        isTextOnlyModel: route => engineProfiles.some(profile => profile.provider === route.provider && profile.model === route.model),
+        isTextOnlyModel: route => subscriptionAccounts?.isDirect(route.provider)
+          || engineProfiles.some(profile => profile.provider === route.provider && profile.model === route.model),
         beforeModelRequest: async request => {
           const profile = engineProfiles.find(item => item.provider === request.provider && item.model === request.model)
           if (!profile) return

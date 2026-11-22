@@ -3,7 +3,12 @@ import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { createCodexSubscriptionBackend } from '../../bot-engines/src/codex-subscription.mjs'
 
+import { ChatGptPlanAdapter } from './chatgpt-plan-adapter.mjs'
+import { hasPlanGrant } from './chatgpt-plan-oauth.mjs'
+
 const kind = 'codex'
+const chatGpt = 'chatgpt'
+const chatGptName = 'ChatGPT 套餐'
 const providerName = 'ChatGPT / Codex'
 const token = /^[a-f0-9]{32}$/
 const modelId = /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,239}$/
@@ -26,10 +31,19 @@ const message = error => typeof error?.code === 'string' && error.code.startsWit
 
 /** The Host stores account metadata and derives all inference routes from it. */
 export function openSubscriptionAccounts({ Database, file, root, backend = createCodexSubscriptionBackend({ root }),
-  usedBy = () => [], checkProfiles = () => {}, onChanged = async () => {}, now = Date.now }) {
+  chatGptPlan, llm, usedBy = () => [], checkProfiles = () => {}, onChanged = async () => {}, now = Date.now }) {
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true })
   const db = new Database(file)
   db.exec('CREATE TABLE IF NOT EXISTS bot_native_subscription_accounts (id TEXT PRIMARY KEY, revision INTEGER NOT NULL, payload TEXT NOT NULL, health TEXT)')
+  db.exec('CREATE TABLE IF NOT EXISTS bot_chatgpt_host (key INTEGER PRIMARY KEY CHECK(key=1), host_id TEXT NOT NULL)')
+  const hostId = () => db.transaction(() => {
+    const current = db.prepare('SELECT host_id FROM bot_chatgpt_host WHERE key=1').get()
+    if (current) return current.host_id
+    const id = 'urn:uuid:' + randomUUID()
+    db.prepare('INSERT INTO bot_chatgpt_host(key,host_id) VALUES(1,?)').run(id)
+    return id
+  }).immediate()
+  const mounted = new Map()
   const legacy = Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='bot_subscription_accounts'").get())
   let closed = false, pending = null, queue = Promise.resolve()
   const serial = work => {
@@ -43,7 +57,8 @@ export function openSubscriptionAccounts({ Database, file, root, backend = creat
   const parse = row => {
     if (!row) return null
     const account = JSON.parse(row.payload)
-    if (!token.test(account.id ?? '') || account.id !== row.id || account.kind !== kind || typeof account.active !== 'boolean'
+    if (!token.test(account.id ?? '') || account.id !== row.id || ![kind, chatGpt].includes(account.kind)
+      || account.kind === chatGpt && (!/^oaiapp_[\w-]+$/.test(account.clientId ?? '') || typeof account.subject !== 'string' || !account.subject) || typeof account.active !== 'boolean'
       || !Array.isArray(account.models) || account.models.length > 64 || account.models.some(model => !modelId.test(model.id ?? '') || !text(model.name, 240))
       || new Set(account.models.map(model => model.id)).size !== account.models.length
       || !Number.isSafeInteger(row.revision) || row.revision < 1) fail('SUBSCRIPTION_STORE_INVALID', '订阅账户记录无效。')
@@ -52,11 +67,52 @@ export function openSubscriptionAccounts({ Database, file, root, backend = creat
   const rows = () => db.prepare('SELECT * FROM bot_native_subscription_accounts ORDER BY rowid').all().map(parse)
   const read = id => parse(db.prepare('SELECT * FROM bot_native_subscription_accounts WHERE id=?').get(id))
   const viewUsage = providers => [...new Map(providers.flatMap(provider => usedBy(provider)).map(bot => [bot.id, bot])).values()]
-  const profileRows = accounts => backend.available ? accounts.filter(account => account.active).flatMap(account => account.models.map(model => {
+  const profileRows = accounts => backend.available ? accounts.filter(account => account.kind === kind && account.active).flatMap(account => account.models.map(model => {
     const provider = route(account.id, model.id)
     return { id: provider, provider, model: model.id, name: account.name, driver: kind, entry: account.entry, revision: account.revision,
       credentialRef: 'subscription-home/' + account.id, hostTools: false }
   })) : []
+  const directRows = () => chatGptPlan?.available ? rows().filter(account => account.kind === chatGpt && account.active) : []
+  const disposeRoute = item => { item.controller.abort(); item.release() }
+  const syncDirect = () => {
+    if (closed || !chatGptPlan) return
+    const wanted = new Map(directRows().flatMap(account => account.models.map(model => [route(account.id, model.id), { account, model }])))
+    for (const [provider, item] of mounted) {
+      if (wanted.get(provider)?.account.revision === item.revision) continue
+      disposeRoute(item)
+      mounted.delete(provider)
+    }
+    for (const [provider, { account, model }] of wanted) {
+      if (mounted.has(provider)) continue
+      const controller = new AbortController()
+      const adapter = new ChatGptPlanAdapter({ model, provider, name: account.name, fetcher: chatGptPlan.fetcher,
+        acquire: async signal => {
+          const combined = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
+          combined.throwIfAborted()
+          try {
+            const accessToken = await chatGptPlan.access(account, combined)
+            combined.throwIfAborted()
+            return { token: accessToken, signal: controller.signal, release() {} }
+          } catch (error) {
+            if (['SUBSCRIPTION_AUTH_REQUIRED', 'SUBSCRIPTION_PLAN_DISABLED'].includes(error.code) && !combined.aborted) {
+              void serial(async () => {
+                if (read(account.id)?.revision !== account.revision) return
+                write({ ...account, active: false, needsConsent: error.code === 'SUBSCRIPTION_PLAN_DISABLED' }, account)
+                await changedRoutes()
+              }).catch(() => {})
+            }
+            throw error
+          }
+        },
+        markVerified: () => {
+          if (!closed) db.prepare('UPDATE bot_native_subscription_accounts SET health=? WHERE id=? AND revision=?')
+            .run(JSON.stringify({ kind: 'verified' }), account.id, account.revision)
+        },
+      })
+      const release = llm.registerAdapter([provider], adapter)
+      mounted.set(provider, { controller, release, revision: account.revision })
+    }
+  }
   const write = ({ revision, health, ...account }, previous) => {
     const stored = { ...account, revision: (previous?.revision ?? 0) + 1, health: null }
     const all = rows().filter(row => row.id !== account.id)
@@ -76,18 +132,21 @@ export function openSubscriptionAccounts({ Database, file, root, backend = creat
     } catch { return [] }
   })
   const loginView = session => ({
-    loginId: session.id, provider: kind, expiresAt: session.expiresAt,
+    loginId: session.id, provider: session.kind ?? kind, expiresAt: session.expiresAt,
     ...(session.authorization ? { url: session.authorization.url } : { preparing: true }),
   })
   const list = context => {
     owner(context)
     return {
-      schemaVersion: 1, service: { phase: backend.available ? 'ready' : 'unsupported' },
-      providers: [{ id: kind, name: providerName, available: backend.available }],
+      schemaVersion: 1, service: { phase: backend.available || chatGptPlan?.available ? 'ready' : 'unsupported' },
+      providers: [
+        ...(chatGptPlan ? [{ id: chatGpt, name: chatGptName, available: chatGptPlan.available }] : []),
+        { id: kind, name: providerName, available: backend.available },
+      ],
       accounts: [...rows().map(account => ({
-        id: account.id, revision: account.revision, provider: legacyRoute(account.id), kind, name: account.name,
+        id: account.id, revision: account.revision, provider: legacyRoute(account.id), kind: account.kind, name: account.name,
         email: account.email, plan: account.plan, enabled: account.active,
-        state: !account.active ? 'needs-login' : !account.models.length ? 'needs-models' : account.health?.kind === 'verified' ? 'ready' : 'configured',
+        state: !account.active ? account.needsConsent ? 'needs-consent' : 'needs-login' : !account.models.length ? 'needs-models' : account.health?.kind === 'verified' ? 'ready' : 'configured',
         models: account.models.map(model => ({ ...model, provider: route(account.id, model.id) })),
         usedBy: viewUsage(account.models.map(model => route(account.id, model.id))),
       })), ...oldAccounts()],
@@ -99,7 +158,10 @@ export function openSubscriptionAccounts({ Database, file, root, backend = creat
     session.controller.abort()
     await session.job
     await session.connection?.close()
-    if (!keepAccount) await backend.forget(session.id)
+    if (!keepAccount) {
+      if (session.kind !== chatGpt) await backend.forget(session.id)
+      else if (!session.previous && session.result) await chatGptPlan.discard(session.result)
+    }
     if (pending === session) pending = null
   }
   const statusFor = input => {
@@ -134,15 +196,33 @@ export function openSubscriptionAccounts({ Database, file, root, backend = creat
     else db.prepare('UPDATE bot_native_subscription_accounts SET payload=? WHERE id=? AND revision=?').run(JSON.stringify(next), account.id, revision)
     return changed
   }
+  const updateDirect = async (account, signal) => {
+    try {
+      const models = await chatGptPlan.models(await chatGptPlan.access(account, signal), signal)
+      signal?.throwIfAborted()
+      if (JSON.stringify(account.models) === JSON.stringify(models)) return false
+      write({ ...account, models }, account)
+    } catch (error) {
+      signal?.throwIfAborted()
+      if (!['SUBSCRIPTION_AUTH_REQUIRED', 'SUBSCRIPTION_PLAN_DISABLED'].includes(error.code)) throw error
+      write({ ...account, active: false, needsConsent: error.code === 'SUBSCRIPTION_PLAN_DISABLED' }, account)
+    }
+    return true
+  }
+  const changedRoutes = async () => { syncDirect(); await onChanged() }
   const timer = setInterval(() => {
     if (pending?.expiresAt <= now()) void serial(() => pending?.expiresAt <= now() && retire(pending)).catch(() => {})
   }, 30_000)
   timer.unref?.()
 
+  syncDirect()
   return Object.freeze({
+    sync: syncDirect,
     list,
     profiles: () => profileRows(rows()),
-    routes: () => profileRows(rows()).map(({ provider, model }) => ({ provider, model })),
+    routes: () => [...profileRows(rows()).map(({ provider, model }) => ({ provider, model })),
+      ...directRows().flatMap(account => account.models.map(model => ({ provider: route(account.id, model.id), model: model.id })))],
+    isDirect: provider => mounted.has(provider),
     owns: provider => /^bot-sub-[a-f0-9]{32}(?:-[a-f0-9]{16})?$/.test(provider),
     metadata(provider) {
       const id = /^bot-sub-([a-f0-9]{32})-[a-f0-9]{16}$/.exec(provider)?.[1]
@@ -170,7 +250,7 @@ export function openSubscriptionAccounts({ Database, file, root, backend = creat
       if (!backend.available || pending) return
       let changed = false
       try {
-        for (const account of rows().filter(account => account.active)) {
+        for (const account of rows().filter(account => account.kind === kind && account.active)) {
           if (account.reading && now() - account.reading.observedAt < 30_000) continue
           changed = await update(account, context.signal, true) || changed
         }
@@ -181,22 +261,48 @@ export function openSubscriptionAccounts({ Database, file, root, backend = creat
     stop: (input, context) => serial(async () => { owner(context); keys(input); await retire(pending); return list(context) }),
     refresh: (input, context) => serial(async () => {
       owner(context); keys(input)
-      if (!backend.available || pending) return list(context)
+      if (pending) return list(context)
       let changed = false
-      try { for (const account of rows()) changed = await update(account, context.signal, false) || changed }
-      finally { if (changed) await onChanged() }
+      try {
+        for (const account of rows()) {
+          if (account.kind === chatGpt) {
+            if (chatGptPlan?.available && account.active) changed = await updateDirect(account, context.signal) || changed
+          } else if (backend.available) changed = await update(account, context.signal, false) || changed
+        }
+      } finally { if (changed) await changedRoutes() }
       return list(context)
     }),
     login: (input, context) => serial(async () => {
-      owner(context); keys(input, ['provider'])
-      if (input.provider !== kind) fail('SUBSCRIPTION_PROVIDER_UNAVAILABLE', '当前仅开放 ChatGPT / Codex 订阅授权。')
-      if (!backend.available) fail('SUBSCRIPTION_PROVIDER_UNAVAILABLE', '当前宿主尚未支持此订阅授权。')
+      owner(context); keys(input, ['provider', 'id', 'expectedRevision', 'consent'])
+      const direct = input.provider === chatGpt
+      if (!(direct ? chatGptPlan?.available : input.provider === kind && backend.available)) {
+        fail('SUBSCRIPTION_PROVIDER_UNAVAILABLE', '当前宿主尚未支持此订阅授权。')
+      }
+      let previous
+      if (input.id !== undefined || input.expectedRevision !== undefined || input.consent !== undefined) {
+        previous = direct && token.test(input.id ?? '') && read(input.id)
+        if (!previous || previous.kind !== chatGpt || previous.revision !== input.expectedRevision
+          || input.consent !== undefined && typeof input.consent !== 'boolean') {
+          fail('SUBSCRIPTION_CONFLICT', 'ChatGPT 账户已更改，请刷新。')
+        }
+      }
       if (pending?.expiresAt <= now()) await retire(pending)
       if (pending) return loginView(pending)
-      const session = { id: randomUUID().replaceAll('-', ''), controller: new AbortController(), expiresAt: now() + 5 * 60_000 }
+      const session = { id: randomUUID().replaceAll('-', ''), kind: input.provider, previous,
+        controller: new AbortController(), expiresAt: now() + 5 * 60_000 }
       pending = session
       session.job = (async () => {
         const { signal } = session.controller
+        if (direct) {
+          session.connection = await chatGptPlan.begin({ hostId: hostId(), account: previous, consent: input.consent === true, signal,
+            onResult(result) {
+              void result.then(value => { session.result = value }, error => {
+                session.failure = { message: message(error), code: error.code }
+              })
+            } })
+          session.authorization = { url: session.connection.url }
+          return
+        }
         session.connection = await backend.open(session.id, { signal, create: true, onLogin(peerId, success) { session.outcome = { peerId, success } } })
         signal.throwIfAborted()
         session.authorization = await session.connection.login()
@@ -213,6 +319,33 @@ export function openSubscriptionAccounts({ Database, file, root, backend = creat
         return { status: 'error', ...(session.failure ?? { message: '授权已过期，请重新连接账户。' }) }
       }
       if (!session.authorization) return { status: 'preparing' }
+      if (session.kind === chatGpt) {
+        if (!session.result) return { status: 'pending', login: loginView(session) }
+        const { clientId, subject, email, tokens } = session.result
+        const previous = session.previous
+        const active = hasPlanGrant(tokens)
+        let models = previous?.models ?? [], catalogWarning
+        if (active) {
+          try { models = await chatGptPlan.models(tokens.accessToken, context.signal) }
+          catch (error) {
+            context.signal?.throwIfAborted()
+            models = []
+            catalogWarning = '已登录 ChatGPT，暂时无法获取模型目录，请点击同步模型。'
+          }
+        }
+        context.signal?.throwIfAborted()
+        const id = previous?.id ?? session.id
+        const account = { id, kind: chatGpt, clientId, subject, email, name: previous?.name ?? chatGptName + ' · ' + id.slice(0, 4),
+          plan: '', models, active, needsConsent: !active, reading: null }
+        await chatGptPlan.install(account, tokens, () => {
+          context.signal?.throwIfAborted()
+          write(account, previous)
+        })
+        await retire(session, true)
+        await changedRoutes()
+        return { status: 'complete', view: list(context), ...(catalogWarning ? { notice: catalogWarning } : !active
+          ? { notice: '已登录 ChatGPT，请授权使用套餐后选择模型。' } : {}) }
+      }
       if (session.outcome?.peerId !== session.authorization.peerId) {
         if (!session.connection.closed) return { status: 'pending', login: loginView(session) }
         await retire(session)
@@ -239,7 +372,7 @@ export function openSubscriptionAccounts({ Database, file, root, backend = creat
     cancelLogin: (input, context) => serial(async () => {
       owner(context)
       const session = statusFor(input)
-      if (session.authorization) await session.connection.cancel(session.authorization.peerId).catch(() => {})
+      if (session.kind !== chatGpt && session.authorization) await session.connection.cancel(session.authorization.peerId).catch(() => {})
       await retire(session)
       return { cancelled: true }
     }),
@@ -248,6 +381,15 @@ export function openSubscriptionAccounts({ Database, file, root, backend = creat
       if (!token.test(input.id ?? '')) fail('SUBSCRIPTION_INVALID', '请选择已有订阅账户。')
       const account = read(input.id)
       if (!account || account.revision !== input.expectedRevision) fail('SUBSCRIPTION_CONFLICT', '订阅账户已更改，请刷新。')
+      if (account.kind === chatGpt) {
+        if (!chatGptPlan?.available) fail('SUBSCRIPTION_STORE_UNAVAILABLE', '当前宿主无法访问 ChatGPT 凭据。')
+        write({ ...account, active: false, needsConsent: false }, account)
+        syncDirect()
+        try {
+          const revoked = await chatGptPlan.disconnect(account)
+          return { disconnected: true, revoked }
+        } finally { await onChanged() }
+      }
       if (viewUsage(account.models.map(model => route(account.id, model.id))).length) fail('SUBSCRIPTION_IN_USE', '仍有 Bot 使用此账户，请先切换模型。')
       await backend.forget(account.id)
       db.prepare('DELETE FROM bot_native_subscription_accounts WHERE id=? AND revision=?').run(account.id, account.revision)
@@ -258,6 +400,8 @@ export function openSubscriptionAccounts({ Database, file, root, backend = creat
       if (closed) return
       clearInterval(timer)
       closed = true
+      for (const item of mounted.values()) disposeRoute(item)
+      mounted.clear()
       pending?.controller.abort()
       await queue.catch(() => {})
       try { await retire(pending) } finally { db.close() }

@@ -106,6 +106,10 @@ const VENDOR_IMPORTERS_ALLOWED = [
   // styles to prove the product AI bridge works inside the native settings UI.
   {file: 'tests/fixtures/ai-providers-preview.jsx', spec: '../../modules/bot-runtime/vendor/ds-bot/src/client/settings.js'},
   {file: 'tests/fixtures/ai-providers-preview.jsx', spec: '../../modules/bot-runtime/vendor/ds-bot/src/client/styles.js'},
+  // Verify the exact avatar catalog, renderer, and settings normalization shipped in the pinned overlay.
+  {file: 'scripts/verify-model-avatars-browser.mjs', spec: '../modules/bot-runtime/vendor/ds-bot/src/client/model-avatar-catalog.js'},
+  {file: 'scripts/verify-model-avatars-browser.mjs', spec: '../modules/bot-runtime/vendor/ds-bot/src/client/model-portrait-eyes.js'},
+  {file: 'tests/model-avatar-picker.test.mjs', spec: '../modules/bot-runtime/vendor/ds-bot/src/host/avatar.js'},
 ]
 
 test('boundaries: the vendored runtime is imported only where it is declared', () => {

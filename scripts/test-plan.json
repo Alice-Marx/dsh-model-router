@@ -27,6 +27,7 @@
       "tests/model-avatar-picker.test.mjs",
       "tests/subscription-accounts.test.mjs",
       "tests/product-subscriptions.test.mjs",
+      "tests/chatgpt-plan.test.mjs",
       "tests/subscription-runtime.test.mjs",
       "tests/subscription-accounts-ui.test.mjs"
     ],
