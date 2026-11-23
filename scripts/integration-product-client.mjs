@@ -17,7 +17,7 @@ export async function bundleProductClient({root=ROOT}={}) {
     // Reused pinned dependency trees may be linked from another checkout.
     // Keep source labels relative to this project, without embedding that path.
     preserveSymlinks:true,
-    format: 'cjs', platform: 'browser', target: 'es2022', minifySyntax: true, charset: 'utf8', write: false,
+    format: 'cjs', platform: 'browser', target: 'es2022', minify: true, keepNames: true, charset: 'utf8', write: false,
     external: ['react', 'react/*', 'react-dom', 'react-dom/*', '@deepseek-ai/dsh-client-ui-primitives'],
     loader: { '.css': 'text', '.png': 'dataurl', '.webp': 'dataurl' }, metafile: true,
     define: { __ROUTER_CLIENT_VERSION__: JSON.stringify(pkg.version), __ROUTER_PACKAGE_NAME__: JSON.stringify(pkg.name) },

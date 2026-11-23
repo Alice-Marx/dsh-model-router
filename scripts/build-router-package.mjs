@@ -14,7 +14,7 @@ export async function bundleRouterClient({ root = ROOT } = {}) {
   const pkg = JSON.parse(await readFile(join(root, 'packages/model-router-plugin/package.json'), 'utf8'))
   const result = await build({ absWorkingDir: root, entryPoints: ['.dsh-plugin/client/official-harness.jsx'],
     bundle: true, preserveSymlinks: true, platform: 'browser', format: 'cjs', target: 'es2022',
-    minifySyntax: true, charset: 'utf8', write: false, metafile: true, logLevel: 'silent',
+    minify: true, keepNames: true, charset: 'utf8', write: false, metafile: true, logLevel: 'silent',
     external: ['react', 'react/*', 'react-dom', 'react-dom/*', '@deepseek-ai/dsh-client-ui-primitives'],
     loader: { '.css': 'text' }, define: { __ROUTER_CLIENT_VERSION__: JSON.stringify(pkg.version), __ROUTER_PACKAGE_NAME__: JSON.stringify(pkg.name) },
     plugins: [{ name: 'router-lf-css', setup(builder) {
