@@ -264,17 +264,21 @@ export function install(rt) {
   // a fresh look at the log and a brief of the member's own chat; the brief is the
   // first message, so it stays fixed and the prefix stays cacheable.
   async function groupSessionFor(room, member) {
+    const isCurrentMember = () => rt.roomOf(room.id) === room && room.members.includes(member.id) && rt.botOf(member.id) !== undefined
+    if (!isCurrentMember()) return undefined
     room.sessions ??= {}
     const known = room.sessions[member.id]
     if (known !== undefined) {
       await rt.ensureCapabilities(known)
+      if (!isCurrentMember()) return undefined
+      if (room.sessions?.[member.id] !== known) return groupSessionFor(room, member)
       return { id: known, brief: undefined }
     }
     const id = await rt.createSession(`${member.name} · ${room.name}`, { dir: rt.workDirOf({ botId: member.id, roomId: room.id }) })
     // While the Session was made the member may have left or been deleted, the group been
     // deleted, or another turn made the member's Session first: the new one is not kept.
     // Undefined means the member is gone from the group.
-    const gone = rt.roomOf(room.id) !== room || !room.members.includes(member.id) || rt.botOf(member.id) === undefined
+    const gone = !isCurrentMember()
     if (gone || room.sessions?.[member.id] !== undefined) {
       void ctx.workspaceRegistry.archiveSession(id, { stopActivity: true })
         .catch(error => rt.warn('ds-bot: unused group Session of %s in %s not archived: %s', member.name, room.name, error))
@@ -296,7 +300,10 @@ export function install(rt) {
     await rt.resolveAgent(id)
       .catch(error => rt.warn('ds-bot: scoped tools for %s in %s not applied: %s', member.name, room.name, error))
     await rt.ensureCapabilities(id)
-    return { id, brief: await rt.ownChatBrief(member) }
+    const brief = await rt.ownChatBrief(member)
+    if (!isCurrentMember()) return undefined
+    if (room.sessions?.[member.id] !== id) return groupSessionFor(room, member)
+    return { id, brief }
   }
 
   // Lines from before the round's opening message are kept apart from this round, so
@@ -316,7 +323,9 @@ export function install(rt) {
     const goal = rt.goalBlock?.(room, member, { nudge: round.goalNudge === true, resume: round.goalResume === true }) ?? ''
     // Members answering in this round are named with the round below.
     const answering = new Set(round.slots.filter(other => other.status === 'speaking').map(other => other.id))
-    const working = workingIn(room).filter(item => item.bot.id !== member.id && !answering.has(item.bot.id))
+    const pending = workingIn(room).filter(item => item.bot.id !== member.id && !answering.has(item.bot.id))
+    const awaitingApproval = pending.filter(item => rt.waitsForApproval?.(room.sessions?.[item.bot.id]))
+    const working = pending.filter(item => !awaitingApproval.includes(item))
       .map(item => ({ ...item, unread: unreadCount(room, item.bot.id) }))
     const text = [
       members,
@@ -329,6 +338,7 @@ export function install(rt) {
         : 'Nothing new in this round since your last message.',
       round.shown?.includes(member.id) ? '' : referenceNote(round.references),
       working.length > 0 ? `Still at work on what they were asked; each posts here when done: ${working.map(item => `${item.bot.name} (${minutesSince(item.since)} min${item.unread > 0 ? `, with ${item.unread} group message(s) it has not read yet` : ''})`).join(', ')}.` : '',
+      awaitingApproval.length > 0 ? `Waiting for the user's approval: ${awaitingApproval.map(item => item.bot.name).join(', ')}.` : '',
       ...placeLines(round, slot),
       ROOM_REPLY,
     ].filter(Boolean).join('\n\n')
@@ -480,9 +490,11 @@ export function install(rt) {
       const finish = (value) => {
         clearTimeout(timer)
         clearTimeout(grace)
+        signal.removeEventListener('abort', abort)
         rt.roomWaiters.delete(exchangeId)
         resolve(value)
       }
+      const abort = () => finish(null)
       const touch = () => {
         clearTimeout(timer)
         timer = setTimeout(() => finish({ missed: true }), ROOM_REPLY_TIMEOUT_MS)
@@ -500,12 +512,14 @@ export function install(rt) {
       }
       touch()
       rt.roomWaiters.set(exchangeId, { sessionId, botId: member.id, roomId: room.id, resolve: finish, fail: failure => finish({ failure }), touch, work, say, approval: () => finish({ approval: true }) })
-      signal.addEventListener('abort', () => finish(null), { once: true })
+      signal.addEventListener('abort', abort, { once: true })
     })
     try {
       await rt.deliver({ fromId: undefined, toId: member.id, sessionId, role: 'room', roomId: room.id, exchangeId, note, text, files, steer: busy, ...(by ? { askedBy: by } : {}) })
       // The prompt reached the member: its read position moves on.
-      room.seen[member.id] = seenAt
+      if (room.sessions?.[member.id] === sessionId) {
+        room.seen[member.id] = Math.max(room.seen[member.id] ?? 0, seenAt)
+      }
       // Still held by an earlier request: this turn cannot start until the user answers.
       if (rt.waitsForApproval?.(sessionId)) rt.roomWaiters.get(exchangeId)?.approval()
       // Still at earlier work: the call steers it at its next step; the round goes on.

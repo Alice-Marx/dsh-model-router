@@ -60,6 +60,7 @@
 # E164 preview additions preserve published source bytes across checkouts.
 /apps/desktop-client/** -text
 /packages/orchestration/src/** -text
+/packages/orchestration/src/product-composition.mjs whitespace=cr-at-eol
 /packages/cli-runtime/src/** -text
 /packages/capability-broker/src/** -text
 /modules/bot-runtime/** -text

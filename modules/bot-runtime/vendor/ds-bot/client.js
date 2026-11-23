@@ -18250,12 +18250,30 @@ function issueWindow() {
   const reserved = window.open("", "_blank");
   if (reserved !== null) reserved.opener = null;
   return {
+    close: () => reserved?.close?.(),
     go: (url) => {
-      if (reserved === null) return false;
+      if (reserved === null || reserved.closed) return false;
       reserved.location.href = url;
       return true;
     }
   };
+}
+function productIssueUrl(report, description) {
+  const text = description.trim().slice(0, WHAT_MAX);
+  const title = text.split("\n")[0].slice(0, 80);
+  const { productVersion, botVersion, dshVersion, os } = report.facts ?? {};
+  const facts = [
+    productVersion && `DSH Bot · Model Router: ${productVersion}`,
+    botVersion && `DS Bot: ${botVersion}`,
+    dshVersion && `DSH: ${dshVersion}`,
+    os && `OS: ${os}`
+  ].filter(Boolean);
+  const issue = new URL(report.issuesUrl);
+  if (title) issue.searchParams.set("title", title);
+  const body = [text, facts.join("\n")].filter(Boolean).join("\n\n");
+  if (body) issue.searchParams.set("body", body);
+  if (issue.href.length > 7e3) issue.searchParams.set("body", facts.join("\n"));
+  return issue.href;
 }
 function FeedbackPage({ actions, run: run2, Section, Row: Row3 }) {
   const [what, setWhat] = (0, import_react46.useState)("");
@@ -18279,6 +18297,14 @@ function FeedbackPage({ actions, run: run2, Section, Row: Row3 }) {
   const openIssue = () => {
     const target = issueWindow();
     run2(fetchReport().then(async (next) => {
+      if (next.issueFormat === "markdown") {
+        const url2 = productIssueUrl(next, what);
+        const opened = target.go(url2);
+        setIssueLink(opened ? null : url2);
+        setPreview(true);
+        setNote(t(opened ? "Opened a new GitHub issue. Copy the diagnostics below into it." : "The browser blocked the new window."));
+        return;
+      }
       const copied = await copy(next.markdown);
       const { url, inline } = issueUrl(next.issuesUrl, { what, diagnostics: next.markdown });
       if (target.go(url)) {
@@ -18289,6 +18315,9 @@ function FeedbackPage({ actions, run: run2, Section, Row: Row3 }) {
         setNote(t("The browser blocked the new window."));
       }
       if (!inline && !copied) setPreview(true);
+    }).catch((error) => {
+      target.close?.();
+      throw error;
     }));
   };
   const downloadLog = () => run2(actions.diagnosticsLog().then((text) => {
@@ -18324,7 +18353,7 @@ function FeedbackPage({ actions, run: run2, Section, Row: Row3 }) {
       preview ? (0, import_react46.createElement)("div", { className: "bt-set-row bt-fb-preview" }, (0, import_react46.createElement)("pre", { tabIndex: 0, "aria-label": t("Diagnostics") }, report?.markdown || t("Loading…"))) : null,
       (0, import_react46.createElement)(
         Row3,
-        { label: t("GitHub issue"), hint: t("Opens a new issue in the DS Bot repository with all of this filled in. Nothing is sent until you submit it there.") },
+        { label: t("GitHub issue"), hint: report?.issueFormat === "markdown" ? void 0 : t("Opens a new issue in the DS Bot repository with all of this filled in. Nothing is sent until you submit it there.") },
         (0, import_react46.createElement)("button", { type: "button", className: "bt-fb-primary", onClick: openIssue }, t("Report on GitHub"))
       )
     ),

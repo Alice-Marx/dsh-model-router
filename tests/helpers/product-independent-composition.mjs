@@ -139,7 +139,7 @@ export async function withProductIndependent(run, { beforeBoot, beforeProduct, n
       const saved = await dispatch('binding.save', { botId, expectedRevision: view.record.revision, settings })
       return saved
     }
-    return await run({ ctx, product, composition, runtime, bind, dispatch, storageFile, readRows, home, runtimeDir: dir })
+    return await run({ ctx, product, composition, runtime, bind, dispatch, storageFile, readRows, home, runtimeDir: dir, routerState: deferred.state })
   } finally {
     runtime?.close()
     await releaseBeforeProduct?.()

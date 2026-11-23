@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { createRuntime, inject } from './vendor/ds-bot/index.js'
 import { isAgentLoopRequest } from '@deepseek-ai/dsh-llm'
 import { attachDsLifecycle } from '../../packages/orchestration/src/ds-lifecycle.mjs'
@@ -13,6 +14,13 @@ export { inject }
 export { isAgentLoopRequest }
 export const contractVersion = 1
 
+const productVersion = (() => {
+  try {
+    const { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'))
+    return typeof version === 'string' ? version : null
+  } catch { return null }
+})()
+
 /**
  * Compose the frozen DS runtime with the host's existing identity, policy and
  * accounting services. This module is internal: the installed MR plugin owns
@@ -27,6 +35,16 @@ export function createBotProduct(ctx, options = {}) {
   if (typeof accountStream !== 'function') throw new TypeError('BOT_PRODUCT_ACCOUNTING_REQUIRED: provide the shared accounting stream decorator')
   // An integrated module must never install/update a second ds-bot bundle.
   const rt = createRuntime(ctx, { mainName: 'Main', mainRole: '主助理', ...options.runtimeConfig, updateCheck: false })
+  const diagnosticReport = rt.diagnostics.report
+  rt.diagnostics.report = async body => {
+    const report = await diagnosticReport(body)
+    const facts = { ...report.facts, productVersion }
+    return { ...report, facts,
+      markdown: productVersion ? report.markdown.replace('|---|---|', `|---|---|\n| DSH Bot · Model Router | ${productVersion} |`) : report.markdown,
+      issuesUrl: 'https://github.com/Alice-Marx/dsh-model-router/issues/new',
+      issueFormat: 'markdown',
+    }
+  }
   rt.isTextOnlyModel = route => options.isTextOnlyModel?.(route) === true
   const integratedUpdate = () => ({ available: false, phase: 'idle', source: 'integrated', name: '@ljwei-stak/dsh-model-route-bot', reason: '请通过 Bot 工作系统插件统一更新。' })
   rt.updateCheck = async () => integratedUpdate()

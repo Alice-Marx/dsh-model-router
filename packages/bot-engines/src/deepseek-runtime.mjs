@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile, unlink, rmdir } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { DEEPSEEK_ACP_VERSION } from './cli-driver-specs.mjs'
 
 export const DEEPSEEK_ACP_CONTEXT_WINDOW = 1_048_576
 export const DEEPSEEK_ACP_MAX_OUTPUT = 4096
@@ -105,7 +106,7 @@ export async function provisionDeepSeekRuntime(home, profile) {
   let sdkUrl
   try {
     const manifest = JSON.parse(await readFile(require.resolve('@deepseek-ai/dsh-llm-deepseek/package.json'), 'utf8'))
-    if (manifest.version !== '0.2.2-rc.2') fail('DEEPSEEK_SDK_VERSION_UNSUPPORTED')
+    if (manifest.version !== DEEPSEEK_ACP_VERSION) fail('DEEPSEEK_SDK_VERSION_UNSUPPORTED')
     sdkUrl = pathToFileURL(require.resolve('@deepseek-ai/dsh-llm-deepseek')).href
   } catch (error) {
     if (error.code === 'DEEPSEEK_SDK_VERSION_UNSUPPORTED') throw error

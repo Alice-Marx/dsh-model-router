@@ -1,5 +1,6 @@
 import { dirname, extname, isAbsolute } from 'node:path'
-import { getOfficialTool } from '../../../.dsh-plugin/shared/official-tool-registry.mjs'
+import { DSH_TUI_BACKEND_VERSION, getOfficialTool } from '../../../.dsh-plugin/shared/official-tool-registry.mjs'
+import { DEEPSEEK_ACP_VERSION } from '../../bot-engines/src/cli-driver-specs.mjs'
 import { probeOfficialTool, startRepair, installStatus, cancelInstall } from '../../../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { findGlobalPackageEntries, findNodeExecutable,officialToolReadiness } from '../../../.dsh-plugin/shared/official-tool-executor.mjs'
 
@@ -23,7 +24,7 @@ export function createCliToolSetup({probe=probeOfficialTool,findNode=findNodeExe
    if(toolId==='dsh-tui'){
     const moduleRoots=found.packageRoot?[dirname(dirname(found.packageRoot))]:undefined
     const entries=await findEntries('@deepseek-ai/dsh','dsh','lib/bin.js',workspace,moduleRoots?{moduleRoots}:{})
-    const dsh=entries.find(item=>item.version==='0.2.2-rc.2')
+    const dsh=entries.find(item=>item.version===DEEPSEEK_ACP_VERSION)
     source=dsh?{installed:true,version:dsh.version,packageEntry:dsh.entry}:null
    }
    if(source?.installed&&typeof source.version==='string'&&/^[0-9][A-Za-z0-9.+_-]{0,31}$/.test(source.version)){
@@ -38,7 +39,7 @@ export function createCliToolSetup({probe=probeOfficialTool,findNode=findNodeExe
     installed:found.installed===true,version:found.version??null,
     modelHint:driver==='stepAgent'?'step/模型名':driver==='deepseekAgent'?'deepseek-official/deepseek-v4-flash':'填写账号中可用的模型 ID',
     reason:'检查安装与托管执行入口，完成登录后回到工具行选择执行模式并保存授权。',
-    ...(!entry?{entryNotice:toolId==='dsh-tui'?'未找到同一安装目录中的 Node 版 dsh 0.2.2-rc.2。点击安装/修复补齐，或填写已有 Node 与 dsh 脚本路径。':'未找到可直接启动的入口。请安装/修复，或填写实际可执行文件路径。'}:{})}
+    ...(!entry?{entryNotice:toolId==='dsh-tui'?`原生 ACP 聊天需要单独安装 dsh ${DEEPSEEK_ACP_VERSION} 并填写 Node 与 dsh 脚本路径。上方安装/修复提供的是托管执行后端 ${DSH_TUI_BACKEND_VERSION}。`:'未找到可直接启动的入口。请安装/修复，或填写实际可执行文件路径。'}:{})}
   },
   repair(payload,context){validate(payload,context,true);const toolId=payload.toolId
    if(payload.operation==='start')return {toolId,job:repair(toolId)}

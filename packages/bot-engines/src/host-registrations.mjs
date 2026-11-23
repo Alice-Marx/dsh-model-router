@@ -7,7 +7,7 @@ import { createCodexEngine } from './codex-engine.mjs'
 import { createPiEngine } from './pi-engine.mjs'
 import { createStepEngine } from './step-engine.mjs'
 import { createMuseEngine } from './muse-engine.mjs'
-import { cliDriver } from './cli-driver-specs.mjs'
+import { cliDriver, DEEPSEEK_ACP_VERSION } from './cli-driver-specs.mjs'
 import { normalizeCliCredential, provisionCliCredential } from './cli-credentials.mjs'
 import { deepseekWireModel } from './deepseek-runtime.mjs'
 
@@ -34,7 +34,7 @@ export function normalizeConversationEngines(value = []) {
       || entry.script === undefined && entry.scriptSha256 !== undefined) fail('CONVERSATION_ENGINE_ENTRY_INVALID')
     if (item.driver === 'antigravityAgent' ? (!isAbsolute(entry.harness ?? '') || !hash(entry.harnessSha256) || Boolean(entry.script))
       : entry.harness !== undefined || entry.harnessSha256 !== undefined) fail('CONVERSATION_ENGINE_ENTRY_INVALID')
-    if (item.driver === 'deepseekAgent') { deepseekWireModel(item.model); if (!entry.script || entry.version !== '0.2.2-rc.2') fail('DEEPSEEK_NODE_ENTRY_REQUIRED') }
+    if (item.driver === 'deepseekAgent') { deepseekWireModel(item.model); if (!entry.script || entry.version !== DEEPSEEK_ACP_VERSION) fail('DEEPSEEK_NODE_ENTRY_REQUIRED') }
     const managedAccount = /^subscription-home\/([a-f0-9]{32})$/.exec(item.credentialRef ?? '')?.[1]
     if (managedAccount) {
       if (item.driver !== 'codex' || item.hostTools || !item.revision || !item.provider.startsWith('bot-sub-' + managedAccount + '-')) {

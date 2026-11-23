@@ -157,6 +157,46 @@ test('team runtime preflights every tool and prevents partial unauthorized execu
   assert.equal(launched, 0)
 })
 
+test('single-task cancellation during final admission settles the checkpoint without launching', async () => {
+  const controller = new AbortController()
+  const checkpoints = []
+  let admissions = 0
+  let launches = 0
+  const result = await runOfficialTask({ toolId: 'codex', task: 'read fixture', workspace, allowedRoot: workspace,
+    sandbox, signal: controller.signal, authorizeOfficial: async request => {
+      if (++admissions === 2) controller.abort()
+      return admitted(request)
+    },
+    runtime: { readiness: ready, runTool: async () => { launches++; return outcome } },
+    onCheckpointResult: checkpoint => { checkpoints.push(checkpoint) },
+  })
+  assert.equal(launches, 0)
+  assert.equal(result.status, 'cancelled')
+  assert.equal(result.notStarted, true)
+  assert.equal(checkpoints.length, 1)
+  assert.equal(checkpoints[0].notStarted, true)
+})
+
+test('team runtime keeps explicit vendor default through both admissions and out of CLI arguments', async () => {
+  const selections = []
+  const launched = []
+  const plan = { team: { workPackages: [
+    { id: 'a', name: 'one', dependsOn: [], recommendedProvider: 'openai', recommendedModel: 'chat-a' },
+  ] } }
+  const result = await runOfficialTeam({ plan, task: 'read fixture', workspace, allowedRoot: workspace,
+    installedIds: ['codex'], cliModels: { a: 'vendor-default' }, sandbox,
+    authorizeOfficial: request => {
+      selections.push(request.cliModel)
+      return { cliModel: request.cliModel ?? 'saved-model' }
+    },
+    runtime: { capabilities: [{ id: 'codex', supported: true, modes: ['read-only'] }], readiness: ready,
+      runTool: async request => { launched.push(request.modelId); return outcome } },
+  })
+  assert.equal(result.status, 'cli-completed')
+  assert.deepEqual(selections, ['vendor-default', 'vendor-default'])
+  assert.deepEqual(launched, [null])
+})
+
 test('shared native entry uses the real task/checkpoint/ledger path and default CLI model', async () => {
   let launched = 0, admissions = 0
   const ctx = { ...ctxFor(request => { admissions++; return admitted(request) }), sandbox }

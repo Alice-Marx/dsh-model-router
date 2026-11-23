@@ -1,4 +1,5 @@
 /** Fixed native chat protocols. Owner configuration selects a pinned entry, never a shell command. */
+export const DEEPSEEK_ACP_VERSION = '0.2.2-rc.2'
 const spec = (id, name, transport, executable, credentialHint, extra = {}) => Object.freeze({ id, name, transport, executable,
   implemented: true, available: true, hostTools: false, credentialHint, ...extra })
 export const CLI_CHAT_DRIVERS = Object.freeze([
@@ -20,7 +21,7 @@ export const CLI_CHAT_DRIVERS = Object.freeze([
   spec('copilotAgent', 'GitHub Copilot CLI', 'acp', 'copilot', '单独保存具有 Copilot 访问权的 GitHub 账号 token。'),
   spec('commandCodeAgent', 'Command Code', 'acp', 'command-code', '使用 Command Code 产品账号，不继承其他厂商的密钥。'),
   spec('customAcp', '自定义 ACP', 'acp', '', '仅用于无外部按量计费的本机实例。选择已核验的 ACP 包装程序，通过标准输入输出提供协议；不接受命令串。'),
-  spec('deepseekAgent', 'DeepSeek Harness ACP', 'acp', 'dsh', '独立保存 DeepSeek API Key；需要 dsh 0.2.2-rc.2 的 Node 入口。按量计费，每轮最多一次请求、输出最多4096 token。'),
+  spec('deepseekAgent', 'DeepSeek Harness ACP', 'acp', 'dsh', `独立保存 DeepSeek API Key；需要 dsh ${DEEPSEEK_ACP_VERSION} 的 Node 入口。按量计费，每轮最多一次请求、输出最多4096 token。`),
 ])
 export const cliDriver = id => CLI_CHAT_DRIVERS.find(driver => driver.id === id)
 export function acpChatArgs(driver, model) {

@@ -1296,6 +1296,9 @@ export function startBotProduct(ctx, options = {}) {
           // N06b: the unified admission owns every Bot model call; the diagnostic
           // decorator only remains for lightweight contexts without the store.
           if (!modelAccounting) return accountStream(streamOptions, next, enriched)
+          // The workbench already reserved and checkpointed this package.
+          // The scoped model stream still enforces the human's allowed route.
+          if (policy.ownerWorkbenchExecution() && policy.financialRun()?.source === 'owner-workbench') return next()
           // A direct MR call inside an admitted execution frame references that
           // run's invoice instead of opening a second Bot-side one.
           funding?.funded?.bindModelRequest?.(streamOptions, { agentLoop: meta?.agentLoop === true, ownRequest: meta?.ownRequest === true })

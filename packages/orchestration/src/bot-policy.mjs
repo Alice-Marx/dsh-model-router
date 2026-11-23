@@ -2,6 +2,9 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import { PolicyError } from '../../capability-broker/src/authority.mjs'
 
+const OWNER_WORKBENCH_CALLS = new Set(['remote/startRun', 'remote/rerunStep'])
+const isOwnerWorkbench = frame => frame?.owner === true && OWNER_WORKBENCH_CALLS.has(frame.capability)
+
 /** One policy for model-originated tools and authenticated human RPC. */
 export function createBotPolicy({ authority, directory, machineId, workspaceId, ownerGrant = { tools: [] }, ttlMs = 120_000 }) {
   const owner = Object.freeze({})
@@ -34,9 +37,13 @@ export function createBotPolicy({ authority, directory, machineId, workspaceId, 
         ...(frame.conversationId?{conversationId:frame.conversationId}:{}),...(frame.workThread?{workThread:frame.workThread}:{}),
         ...(frame.background?{background:true}:{})}:null
     },
+    ownerWorkbenchExecution() { return isOwnerWorkbench(current.getStore()) },
     bindFinancialRun(binding) {
       const frame=current.getStore()
-      if(!frame||frame.owner||frame.financial?.active())throw new PolicyError('FINANCIAL_CALL_CONTEXT_REQUIRED')
+      if(!frame||frame.financial?.active()||
+        (frame.owner ? binding.source !== 'owner-workbench' || !isOwnerWorkbench(frame) : binding.source === 'owner-workbench')) {
+        throw new PolicyError('FINANCIAL_CALL_CONTEXT_REQUIRED')
+      }
       frame.financial=Object.freeze({...binding})
     },
     financialRunActive() { return Boolean(current.getStore()?.financial?.active()) },
@@ -44,6 +51,7 @@ export function createBotPolicy({ authority, directory, machineId, workspaceId, 
       const frame=current.getStore(),binding=frame?.financial
       if(!binding||!binding.active())return null
       frame.signal?.throwIfAborted()
+      if (frame.owner) authority.assertTool(frame.subject, frame.capability)
       const packageId=binding.packageId()
       if(!packageId)throw new PolicyError('FINANCIAL_PACKAGE_NOT_STARTED')
       return {...binding,packageId,botId:authority.describe(frame.subject).botId}
@@ -106,7 +114,7 @@ export function createBotPolicy({ authority, directory, machineId, workspaceId, 
       const signal = incoming.length ? AbortSignal.any(incoming) : undefined
       try {
         return await authority.run(token, binding, capability(call), ({ signal }) =>
-          current.run({ ...who, signal }, () => operation(signal)), { signal })
+          current.run({ ...who, signal, capability: capability(call) }, () => operation(signal)), { signal })
       } finally { authority.release(token) }
     },
     filterRoutes(routes) {

@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-route-bot",
-  "version": "0.82.1",
+  "version": "0.82.2",
   "type": "module",
   "description": "DSH Bot workspace with integrated model routing, official tools and remote computers",
   "repository": {
@@ -367,7 +367,7 @@
     "test": "node scripts/run-tests.mjs",
     "verify:independent": "node scripts/verify-bot-independent.mjs",
     "verify:independent-chat": "node scripts/verify-independent-chat-browser.mjs && node scripts/verify-independent-chat-rich-browser.mjs && node scripts/verify-independent-chat-native-browser.mjs",
-    "prepack": "node scripts/build-openmaus-protocol.mjs && node remote-computer-agent/build.mjs && node scripts/prepack.mjs",
+    "prepack": "node scripts/prepack.mjs",
     "prepare:native": "node scripts/prepare-native-driver.mjs",
     "check:github-math": "node scripts/check-github-math.mjs"
   },

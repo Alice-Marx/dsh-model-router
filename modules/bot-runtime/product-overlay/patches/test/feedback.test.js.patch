@@ -1,0 +1,47 @@
+--- a/test/feedback.test.js
++++ b/test/feedback.test.js
+@@ -12,7 +12,7 @@
+ const ISSUES = 'https://github.com/Fei2411/DS-Bot/issues/new'
+ 
+ // Settings → Feedback in a window whose `open` is `open`, with every state change kept.
+-function page(window) {
++function page(window, diagnostics = async () => ({ markdown: '| DS Bot | 0.1.6 |', issuesUrl: ISSUES, entries: [], total: 0 })) {
+   const notes = []
+   const react = {
+   createContext: (initial) => { const ctx = { value: initial }; ctx.Provider = ({ value, children }) => { ctx.value = value; return children }; return ctx },
+@@ -38,7 +38,7 @@
+       throw new Error(`no platform module ${name}`)
+     },
+   })
+-  const actions = { diagnostics: async () => ({ markdown: '| DS Bot | 0.1.6 |', issuesUrl: ISSUES, entries: [], total: 0 }) }
++  const actions = { diagnostics }
+   let pending
+   const run = (promise) => { pending = promise; return promise }
+   const tree = module.exports.FeedbackPage({ actions, run, Section: 'section', Row: 'row' })
+@@ -82,3 +82,26 @@
+   assert.ok(notes.includes('The browser blocked the new window.'))
+   assert.ok(notes.some(note => note.startsWith(`${ISSUES}?template=bug.yml`)))
+ })
++
++test('integrated feedback opens the product issue with versions but leaves the log in the local preview', async () => {
++  const reserved = { location: { href: '' } }
++  const { report } = page({ open: () => reserved }, async () => ({
++    issuesUrl: 'https://github.com/Alice-Marx/dsh-model-router/issues/new', issueFormat: 'markdown',
++    facts: { productVersion: '0.82.1', dshVersion: '0.2.2-rc.5', os: 'win32' },
++    markdown: 'private-task-diagnostic-fixture',
++  }))
++  await report()
++  const issue = new URL(reserved.location.href)
++  assert.equal(issue.pathname, '/Alice-Marx/dsh-model-router/issues/new')
++  assert.equal(issue.searchParams.has('template'), false)
++  assert.match(issue.searchParams.get('body'), /0\.82\.1/)
++  assert.doesNotMatch(issue.searchParams.get('body'), /private-task-diagnostic-fixture/)
++})
++
++test('failed diagnostic loading closes the window reserved by the issue button', async () => {
++  let closed = false
++  const reserved = { close: () => { closed = true } }
++  const { report } = page({ open: () => reserved }, async () => { throw new Error('report unavailable') })
++  await assert.rejects(report(), /report unavailable/)
++  assert.equal(closed, true)
++})

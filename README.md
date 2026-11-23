@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**GitHub release 0.82.1 · npm 0.82.1 · Windows Remote Agent 0.1.3**
+**GitHub release 0.82.2 · npm 0.82.2 · Windows Remote Agent 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -71,7 +71,7 @@ The full Bot edition uses OpenAI’s [Sign in with ChatGPT](https://developers.o
 
 CLI chat drivers include Claude Code, Codex, Pi, Step Code, Muse Code, Antigravity, Grok, Gemini, Kimi Code, Droid, Cursor, OpenCode, Qwen, Hermes, Cline, Copilot, Command Code, DeepSeek ACP and custom ACP. Availability depends on the local installation, account and model access. Connection states distinguish configuration, required attention and a verified conversation.
 
-Antigravity uses its matching official runtime and harness files with separate OAuth credentials. DeepSeek ACP uses the dsh **0.2.2-rc.3** Node entry, its own API key and API funding, with one model request and at most 4096 output tokens per turn. Other subscription CLIs use their respective plan accounts. See the [CLI chat connection guide](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/cli-chat-providers.md) for installation and configuration.
+Antigravity uses its matching official runtime and harness files with separate OAuth credentials. DeepSeek ACP chat uses a separate dsh **0.2.2-rc.2** Node entry and its own API key, with one model request and up to 4,096 output tokens per turn. The dsh-TUI install or repair action provides dsh **0.2.2-rc.3** for managed tool execution. See the [CLI chat connection guide](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/cli-chat-providers.md) for installation and configuration.
 
 Edit the Bot's name, role and standing instructions under **Identity & personality**, then save to apply them. Chat supports separate threads, text drafts, paged history, Markdown, code and mathematics. Notifications open the relevant Bot and task. Main Bot supports multiple saved model routes; workers use their own models, permissions and funding.
 
@@ -84,8 +84,8 @@ Bot calls through saved loopback connections share one running inference per loc
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.82.1`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.82.1`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.82.2`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.82.2`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -93,10 +93,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.82.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.82.2
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.82.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.82.2
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -321,7 +321,7 @@ Credentials for independent plugin AI connections are saved through the Host cre
 | Library upload/edit refused | Check file size and same-name collisions; binary transfer and text-edit limits differ. |
 | Cost or usage unknown | Check actual model identity, configured prices, and reported usage. Missing data is not zero. |
 
-Use [GitHub Issues](https://github.com/Alice-Marx/dsh-model-router/issues) for reproducible problems and [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) for installation files. Include the edition, plugin/Host versions, platform, steps, and a sanitized screenshot or error. Remove credentials, pairing files, and private task content.
+In the full Bot edition, **Settings → Feedback → Report on GitHub** opens an issue draft with the product and Host versions. Review the local diagnostics preview and copy only the details needed to reproduce the problem. Include the steps and remove credentials, pairing files, and private task content. [GitHub Issues](https://github.com/Alice-Marx/dsh-model-router/issues) · [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest)
 
 ## License and acknowledgements
 

@@ -14,7 +14,7 @@ import { toolForProvider } from './official-tool-registry.mjs'
 import { workspaceChanged, readOnlyViolation } from './read-only-guard.mjs'
 import { awaitExecutionCheckpoint, observeExecutionProgress, redactDiagnostic, verifiedDiagnostic } from './task-executors.mjs'
 import { unsupportedCliReasoning } from './reasoning-execution.mjs'
-import { admittedOfficialModel, officialModelId } from './bot-official-execution.mjs'
+import { admittedOfficialSelection } from './bot-official-execution.mjs'
 
 const MAX_GIT_OUTPUT = 64_000_000
 const GIT_TIMEOUT_MS = 120_000
@@ -278,13 +278,10 @@ function checkedTeamCliModels(cliModels, assigned) {
   return checked
 }
 
-function teamCliModel(item, cliModels) {
-  // Harness directory IDs and vendor CLI aliases are independent namespaces.
-  // Every vendor uses its own configured default unless a package or tool
-  // explicitly binds the model name accepted by that CLI.
-  if (cliModels[item.id]) return officialModelId(cliModels[item.id])
-  if (cliModels[item.toolId]) return officialModelId(cliModels[item.toolId])
-  return null
+function requestedTeamCliModel(item, cliModels) {
+  // Leave an omitted selection for Host admission to resolve. An explicit
+  // vendor-default is itself a selection, even though it has no CLI argument.
+  return cliModels[item.id] ?? cliModels[item.toolId]
 }
 
 function reportedCliModel(toolId, value) {
@@ -451,8 +448,8 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   // Check the complete team before any cost or worktree mutation, then re-read
   // the same Host authorization immediately before each actual process launch.
   const admittedModels = new Map()
-  for (const item of assigned) admittedModels.set(item.id, await admittedOfficialModel(authorizeOfficial, {
-    toolId: item.toolId, modelId: teamCliModel(item, configuredCliModels), mode, executionEnvironment }))
+  for (const item of assigned) admittedModels.set(item.id, await admittedOfficialSelection(authorizeOfficial, {
+    toolId: item.toolId, cliModel: requestedTeamCliModel(item, configuredCliModels), mode, executionEnvironment }))
   const source = await approvedSource(workspace, allowedRoot)
   if (signal?.aborted) return { status: 'cancelled', workspace: source, results: [] }
   if (executionEnvironment === 'harness' && typeof sandbox?.confine !== 'function') return { status: 'blocked', blocking: [{ reason: '官方 Harness 进程沙箱不可用。' }], results: [] }
@@ -487,7 +484,8 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   const readOnlyBaseline = mode === 'read-only' ? await workspaceFingerprint(source, signal) : null
   for (const item of assigned) {
     if (signal?.aborted) return cancelledRun()
-    let cliModel = admittedModels.get(item.id)
+    const selected = admittedModels.get(item.id)
+    let cliModel = selected.modelId
     const prompt = packagePrompt(task, item, [...context, ...completed])
     const startedAt = Date.now()
     const starting = { ...item, provider: item.recommendedProvider,
@@ -498,9 +496,10 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
     if (signal?.aborted) return cancelledRun()
     let result
     try {
-      cliModel = await admittedOfficialModel(authorizeOfficial, { toolId: item.toolId,
-        cliModel: cliModel ?? 'vendor-default', mode, executionEnvironment })
-      result = await runTool({
+      const admission = await admittedOfficialSelection(authorizeOfficial, { toolId: item.toolId,
+        cliModel: selected.cliModel, mode, executionEnvironment })
+      cliModel = admission.modelId
+      result = signal?.aborted ? { status: 'cancelled', notStarted: true } : await runTool({
         toolId: item.toolId,
         modelId: cliModel,
         task: prompt,
@@ -585,8 +584,8 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
 
 /** One editable CLI task also uses the same isolated workspace and merge gate. */
 export async function runOfficialTask({ toolId, task, workspace, allowedRoot, modelId, mode = 'read-only', signal, sandbox, runtime, onCheckpointStart, onCheckpointResult, onWorkspace, authorizeOfficial }) {
-  modelId = await admittedOfficialModel(authorizeOfficial, { toolId, modelId, mode, executionEnvironment: 'harness' })
-  const selectedCliModel = modelId ?? 'vendor-default'
+  const selected = await admittedOfficialSelection(authorizeOfficial, { toolId, modelId, mode, executionEnvironment: 'harness' })
+  modelId = selected.modelId
   const source = await approvedSource(workspace, allowedRoot)
   if (signal?.aborted) return { toolId, status: 'cancelled', notStarted: true, finalText: '' }
   if (typeof sandbox?.confine !== 'function') return { toolId, status: 'unsupported', reason: '官方 Harness 进程沙箱不可用。' }
@@ -609,8 +608,9 @@ export async function runOfficialTask({ toolId, task, workspace, allowedRoot, mo
     workspace: runWorkspace, startedAt: Date.now() }, partial, 'start')
   if (signal?.aborted) return { ...partial(), status: 'cancelled', notStarted: true }
   try {
-    modelId = await admittedOfficialModel(authorizeOfficial, { toolId, cliModel: selectedCliModel, mode, executionEnvironment: 'harness' })
-    result = await (runtime?.runTool ?? runOfficialTool)({ toolId, task, modelId, workspace: runWorkspace,
+    const admission = await admittedOfficialSelection(authorizeOfficial, { toolId, cliModel: selected.cliModel, mode, executionEnvironment: 'harness' })
+    modelId = admission.modelId
+    result = signal?.aborted ? { status: 'cancelled', notStarted: true } : await (runtime?.runTool ?? runOfficialTool)({ toolId, task, modelId, workspace: runWorkspace,
       mode, isolatedRoot: isolated?.isolatedRoot, signal, sandbox })
     if (!result || typeof result.status !== 'string') throw new TypeError('官方 CLI 执行器没有返回有效状态。')
   } catch (error) {

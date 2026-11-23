@@ -28,8 +28,13 @@ test('missing or shim-only entries remain editable without reporting execution r
  const service=createCliToolSetup({probe:async()=>({installed:true,version:'1.0.0',executablePath:resolve('tools/step.cmd')})})
  const value=await service.inspect({toolId:'stepcode'},owner)
  assert.equal(value.entry,null);assert.match(value.entryNotice,/安装\/修复/);assert.equal(value.driver,'stepAgent')
- const dsh=createCliToolSetup({probe:async()=>({installed:true,version:'0.19.0'}),findEntries:async()=>[]})
- assert.match((await dsh.inspect({toolId:'dsh-tui'},owner)).entryNotice,/0.2.2-rc.2/)
+ const dsh=createCliToolSetup({probe:async()=>({installed:true,version:'0.19.0'}),
+  findEntries:async()=>[{version:'0.2.2-rc.3',entry:script}],readiness:async()=>({ready:true})})
+ const result=await dsh.inspect({toolId:'dsh-tui'},owner)
+ assert.equal(result.entry,null)
+ assert.equal(result.execution.ready,true)
+ assert.match(result.entryNotice,/原生 ACP 聊天需要单独安装 dsh 0\.2\.2-rc\.2/)
+ assert.match(result.entryNotice,/托管执行后端 0\.2\.2-rc\.3/)
 })
 test('repair only starts on the explicit owner operation and status/cancel reconcile the same registry tool',()=>{
  const calls=[],job={status:'running',tool:'stepcode'},service=createCliToolSetup({repair:id=>{calls.push(['start',id]);return job},status:id=>{calls.push(['status',id]);return job},cancel:id=>{calls.push(['cancel',id]);return {...job,cancelRequested:true}}})

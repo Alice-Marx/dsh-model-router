@@ -87,6 +87,25 @@ test('CLI uninstall, logout, unknown login and bad launch readiness cannot start
   }
 })
 
+test('discovery marks a ready CLI unavailable when the saved grant cannot use it', async t => {
+  const f = await fixture(t)
+  const [initial] = f.access.snapshotFor('worker')
+  assert.equal(initial.status, 'ready')
+  for (const [grant, reason] of [
+    [{ ...selected(), cliModel: 'removed-model' }, /CLI 模型当前不可用/],
+    [{ ...selected(), mode: 'workspace-write' }, /执行模式当前不可用/],
+  ]) {
+    f.state.row.settings.officialTools = [grant]
+    f.state.readiness = id => ({ ...ready(id), readyModes: ['read-only'] })
+    await f.catalog.refresh({ fresh: true })
+    const [entry] = f.access.snapshotFor('worker')
+    assert.equal(entry.status, 'unavailable')
+    assert.match(entry.reason, reason)
+    assert.deepEqual(entry.modes, [])
+    assert.deepEqual(entry.identities, [])
+  }
+})
+
 test('expiry may refresh a saved choice before checking the live CLI grant', async t => {
   const f = await fixture(t)
   f.state.clock += 20

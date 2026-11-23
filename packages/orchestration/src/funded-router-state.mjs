@@ -56,6 +56,13 @@ export function createFundedRouterState({store,policy,authority,pricingFor,now=D
   }
   const prepareExecutionFunding=async({packageEstimates,managedExecution,officialExecution})=>{
     if(officialExecution)return prepareOfficialFunding({packageEstimates,managedExecution,officialExecution})
+    if (policy.ownerWorkbenchExecution?.()) {
+      if (policy.financialRunActive()) fail('FINANCIAL_CALL_ALREADY_ACTIVE')
+      // The human workbench checks its own global budget and writes its own
+      // receipt through the shared lifecycle. It has no Bot funding binding.
+      return { state: store, packageEstimates, stamp: run => run,
+        bind: binding => policy.bindFinancialRun({ ...binding, source: 'owner-workbench' }) }
+    }
     const prepared=await configuration()
     if(!prepared)return null
     if(policy.financialRunActive())fail('FINANCIAL_CALL_ALREADY_ACTIVE')

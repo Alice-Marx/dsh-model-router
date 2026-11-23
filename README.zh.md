@@ -14,7 +14,7 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**GitHub 版本 0.82.1 · npm 版本 0.82.1 · Windows Remote Agent 0.1.3**
+**GitHub 版本 0.82.2 · npm 版本 0.82.2 · Windows Remote Agent 0.1.3**
 
 以 Bot 联系人和聊天为主要入口，集中使用独立 AI 连接、多模型路线、团队委派、私有资料库、数据分析与自有 Windows 电脑。任务、通知和执行记录保存在工作空间中，Main Bot 可在已保存的多条模型路线之间调度。
 
@@ -71,7 +71,7 @@
 
 CLI 聊天驱动包括 Claude Code、Codex、Pi、Step Code、Muse Code、Antigravity、Grok、Gemini、Kimi Code、Droid、Cursor、OpenCode、Qwen、Hermes、Cline、Copilot、Command Code、DeepSeek ACP 和自定义 ACP。实际可用性取决于本机安装、账号权限和模型访问；连接页面分别显示已配置、需要处理和已验证对话等状态。
 
-Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资料。DeepSeek ACP 使用 dsh **0.2.2-rc.3** 的 Node 入口、独立 API Key 和 API 资金配置，每轮最多一次模型请求、最多4096输出 token。其他订阅 CLI 使用各自的套餐账号。安装与配置步骤见 [CLI 聊天连接指南](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/cli-chat-providers.md)。
+Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资料。DeepSeek ACP 聊天需单独配置 dsh **0.2.2-rc.2** 的 Node 入口和独立 API Key，每轮最多一次模型请求、输出最多 4,096 token。dsh-TUI 的安装与修复提供 dsh **0.2.2-rc.3**，用于托管工具执行。安装与配置步骤见 [CLI 聊天连接指南](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/cli-chat-providers.md)。
 
 在“身份与个性”中编辑 Bot 名称、职责和长期指令，保存后应用。聊天支持独立线程、文字草稿、历史分页、Markdown、代码与数学公式；通知可回到对应 Bot 和任务。Main Bot 可配置多条模型路线，执行 Bot 使用自己的模型、权限与资金。
 
@@ -84,8 +84,8 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.82.1`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.82.1`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.82.2`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.82.2`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 完整版本进入 Bot 工作区，在 **设置 → AI** 添加独立模型连接，再为 Bot 选择模型。纯路由版本从侧栏打开 **模型路由**，使用 Harness 已配置路线。
 
@@ -93,10 +93,10 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.82.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.82.2
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.82.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.82.2
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -321,7 +321,7 @@ Host 管理已提交的模型、工具、电脑、资金及操作身份。Bot �
 | 资料库拒绝上传或编辑 | 检查文件大小及同名冲突；二进制传输与文本编辑的限额不同。 |
 | 金额或用量未知 | 检查实际模型身份、配置价格和已报告用量，缺失数据不是零。 |
 
-通过 [GitHub Issues](https://github.com/Alice-Marx/dsh-model-router/issues) 提交可复现问题，通过 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 获取安装文件。反馈时附上安装版本、插件/Host 版本、平台、复现步骤和脱敏截图或错误；移除凭据、配对文件和私有任务内容。
+完整 Bot 版可从 **设置 → 反馈 → 在 GitHub 上报告** 打开带产品和宿主版本的草稿。在本地预览诊断信息，只复制复现所需的内容。请附上复现步骤，移除凭据、配对文件和私有任务内容。[GitHub Issues](https://github.com/Alice-Marx/dsh-model-router/issues) · [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest)
 
 ## 许可与致谢
 

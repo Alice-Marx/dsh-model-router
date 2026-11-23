@@ -21,6 +21,18 @@ test('Host engine profiles reject request-supplied authority and duplicate provi
   assert.throws(() => normalizeConversationEngines([value, { ...value, id: 'other' }]), { code: 'CONVERSATION_ENGINE_DUPLICATE' })
 })
 
+test('installed product reports its own version and directs support to its own repository', async () => {
+  await withProductIndependent(async ({ product }) => {
+    const result = await product.rt.diagnostics.report({ client: { surface: 'offline test' } })
+    const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+    assert.equal(result.issuesUrl, 'https://github.com/Alice-Marx/dsh-model-router/issues/new')
+    assert.equal(result.issueFormat, 'markdown')
+    assert.equal(result.facts.productVersion, version)
+    assert.ok(result.markdown.includes(`| DSH Bot · Model Router | ${version} |`))
+    assert.ok(result.facts.botVersion)
+  })
+})
+
 test('whole product binds the configured Claude route and settles two owner chat requests on one native session', async () => {
   await withProductIndependent(async ({ ctx, product, runtime, bind, dispatch, readRows, home }) => {
     const catalog = ctx.get('botConversationEngines').catalog()
@@ -100,7 +112,7 @@ test('whole product binds the configured Claude route and settles two owner chat
     await bind('a','alpha','one')
     assert.deepEqual(toolView.schemas().map(tool=>tool.name).sort(),['bot_task_cancel','bot_task_status',
       'data_load','data_describe','data_sql','data_show','data_export',
-      'coordinate_bots','assignment_status','list_bots','list_threads'].sort(),'an API route restores supported tool declarations without changing Main authorization')
+      'coordinate_bots','assignment_status','list_bots','list_threads','team_inbox'].sort(),'an API route restores supported tool declarations without changing Main authorization')
     assert.equal(readRows('router_model_calls').length,3,'changing the default route does not send a message')
   }, { conversationEngines: [await profile()] })
 }, { timeout: 120000 })

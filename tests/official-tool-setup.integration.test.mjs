@@ -51,6 +51,41 @@ test('changing Host drops a secret draft and late old setup/status results canno
  })
 })
 
+test('an older status response cannot erase a newly accepted installation',async()=>{
+ await withDom(async({render,click,flush,container})=>{
+  let reads=0,resolveOld
+  const api=fixture((action,payload)=>{
+   if(action==='cliProviders.repair'&&payload.operation==='status'&&++reads===2){
+    return new Promise(resolve=>{resolveOld=resolve})
+   }
+  })
+  await render(api)
+  await click('读取安装状态')
+  await click('安装/修复 CLI')
+  resolveOld({toolId:'stepcode',job:null})
+  await flush()
+  assert.match(container.textContent,/安装正在进行/)
+  assert.equal(api.calls.filter(call=>call.payload?.operation==='start').length,1)
+  assert.ok([...container.querySelectorAll('button')].find(button=>button.textContent==='安装/修复中…').disabled)
+ })
+})
+
+test('a lost installation response reads the existing job without submitting again',async()=>{
+ await withDom(async({render,click,container})=>{
+  let started=false
+  const api=fixture((action,payload)=>{
+   if(action!=='cliProviders.repair')return
+   if(payload.operation==='start'){started=true;return Promise.reject(new Error('连接中断'))}
+   if(payload.operation==='status'&&started)return {toolId:'stepcode',job:{status:'running',id:'accepted-job'}}
+  })
+  await render(api)
+  await click('安装/修复 CLI')
+  assert.match(container.textContent,/安装正在进行/)
+  assert.doesNotMatch(container.textContent,/连接中断/)
+  assert.deepEqual(api.calls.filter(call=>call.action==='cliProviders.repair').map(call=>call.payload.operation),['status','start','status'])
+ })
+})
+
 test('CodeBuddy exposes execution repair and login without an unsupported chat configuration',async()=>{
  await withDom(async({render,container,click})=>{const api=fixture((action,payload)=>action==='cliProviders.setup'?{schemaVersion:1,toolId:payload.toolId,label:'CodeBuddy Code',driver:'execution-only',loginCommand:'codebuddy',reason:'托管执行',execution:{ready:true}}:undefined)
   await render(api,'codebuddy-code');assert.match(container.textContent,/CodeBuddy Code/);assert.match(container.textContent,/账号登录/);assert.doesNotMatch(container.textContent,/另作聊天模型/)

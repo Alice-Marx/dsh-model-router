@@ -4,12 +4,13 @@ import { createReadStream } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { pinAcpEntry } from '../../bot-acp/src/native-launch.mjs'
 import { inspectAntigravityEntry } from './antigravity-runtime.mjs'
+import { DEEPSEEK_ACP_VERSION } from './cli-driver-specs.mjs'
 const digest = async path => { const hash = createHash('sha256'); for await (const chunk of createReadStream(path)) hash.update(chunk); return hash.digest('hex') }
 
 /** Owner-selected executable, verified without loading an account or sending a prompt. */
 export async function inspectCliEntry(input, _driver, signal, root) {
   if (_driver === 'antigravityAgent') return inspectAntigravityEntry(input, { signal, root })
-  if (_driver === 'deepseekAgent' && (!input.script || input.version !== '0.2.2-rc.2')) throw Object.assign(new Error('DeepSeek ACP 需要 dsh 0.2.2-rc.2 的 Node 和入口脚本。'), { code: 'DEEPSEEK_NODE_ENTRY_REQUIRED' })
+  if (_driver === 'deepseekAgent' && (!input.script || input.version !== DEEPSEEK_ACP_VERSION)) throw Object.assign(new Error(`DeepSeek ACP 需要 dsh ${DEEPSEEK_ACP_VERSION} 的 Node 和入口脚本。`), { code: 'DEEPSEEK_NODE_ENTRY_REQUIRED' })
   const invalid = () => { throw Object.assign(new Error('请使用实际可执行文件的绝对路径；Node/Python CLI 可填写解释器和脚本，不能填写 shell 命令。'), { code: 'CLI_CHAT_ENTRY_INVALID' }) }
   if (!isAbsolute(input.executable ?? '') || /\.(?:cmd|bat|ps1)$/i.test(input.executable) || input.script && !isAbsolute(input.script)) invalid()
   signal?.throwIfAborted()

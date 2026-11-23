@@ -47,8 +47,14 @@ export function createBotOfficialAccess({ catalog, identityFor, settingsFor, isM
           if (main) return { ...tool, grant }
           if (row.status !== 'available') return { ...tool, grant, modes: [], identities: [],
             ...(tool.status === 'ready' ? { status: 'unavailable', reason: '此 Bot 的已保存绑定当前不可用，请先修复绑定。' } : {}) }
-          return { ...tool, grant, modes: tool.modes.filter(mode => mode === grant.mode),
-            identities: tool.identities.filter(identity => identity.model === grant.cliModel) }
+          const modes = tool.modes.filter(mode => mode === grant.mode)
+          const identities = tool.identities.filter(identity => identity.model === grant.cliModel)
+          if (tool.status === 'ready' && (!modes.length || !identities.length)) return {
+            ...tool, grant, status: 'unavailable', modes: [], identities: [],
+            reason: !modes.length ? '此 Bot 授权的执行模式当前不可用，请检查工具就绪状态与已保存授权。'
+              : '此 Bot 授权的 CLI 模型当前不可用，请检查已保存授权。',
+          }
+          return { ...tool, grant, modes, identities }
         })
     },
     async authorize(request = {}) {

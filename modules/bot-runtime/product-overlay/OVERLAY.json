@@ -263,6 +263,42 @@
       "path": "src/client/model-portrait-art.js",
       "kind": "product-file",
       "summary": "Deforms the original portrait around separate neck and upper-body pivots."
+    },
+    {
+      "path": "src/host/groups.js",
+      "kind": "patched",
+      "summary": "Revalidate group membership and read positions, detach completed cancellation listeners, and identify members waiting for approval.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "2d8701ad88db093c776295332e736273adcd392515c3f6ccd09f364e571cd70b"
+      }
+    },
+    {
+      "path": "web-search.js",
+      "kind": "patched",
+      "summary": "Preserve longer search extracts and require HTTPS for declared search endpoints, following DS Bot upstream.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "9e38330353021a9bdc1503ee24d523b16b309b3f1ff688338caef48862e20265"
+      }
+    },
+    {
+      "path": "src/client/feedback.js",
+      "kind": "patched",
+      "summary": "Support the integrated product issue draft, keep logs local until explicitly copied, and release a reserved window if diagnostics loading fails.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "38dba7416ad6ba1c96e5e6f46d2f5754041dc688abae378bacd690b5eb4ebc9a"
+      }
+    },
+    {
+      "path": "test/feedback.test.js",
+      "kind": "patched",
+      "summary": "Verify product issue routing, local diagnostic retention, and reserved-window cleanup.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "20e7d13bdf844b5c99556d5ff2d9b278d127946467e5effb3373197b61d4ebd4"
+      }
     }
   ]
 }

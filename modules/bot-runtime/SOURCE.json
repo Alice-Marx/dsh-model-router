@@ -267,6 +267,42 @@
       "path": "src/client/model-portrait-art.js",
       "kind": "product-file",
       "summary": "Deforms the original portrait around separate neck and upper-body pivots."
+    },
+    {
+      "path": "src/host/groups.js",
+      "kind": "patched",
+      "summary": "Revalidate group membership and read positions, detach completed cancellation listeners, and identify members waiting for approval.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "2d8701ad88db093c776295332e736273adcd392515c3f6ccd09f364e571cd70b"
+      }
+    },
+    {
+      "path": "web-search.js",
+      "kind": "patched",
+      "summary": "Preserve longer search extracts and require HTTPS for declared search endpoints, following DS Bot upstream.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "9e38330353021a9bdc1503ee24d523b16b309b3f1ff688338caef48862e20265"
+      }
+    },
+    {
+      "path": "src/client/feedback.js",
+      "kind": "patched",
+      "summary": "Support the integrated product issue draft, keep logs local until explicitly copied, and release a reserved window if diagnostics loading fails.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "38dba7416ad6ba1c96e5e6f46d2f5754041dc688abae378bacd690b5eb4ebc9a"
+      }
+    },
+    {
+      "path": "test/feedback.test.js",
+      "kind": "patched",
+      "summary": "Verify product issue routing, local diagnostic retention, and reserved-window cleanup.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "20e7d13bdf844b5c99556d5ff2d9b278d127946467e5effb3373197b61d4ebd4"
+      }
     }
   ],
   "files": [
@@ -322,8 +358,8 @@
     {
       "path": "vendor/ds-bot/client.js",
       "sourcePath": "ds-bot/client.js",
-      "sha256": "4594191568ae3db7c71e25bbd43afc7e590b8bcc12cdbcc8ad34274e50a82866",
-      "gitBlob": "403650bd68c9960c1cb495f1611d8e96d6398cf9",
+      "sha256": "c3321f289fc03c448d6041821e2fc2d3a123115ab2eac797561e54033b596450",
+      "gitBlob": "d10b276e5cf1907b2136ce8c4ef587f5662fdc12",
       "origin": "generated"
     },
     {
@@ -854,9 +890,9 @@
     {
       "path": "vendor/ds-bot/src/client/feedback.js",
       "sourcePath": "ds-bot/src/client/feedback.js",
-      "sha256": "4bc9b9006d4812554104922edb4758d98e2c557fed5e3c88e336f57bafb6e5e9",
-      "gitBlob": "5567007d3bc6f73aa19672bda6975e91946c081c",
-      "origin": "upstream"
+      "sha256": "efd3cdedddf7ab530b21e97c02460456571eecfb86c8280cd2a2b330f1aabd1f",
+      "gitBlob": "519c433be1ead3d089fc384626f3495a7362776e",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/fold.js",
@@ -1470,9 +1506,9 @@
     {
       "path": "vendor/ds-bot/src/host/groups.js",
       "sourcePath": "ds-bot/src/host/groups.js",
-      "sha256": "1a0502a28bdb9da93aef9e8005e0f39f3a0f92fd5c797f6d7764bcd45c44d7cf",
-      "gitBlob": "0527eeeb843fc2eee4a6c11eb2ba1ce9e27997a0",
-      "origin": "upstream"
+      "sha256": "9d40f5dab7c51fd5b6df71de975cbcdeac96e8c144ff54affecf38fbc16ede8c",
+      "gitBlob": "656d4ab6fbde6a8f225096ee864490971dbf75b2",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/host/handoffs.js",
@@ -2086,9 +2122,9 @@
     {
       "path": "vendor/ds-bot/test/feedback.test.js",
       "sourcePath": "ds-bot/test/feedback.test.js",
-      "sha256": "4791570f753d64d764d8f3206b087e2ab9f6efa1cb067f6e03f9dea35c2d0fff",
-      "gitBlob": "35bb3771b8071aabcc85a2c2f04deb51ec7566ac",
-      "origin": "upstream"
+      "sha256": "c85ba567d0a53026e3c58cba6c96908fa548768f2464d31a3c0920400c9a1204",
+      "gitBlob": "6f92fa39dfb7dfc7d3d2c97839a6a510c5ff24a2",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/test/files.test.js",
@@ -2835,9 +2871,9 @@
     {
       "path": "vendor/ds-bot/web-search.js",
       "sourcePath": "ds-bot/web-search.js",
-      "sha256": "c47a67e66c3fa5e1b739f2389f56c6a3bc8d39148e4897160800f8c11250740e",
-      "gitBlob": "e8d889292d036e94b758ea5a98da03f43905df2a",
-      "origin": "upstream"
+      "sha256": "75db6e3af59a90c3a1a3c88578282ff875ef040844759ff41da8dd5c14673139",
+      "gitBlob": "18bf52f7136e31643961ed285418503a7b42b8aa",
+      "origin": "overlay"
     }
   ]
 }

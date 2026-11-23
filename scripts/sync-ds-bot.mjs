@@ -320,6 +320,24 @@ export async function overlayDiff(entry) {
   return { path: entry.path, kind: entry.kind, patch }
 }
 
+async function verifyOverlayTargets(overlay, runtime) {
+  const normalize = text => text.replaceAll('\r\n', '\n')
+  for (const entry of overlay.entries) {
+    const path = entry.path
+    const installed = await readFile(join(VENDOR, path))
+    if (entry.kind === 'product-file') {
+      assert.ok(installed.equals(await readFile(productFile(path))), `Product overlay file differs: ${path}`)
+      continue
+    }
+    const recordedBase = await readFile(baseFile(path))
+    assert.equal(digest(recordedBase), entry.base.sha256, `Product overlay base differs: ${path}`)
+    const source = runtime ? await readFile(join(runtime, path), 'utf8') : recordedBase.toString('utf8')
+    const result = applyPatchText(source, await readFile(patchFile(path), 'utf8'))
+    assert.ok(result.ok && normalize(result.text) === normalize(installed.toString('utf8')),
+      `Product overlay does not reproduce the vendored file: ${path}`)
+  }
+}
+
 // ---------------------------------------------------------------- vendored client bundle
 
 let bundleClientOnce
@@ -404,11 +422,14 @@ async function verifyAgainstSource(pinned) {
   assert.equal(current.commit, pinned.commit, `DS Bot source is stale: SOURCE.json records ${current.commit}, the source is at ${pinned.commit}`)
   assert.equal(current.runtime?.version, pinned.version, `DS Bot runtime version differs: ${current.runtime?.version} against ${pinned.version}`)
   assert.deepEqual(current, expected, 'The vendored DS Bot source or SOURCE.json is stale')
+  await verifyOverlayTargets(overlay, pinned.runtime)
   const drifted = []
   for (const entry of overlay.entries) {
     if (entry.kind !== 'patched') continue
     const bytes = await readFile(join(pinned.runtime, entry.path))
-    if (digest(bytes) !== entry.base.sha256) drifted.push({ path: entry.path, base: entry.base.commit, source: pinned.commit })
+    if (digest(bytes) !== entry.base.sha256 && !sameLines(bytes.toString('utf8'), await readFile(baseFile(entry.path), 'utf8'))) {
+      drifted.push({ path: entry.path, base: entry.base.commit, source: pinned.commit })
+    }
   }
   // Every file the product does not own must be this source's bytes, byte for byte.
   const stale = []
@@ -442,7 +463,9 @@ export async function syncDsBot({ check = false, source = null, sourceCommit = n
     return { status: 'synced', files: next.files.length, commit: next.commit, version: next.runtime.version, overlays: applied }
   }
   const current = await recorded()
-  const next = await manifest({ commit: current.commit, version: current.runtime?.version, overlays: current.overlays ?? [] })
+  const overlay = await readOverlay()
+  await verifyOverlayTargets(overlay)
+  const next = await manifest({ commit: current.commit, version: current.runtime?.version, overlays: overlayRows(overlay) })
   if (check) {
     assert.deepEqual(current, next, 'The vendored DS Bot source or SOURCE.json is stale')
     return { status: 'passed', files: next.files.length, commit: next.commit }
