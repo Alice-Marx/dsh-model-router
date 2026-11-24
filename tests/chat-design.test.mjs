@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { transform } from 'esbuild'
+import { JSDOM } from 'jsdom'
 import { CHAT_DESIGN, chatContrast, chatTokens, cssBlocks, chatViolations, darkTokenGaps, selectorList, tokenGaps } from '../apps/integration-client/chat-design.mjs'
 
 // The chat surface's own contract: what the stylesheet promises about colour,
@@ -16,6 +17,19 @@ const ruleText = blocks.filter(block => !block.atRule).map(block => block.select
 test('chat stylesheet parses without CSS warnings', async () => {
   const result = await transform(css, { loader: 'css', minify: true })
   assert.deepEqual(result.warnings, [])
+})
+
+test('product hidden styles leave the Harness transcript process body to its conversation renderer', async () => {
+  const refinement = await readFile(new URL('../apps/integration-client/product-refinement.css', import.meta.url), 'utf8')
+  const hides = cssBlocks(refinement).filter(rule => !rule.atRule && rule.selectors.includes('[hidden]')
+    && /(?:^|;)\s*display\s*:\s*none\b/.test(rule.body)).map(rule => rule.selectors).join(',')
+  const { document } = new JSDOM(`<body data-bot-product-ui>
+    <div data-step-process><div data-step-process-body hidden="until-found" id="group-replies"></div></div>
+    <button hidden id="closed-control"></button>
+    <div data-step-process-body hidden id="unrelated-element"></div>
+  </body>`).window
+
+  assert.deepEqual([...document.querySelectorAll(hides)].map(element => element.id), ['closed-control', 'unrelated-element'])
 })
 
 test('both appearances declare the same chat tokens, and every pair clears its floor', () => {

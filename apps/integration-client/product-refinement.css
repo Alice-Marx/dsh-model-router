@@ -18,7 +18,8 @@ html body[data-bot-product-ui][data-ds-dark-theme]:not([data-bp-appearance=light
   --bp-chat-hover: #34303e; --bp-chat-ink: #efedf5; --bp-chat-muted: #b1aabc; --bp-chat-line: #3b3745;
   --bp-chat-accent: #bfabe7; --bp-chat-focus: #b6a0e4; --bp-chat-user: #3c334e; --bp-chat-on-user: #efedf5;
 }
-html body[data-bot-product-ui] [hidden] { display: none !important; }
+/* DS Bot keeps the contents of Harness's folded process visible in the chat. */
+html body[data-bot-product-ui] [hidden]:not([data-step-process] > [data-step-process-body]) { display: none !important; }
 html body[data-bot-product-ui] .bp-page { line-height: 1.6; }
 .bp-workspace > .bp-page { padding: 28px; }
 .bp-workspace > .bp-page > .bp-page-inner { max-width: 1050px; }
