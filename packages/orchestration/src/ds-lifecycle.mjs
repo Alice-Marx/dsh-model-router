@@ -159,6 +159,7 @@ export function attachDsLifecycle({ runtime, directory, grantFor, readSaved = ()
     if (closed) fail('DS_LIFECYCLE_CLOSED')
     const sessionId = agent?.session?.id
     if (!id(sessionId)) fail('INVALID_AGENT')
+    if (bindings.get(sessionId)?.agent === agent) return
     if (knownAgents.size >= 16384 && !knownAgents.has(sessionId)) fail('DS_STATE_LIMIT')
     if (knownAgents.get(sessionId) !== agent) {
       knownAgents.set(sessionId,agent)
@@ -205,6 +206,7 @@ export function attachDsLifecycle({ runtime, directory, grantFor, readSaved = ()
   Object.assign(runtime,wrapped)
   return Object.freeze({
     observeAgent,
+    ownsSession: sessionId => healthy && !closed && ownership.has(sessionId),
     committedBot(botId) { return healthy&&!closed&&committedBots.has(botId)?structuredClone(committedBots.get(botId)):null },
     committedGrant(botId) { return healthy&&!closed&&records.has(botId)?structuredClone(records.get(botId).grant):null },
     committedBots() { return healthy&&!closed?[...committedBots.values()].map(bot=>structuredClone(bot)):[] },

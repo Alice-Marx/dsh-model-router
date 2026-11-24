@@ -1,8 +1,53 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { withProductIndependent } from './helpers/product-independent-composition.mjs'
 import { attachActualAgentLoop } from './helpers/actual-agent-loop.mjs'
 import { compileDsOwnership } from '../packages/orchestration/src/ds-lifecycle.mjs'
+
+test('already-live private and group member sessions can use their committed grants on the first turn', async () => {
+  let actual, home
+  const handles = []
+  await withProductIndependent(async ({ ctx, product, bind, readRows }) => {
+    await bind('a', 'alpha', 'one')
+    await bind('b', 'beta', 'vendor/two')
+    // The native controller can return a cached Agent without replaying the creation
+    // event. Do not let a background roster lookup warm it before the test turn.
+    product.rt.resolveAgent = async sessionId => {
+      const { agent, error } = await ctx.sessionController.resolveAgent(sessionId)
+      if (error) throw new Error(error.message)
+      return agent
+    }
+    for (const [index, route] of [['alpha', 'one'], ['beta', 'vendor/two']].entries()) {
+      const { agent } = handles[index]
+      const [provider, model] = route
+      assert.throws(() => ctx.get('botIntegrationPolicy').modelIdentity({ sessionId: agent.session.id, provider, model }), { code: 'UNKNOWN_SUBJECT' }, 'the Agent was already live when the product attached')
+      agent.send(createUserMessage({ content: [{ type: 'text', text: 'Reply once to this restored session' }], source: { kind: 'user' } }), 'next-turn', true)
+      await agent.whenIdle()
+      const end = agent.session.log.findLast(event => event.type === 'turn/end')
+      assert.equal(end?.data.reason.kind, 'completed', JSON.stringify(end?.data.reason))
+    }
+    assert.deepEqual(readRows('router_model_calls').map(row => [row.botId, row.provider, row.model, row.state]), [
+      ['a', 'alpha', 'one', 'settled'], ['b', 'beta', 'vendor/two', 'settled'],
+    ])
+  }, { runtimeConfig: { memoryReview: false }, beforeProduct: async ({ ctx, home: isolatedHome }) => {
+    home = isolatedHome
+    ctx.on = (...args) => ctx.nativeLlmContext.on(...args)
+    actual = await attachActualAgentLoop(ctx)
+    for (const [sessionId, provider, model] of [['a', 'alpha', 'one'], ['old-group-member', 'beta', 'vendor/two']]) {
+      handles.push(await actual.context.agents.create({ sessionId, agentOptions: { provider, model } }))
+    }
+    return () => actual.close()
+  }, beforeBoot: async () => {
+    const path = join(home, 'bot', 'state.json')
+    const state = JSON.parse(await readFile(path, 'utf8'))
+    state.rooms['old-room'] = { id: 'old-room', name: 'Existing group', named: true, mode: 'admin', admin: 'b', members: ['a', 'b'],
+      sessions: { b: 'old-group-member' }, createdAt: 1, seen: {}, seq: 0, log: [] }
+    await writeFile(path, JSON.stringify(state))
+  } })
+})
 
 test('an executor already registered in the Agent scope does not prevent Bot binding or activity reads', async () => {
   let actual

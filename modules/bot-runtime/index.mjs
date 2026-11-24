@@ -177,6 +177,12 @@ export function createBotProduct(ctx, options = {}) {
     } catch { return false }
   }
   const offAgent = ctx.on('agent/created', ({ agent }) => lifecycle.observeAgent(agent))
+  // The native controller can reuse a live Agent without announcing it again.
+  // Claiming its message is the last synchronous boundary before the Host
+  // resolves tools and prepares the first model request.
+  const offInbox = ctx.on('agent/inbox/claimed', ({ agent }) => {
+    if (lifecycle.ownsSession(agent.session.id)) lifecycle.observeAgent(agent)
+  }, { global: true })
   // The independent loop's turns run in a frame only this Host can build: the committed Bot, the
   // model that Bot has saved, the Bot policy and the one money stream. It is published once, before
   // any Bot is moved, and the loop asks it per step — a Host that has not started this product has
@@ -302,7 +308,7 @@ export function createBotProduct(ctx, options = {}) {
     if (closed) return
     closed = true
     releaseServingRuntime?.()
-    releaseWorkspacePrivacy(); releaseChannel(); offStream(); offAgent(); lifecycle.close()
+    releaseWorkspacePrivacy(); releaseChannel(); offStream(); offInbox(); offAgent(); lifecycle.close()
   }
   ctx.effect(() => dispose, 'bot-product: composed lifecycle')
   return Object.freeze({ version: contractVersion, rt, lifecycle, readModel, dispose, serving, threadAdmission })
