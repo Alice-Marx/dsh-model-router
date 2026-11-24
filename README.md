@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**GitHub release 0.82.2 · npm 0.82.2 · Windows Remote Agent 0.1.3**
+**GitHub release 0.82.3 · npm 0.82.3 · Windows Remote Agent 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -84,8 +84,8 @@ Bot calls through saved loopback connections share one running inference per loc
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.82.2`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.82.2`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.82.3`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.82.3`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -93,10 +93,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.82.2
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.82.3
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.82.2
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.82.3
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.

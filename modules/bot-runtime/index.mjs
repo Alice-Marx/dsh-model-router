@@ -78,6 +78,7 @@ export function createBotProduct(ctx, options = {}) {
   const releaseServingRuntime = typeof serving.bindRuntime === 'function' ? serving.bindRuntime(rt) : null
 
   const toolPresentation = new WeakMap()
+  const agentsWithExistingExecutor = new WeakSet()
   const lifecycle = attachDsLifecycle({ runtime: rt, directory, grantFor, onBind: (agent, grant) => {
     const scoped = agent.ctx.get('tools')
     let signature, release = () => {}
@@ -97,19 +98,28 @@ export function createBotProduct(ctx, options = {}) {
     // rc.5 takes tool declarations from the selected executor, outside the
     // prompt waterfall. Keep the Host executor for tool-capable routes.
     let presentation = toolPresentation.get(agent)
-    if (!presentation && options.isTextOnlyModel && agent.model?.current && scoped?.selectExecutor && scoped?.setExecutor) {
+    if (!presentation && !agentsWithExistingExecutor.has(agent) && options.isTextOnlyModel && agent.model?.current && scoped?.selectExecutor && scoped?.setExecutor) {
       const executor = scoped.selectExecutor(agent)
       presentation = { isTextOnly: null }
       const textOnly = () => presentation.isTextOnly?.(agent.model.current()) === true
-      scoped.setExecutor({
+      const wrapper = {
         describe: tools => textOnly() ? { schemas: [] } : executor.describe(tools),
         execute: input => executor.execute(input),
         sections: executor.sections?.map(section => ({
           ...section,
           text: tools => textOnly() ? '' : typeof section.text === 'function' ? section.text(tools) : section.text,
         })),
-      })
-      toolPresentation.set(agent, presentation)
+      }
+      try {
+        scoped.setExecutor(wrapper)
+      } catch (error) {
+        // Another Host component may already own the scope. Keep its executor
+        // and finish binding the Bot's permissions and request hooks.
+        if (error?.message !== 'Only one tool executor may be registered in each scope') throw error
+        agentsWithExistingExecutor.add(agent)
+        presentation = null
+      }
+      if (presentation) toolPresentation.set(agent, presentation)
     }
     if (presentation) presentation.isTextOnly = isTextOnly
     // The SDK's restrict() masks inherited tools only; DS Bot's team tools are

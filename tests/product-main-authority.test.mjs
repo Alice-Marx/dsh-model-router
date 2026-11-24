@@ -4,6 +4,25 @@ import { withProductIndependent } from './helpers/product-independent-compositio
 import { attachActualAgentLoop } from './helpers/actual-agent-loop.mjs'
 import { compileDsOwnership } from '../packages/orchestration/src/ds-lifecycle.mjs'
 
+test('an executor already registered in the Agent scope does not prevent Bot binding or activity reads', async () => {
+  let actual
+  await withProductIndependent(async ({ ctx, bind, dispatch }) => {
+    await bind('a', 'alpha', 'one')
+    const executor = { describe: () => ({ schemas: [] }), execute: async () => { throw new Error('unexpected tool execution') } }
+    const handle = await actual.context.agents.create({
+      sessionId: 'a', agentOptions: { provider: 'alpha', model: 'one' },
+      setup: scope => { scope.tools.setExecutor(executor) },
+    })
+    try {
+      assert.equal(handle.agent.ctx.tools.selectExecutor(handle.agent), executor)
+      assert.equal(ctx.get('botIntegrationPolicy').modelIdentity({ sessionId: 'a', provider: 'alpha', model: 'one' }).botId, 'a')
+      const page = await dispatch('nativeActivity.list', { botId: 'a', mode: 'integration', sessionId: 'a' })
+      assert.deepEqual(page.items, [])
+      assert.equal(page.recording.status, 'ready')
+    } finally { await handle.dispose() }
+  }, { beforeProduct: async ({ ctx }) => { actual = await attachActualAgentLoop(ctx); return () => actual.close() } })
+})
+
 test('committed Main gets all Host routes and tools while a worker retains its explicit scope', async () => {
   let actual
   await withProductIndependent(async ({ ctx, product, bind, dispatch }) => {
