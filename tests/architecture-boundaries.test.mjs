@@ -98,10 +98,14 @@ const VENDOR_IMPORTERS_ALLOWED = [
   {file: 'modules/bot-runtime/web-search.mjs', spec: './vendor/ds-bot/web-search.js'},
   {file: 'apps/integration-client/index.jsx', spec: '../../modules/bot-runtime/vendor/ds-bot/src/client/index.js'},
   {file: 'apps/integration-client/index.jsx', spec: '../../modules/bot-runtime/vendor/ds-bot/src/client/sidebar.js'},
+  // The client composition root shares the pinned sidebar's observable sources with the inbox.
+  {file: 'apps/integration-client/index.jsx', spec: '../../modules/bot-runtime/vendor/ds-bot/src/client/sources.js'},
   {file: 'packages/orchestration/src/machine-secrets.mjs', spec: '../../../modules/bot-runtime/vendor/ds-bot/src/host/secrets.js'},
   {file: 'packages/orchestration/src/migration-supporting-domains.mjs', spec: '../../../modules/bot-runtime/vendor/ds-bot/src/host/memory.js'},
   {file: 'packages/orchestration/src/migration-supporting-domains.mjs', spec: '../../../modules/bot-runtime/vendor/ds-bot/src/host/capabilities.js'},
   {file: 'tests/fixtures/migration-legacy-ds-writer.mjs', spec: '../../modules/bot-runtime/vendor/ds-bot/src/host/store.js'},
+  // Verify that a failing flush leaves the last committed state intact in the shipped overlay.
+  {file: 'tests/bot-team-durability.test.mjs', spec: '../modules/bot-runtime/vendor/ds-bot/src/host/store.js'},
   // Verification only: mount the actual pinned SettingsDialog and its shell
   // styles to prove the product AI bridge works inside the native settings UI.
   {file: 'tests/fixtures/ai-providers-preview.jsx', spec: '../../modules/bot-runtime/vendor/ds-bot/src/client/settings.js'},

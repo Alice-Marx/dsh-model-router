@@ -85,7 +85,7 @@ async function verify() {
     await page.setViewportSize({ width: 1360, height: 900 })
     checks.push('the actual Bot settings page and compact model popover fit 375px without horizontal overflow')
     await page.getByRole('button', { name: '搜索工作空间', exact: true }).last().click()
-    await page.getByRole('combobox').fill('fixture-operation-original')
+    await page.getByRole('combobox', { name: '搜索任务、Bot 和电脑' }).fill('fixture-operation-original')
     await page.waitForFunction(() => document.querySelectorAll('.bp-palette [role=option]').length === 1)
     assert.equal(await page.locator('.bp-palette').getByRole('option').count(), 1)
     images.push(await capture('workspace-search'))

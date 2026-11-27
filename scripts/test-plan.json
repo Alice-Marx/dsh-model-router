@@ -102,6 +102,8 @@
       "tests/bot-surface.test.mjs",
       "tests/chat-design.test.mjs",
       "tests/contact-attention.integration.test.mjs",
+      "tests/conversation-inbox.test.mjs",
+      "tests/bot-team-durability.test.mjs",
       "tests/notifications-store.native.mjs",
       "tests/notifications-panel.integration.test.mjs",
       "tests/data-chart.test.mjs",

@@ -152,6 +152,9 @@ html body[data-bot-product-ui][data-bp-appearance] {
 .bp-resource-links small { font-size: 10px; }
 .bp-inbox { min-width: 0; }
 .bp-inbox-rows { border-top: 1px solid var(--bp-border); }
+.bp-conversation-inbox { margin-bottom: 24px; }
+.bp-conversation-inbox .bp-inbox-rows { list-style: none; padding: 0; margin: 0; }
+.bp-conversation-inbox .bp-inbox-copy h3 { overflow-wrap: anywhere; }
 .bp-inbox-item { display: flex; align-items: flex-start; gap: 14px; padding: 21px 0; border-bottom: 1px solid var(--bp-border); }
 .bp-inbox-icon { width: 32px; height: 32px; flex-shrink: 0; display: grid; place-items: center; border-radius: 9px; background: var(--bp-warning-bg); color: var(--bp-warning); margin-top: 2px; }
 .bp-inbox-item[data-stage=approve] .bp-inbox-icon { color: var(--bp-solid); background: var(--bp-accent-soft); }

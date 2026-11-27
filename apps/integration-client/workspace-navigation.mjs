@@ -1,6 +1,6 @@
 export const WORKSPACE_SECTIONS = Object.freeze([
   { section: 'home', title: '工作空间', label: '总览', icon: 'home', group: '工作', description: '从一个目标开始，和你的 Bot 团队一起把事情做好。' },
-  { section: 'inbox', title: '需要你处理', label: '任务待办', icon: 'inbox', group: '工作', description: '集中查看需要确认、补充条件或核对结果的任务。' },
+  { section: 'inbox', title: '收件箱', label: '收件箱', icon: 'inbox', group: '工作', description: '查看 Bot 与群聊的审批、问题、未读会话和任务通知。' },
   { section: 'notifications', title: '通知中心', label: '通知', icon: 'bell', group: '工作', description: '查看 Bot 的任务进展，回到对应的执行记录。' },
   { section: 'threads', title: '会话线程', label: '线程', icon: 'list', group: '工作', description: '在同一个 Bot 下建立多条独立会话，命名、切换与归档互不串上下文。' },
   { section: 'tasks', title: '团队任务', label: '任务', icon: 'tasks', group: '工作', description: '从目标到结果，用列表或看板跟进每一项工作。' },

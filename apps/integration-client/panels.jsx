@@ -24,7 +24,9 @@ import { routingSubmissions, submissionCode } from './routing-submissions.mjs'
 import { WORKSPACE_SECTIONS, workspaceNavigation } from './workspace-navigation.mjs'
 import { AiProvidersPage } from './ai-providers.jsx'
 import { BotSettingsDialog } from './bot-settings-dialog.jsx'
-import { TeamDirectory, WorkspaceCommandPalette, WorkspaceHome, WorkspaceInbox, WorkspaceToolbar } from './workspace-ui.jsx'
+import { TeamDirectory, WorkspaceCommandPalette, WorkspaceHome, WorkspaceToolbar } from './workspace-ui.jsx'
+import { UnifiedInbox } from './conversation-inbox.jsx'
+import { useTaskAttention } from './task-attention-source.mjs'
 
 const NAV_EVENT = 'bot-product:navigation'
 let activePanel = null
@@ -173,6 +175,12 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
   const [working, setWorking] = React.useState('')
   const [savedCode, setSavedCode] = useState('')
   const [copyStatus, setCopyStatus] = useState('')
+  const [namespaceReadyFor, setNamespaceReadyFor] = useState(null)
+  const autoCheck = useRef(null)
+  const canCheckSubmission = snapshot.availableActions?.includes('botRouting.status') === true
+  const canRestoreAutomatically = canCheckSubmission && snapshot.availableActions?.includes('ui.namespace') === true
+    && typeof submissionScope?.dispatch === 'function'
+  const namespacePending = canRestoreAutomatically && namespaceReadyFor !== submissionScope
   const codeInput = useRef(null)
   const [viewReady, setViewReady] = React.useState(false)
   const control = useRef({ live: false, epoch: 0, draft: 0, active: null, prepared: null, ready: false })
@@ -207,6 +215,21 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
     setText(restored); setPin(''); setMachine(''); setRoot(''); setEffect('read')
   }, [navigation, submissionScope])
   useEffect(() => {
+    if (!canRestoreAutomatically) return
+    const controller = new AbortController()
+    const finish = () => { if (!controller.signal.aborted) setNamespaceReadyFor(submissionScope) }
+    const timeout = setTimeout(() => { finish(); controller.abort() }, 8000)
+    const restore = async () => {
+      try {
+        const namespace = await submissionScope.dispatch('ui.namespace', {}, controller.signal)
+        if (!controller.signal.aborted && submissions.attachStorage(namespace)) autoCheck.current = submissions
+      } catch { /* manual recovery remains available */ }
+      finally { clearTimeout(timeout); finish() }
+    }
+    void restore()
+    return () => { controller.abort(); clearTimeout(timeout) }
+  }, [submissionScope, submissions, canRestoreAutomatically])
+  useEffect(() => {
     if (!focus?.compose || !viewReady || draftFocus.current === focus.version) return
     draftFocus.current = focus.version
     const draft = navigation?.claimDraft(focus.version)
@@ -221,8 +244,8 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
     state.active = token; setWorking(kind); setError('')
     return token
   }, [])
-  const current = token => control.current.live && control.current.epoch === token.epoch && control.current.active === token
-  const finish = token => { if (current(token)) { control.current.active = null; setWorking('') } }
+  const current = useCallback(token => control.current.live && control.current.epoch === token.epoch && control.current.active === token, [])
+  const finish = useCallback(token => { if (current(token)) { control.current.active = null; setWorking('') } }, [current])
   const staleView = () => { control.current.ready = false; setViewReady(false) }
   const load = React.useCallback(async () => {
     const token = begin('inspect')
@@ -272,7 +295,7 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
   }
   const submitRouted = async () => {
     const state = control.current, prepared = state.prepared
-    if (!state.ready || submissions.getSnapshot() || !prepared || prepared.draft !== state.draft || prepared.epoch !== state.epoch) return
+    if (namespacePending || !state.ready || submissions.getSnapshot() || !prepared || prepared.draft !== state.draft || prepared.epoch !== state.epoch) return
     const token = begin('dispatch')
     if (!token) return
     let reference
@@ -297,11 +320,12 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
       }
     } finally { finish(token) }
   }
-  const checkSubmission = async () => {
+  const checkSubmission = useCallback(async () => {
     const reference = submissions.getSnapshot()
-    if (!reference || !snapshot.availableActions?.includes('botRouting.status')) return
+    if (!reference || !canCheckSubmission) return
     const token = begin('status')
     if (!token) return
+    if (autoCheck.current === submissions) autoCheck.current = null
     try {
       const next = await call('botRouting.status', { requestKey: reference.requestKey, requesterBotId: reference.requesterBotId })
       if (typeof next?.found !== 'boolean' || next.originBotId !== reference.requesterBotId
@@ -310,10 +334,13 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
     } catch (failure) {
       if (current(token)) setError(submissionFailureMessage(failure))
     } finally { finish(token) }
-  }
+  }, [submissions, canCheckSubmission, begin, call, current, finish])
+  useEffect(() => {
+    if (submission && autoCheck.current === submissions && !namespacePending && !working && !busy) void checkSubmission()
+  }, [submission, submissions, namespacePending, working, busy, checkSubmission])
   const restoreSubmission = event => {
     event.preventDefault()
-    if (busyRef.current || control.current.active || !control.current.live || submissions.getSnapshot()) return
+    if (namespacePending || busyRef.current || control.current.active || !control.current.live || submissions.getSnapshot()) return
     try {
       if (!submissions.restore(savedCode)) return
       setSavedCode(''); invalidate()
@@ -360,7 +387,8 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
         : <p role="status">{submission.state === 'submitting' && working === 'dispatch' ? '正在提交任务…' : '提交结果尚未确认，请核对原提交。'}</p>}
     <p>核对只读取原任务记录，不会再次提交或授予权限。</p>
     <details className="bp-technical"><summary>保存提交核对码</summary>
-      <p>重载应用前可保存核对码，之后在原宿主粘贴查询。核对码只包含提交编号，不包含任务正文或登录凭据。</p>
+      <p>{submissions.savedLocally() ? '当前窗口重载后会自动核对这次提交。也可复制核对码，在其他窗口连接原宿主时查询。'
+        : '可复制核对码，重载后连接原宿主时粘贴查询。'}核对码只包含提交标识。</p>
       <label>当前提交核对码<input ref={codeInput} aria-label="当前提交核对码" className="bp-submission-code" readOnly value={submissionCode(submission)} onFocus={event => event.target.select()} /></label>
       <div className="bp-actions"><button type="button" onClick={() => { void copySubmission() }}>复制核对码</button>{copyStatus && <small role="status">{copyStatus}</small>}</div>
     </details>
@@ -374,7 +402,7 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
       <button type="button" disabled={busy || Boolean(working)} onClick={() => { submissions.dismissUnconfirmed(submission); invalidate() }}>清除本窗口提醒</button>
     </details>}
   </section>
-  const savedSubmissionForm = !submission && snapshot.availableActions?.includes('botRouting.status') && <details className="bp-technical">
+  const savedSubmissionForm = !submission && !namespacePending && canCheckSubmission && <details className="bp-technical">
     <summary>核对已保存的提交</summary><p>请连接原宿主并粘贴之前保存的核对码。此操作只查询原记录，不会创建任务。</p>
     <form className="bp-submission-restore" onSubmit={restoreSubmission}>
       <label>已保存的提交核对码<input aria-label="已保存的提交核对码" className="bp-submission-code" value={savedCode} maxLength={1024} autoComplete="off" spellCheck={false} disabled={busy || Boolean(working)} onChange={event => setSavedCode(event.target.value)} placeholder="dsh-route-v1:…" /></label>
@@ -447,7 +475,7 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch, 
         {decision.rejected?.map(row => <p key={row.botId}>{row.botId}：{row.reason}</p>)}
       </details>}
       {decision.chosen ? <div className="bp-actions">
-        <button type="button" disabled={busy || Boolean(working) || !viewReady || Boolean(submission)} onClick={() => { void submitRouted() }}>按此路由创建任务</button>
+        <button type="button" disabled={busy || Boolean(working) || !viewReady || Boolean(submission) || namespacePending} onClick={() => { void submitRouted() }}>按此路由创建任务</button>
       </div> : null}
     </div> : null}
   </article>
@@ -870,7 +898,7 @@ export function RoleCatalog({ dispatch, busy }) {
   </article>
 }
 
-export function ProductPage({ section, productApi, openSession, openPanel }) {
+export function ProductPage({ section, productApi, openSession, openPanel, inboxTeam, useSessionStatus, useSessions }) {
   const workspaceRef = useRef(null)
   useWorkspaceInset(workspaceRef)
   const pageRef = useRef(null)
@@ -880,6 +908,8 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
   const route = useSyncExternalStore(navigation.subscribe, navigation.getSnapshot, navigation.getSnapshot)
   const focus = route?.section === section ? route : null
   const [searchOpen, setSearchOpen] = useState(false)
+  const [attention, refreshAttention] = useTaskAttention(productApi, section === 'inbox' ? 'inbox' : section === 'notifications' ? 'summary' : false)
+  const lightweight = section === 'notifications' || (section === 'inbox' && typeof productApi?.inbox === 'function' && !attention.inboxUnsupported)
   const onNavigate = useCallback(destination => {
     navigation.navigate(destination)
     openPanel?.(PRODUCT_PANELS[destination.section])
@@ -927,16 +957,25 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     }
   }, [productApi])
   useEffect(() => {
-    const controller = new AbortController()
     const state = lifecycle.current
     state.live = true; state.epoch++
     // A changed product API must not keep the previous host's writable view.
     setSnapshotStale(true); pendingActions.current = 0; setBusy(false)
+    return () => { state.live = false; state.epoch++; state.request++ }
+  }, [productApi])
+  useEffect(() => {
+    const controller = new AbortController()
     let timer, stopped = false
-    const loop = async () => { await refresh(controller.signal); if (!stopped) timer = setTimeout(loop, document.hidden ? 15000 : 4000) }
+    const loop = async () => { await refresh(controller.signal); if (!stopped && !lightweight) timer = setTimeout(loop, document.hidden ? 15000 : 4000) }
     void loop()
-    return () => { stopped = true; state.live = false; state.epoch++; state.request++; controller.abort(); clearTimeout(timer) }
-  }, [refresh])
+    return () => { stopped = true; controller.abort(); clearTimeout(timer) }
+  }, [refresh, lightweight])
+  useEffect(() => {
+    if (!searchOpen || !lightweight) return
+    const controller = new AbortController()
+    void refresh(controller.signal)
+    return () => controller.abort()
+  }, [searchOpen, lightweight, refresh])
   const dispatch = useCallback(async (action, payload, { errorResult = false } = {}) => {
     if (dispatchState.current.snapshotStale || dispatchState.current.readOnly || snapshotApi.current !== productApi || !lifecycle.current.live) return
     const state = lifecycle.current, epoch = state.epoch
@@ -958,19 +997,27 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
   const inspectTask = useCallback((payload, signal) => productApi.dispatch('task.inspect', payload, signal), [productApi])
   const desktopTransport = useCallback((action,payload,signal) => productApi.dispatch(action,payload,signal),[productApi])
   const disabled = busy || snapshotStale || snapshotApi.current !== productApi || Boolean(snapshot?.readOnly)
+  const currentSnapshot = snapshotApi.current === productApi ? snapshot : null
+  const inboxSnapshot = attention.lastInbox ?? currentSnapshot
+  const readOnly = attention.readOnly ? currentSnapshot?.readOnly ?? '宿主目前处于只读状态。'
+    : lightweight && attention.value ? null : currentSnapshot?.readOnly
+  const notificationsAvailable = !snapshotStale && !readOnly && currentSnapshot?.availableActions?.includes('notifications.list')
   const meta = WORKSPACE_SECTIONS.find(row => row.section === section) ?? { title: '工作空间', icon: 'home', description: '' }
   const title = meta.title
   const currentBot = snapshotApi.current === productApi ? snapshot?.bots?.find(bot => bot.id === (focus?.botId ?? snapshot.mainBotId)) : null
   return <div className="bp-workspace" ref={workspaceRef}><WorkspaceToolbar title={title} section={section} onHome={() => onNavigate({ section: 'home' })} onSearch={() => setSearchOpen(true)}
     onNavigate={target => onNavigate({ section: target, botId: currentBot?.id })} botName={currentBot?.name}
     onOpenBotSettings={!disabled && currentBot && snapshot.availableActions?.includes('binding.inspect') ? () => setSettingsBot({ api: productApi, botId: currentBot.id }) : undefined}
-    onRefresh={() => refresh()} refreshing={busy} syncing={!snapshot} stale={snapshotStale}/><main ref={pageRef} className="bp-page" data-section={section}><div className="bp-page-inner"><div className="bp-page-body">
+    onRefresh={() => { refreshAttention?.(); void refresh() }} refreshing={busy} syncing={!snapshot} stale={snapshotStale || (lightweight && attention.failed)}/><main ref={pageRef} className="bp-page" data-section={section}><div className="bp-page-inner"><div className="bp-page-body">
     {error && <div role="alert" className="bp-blocked"><strong>无法取得最新宿主状态</strong><p>{error}</p>{snapshot && <p>{snapshotStale ? '下面保留上次读取结果；状态未更新时，操作暂不可用。' : '下面保留上次读取结果，操作以宿主当前授权为准。'}</p>}</div>}
-    {snapshot?.readOnly && <Blocked value={{ reason: snapshot.readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
+    {readOnly && <Blocked value={{ reason: readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
     {!snapshot && !error && <div className="bp-loading" role="status"><span className="bp-loading-line" aria-hidden="true" /><span className="bp-loading-line" aria-hidden="true" /><p>正在读取宿主状态…</p></div>}
+    {section === 'inbox' && <UnifiedInbox teamSource={inboxTeam} useSessionStatus={useSessionStatus} useSessions={useSessions}
+      snapshot={inboxSnapshot} notificationsAvailable={notificationsAvailable}
+      productApi={productApi} onNavigate={onNavigate} openSession={!snapshotStale && !readOnly && currentSnapshot ? openSession : undefined} />}
     {snapshot && <>{section === 'home' && <WorkspaceHome snapshot={snapshot} onNavigate={onNavigate} openSession={openSession} disabled={disabled} />}
-      {section === 'inbox' && <WorkspaceInbox snapshot={snapshot} onNavigate={onNavigate} openSession={openSession} />}
-      {section === 'notifications' && <NotificationsPanel productApi={productApi} botIds={snapshot.bots.map(bot => bot.id)} available={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly && snapshot.availableActions?.includes('notifications.list')} onNavigate={onNavigate} />}
+      {section === 'notifications' && <NotificationsPanel productApi={productApi} botIds={attention.value?.botIds ?? currentSnapshot?.bots.map(bot => bot.id)}
+        available={notificationsAvailable === true} onNavigate={onNavigate} />}
       {section === 'threads' && <BotThreadsPanel productApi={productApi} botId={focus?.botId ?? snapshot.mainBotId} onOpenSession={!snapshotStale && snapshotApi.current === productApi ? openSession : undefined} available={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly && snapshot.availableActions?.includes('threads.list')} />}
       {section === 'webPanel' && <WebPanelsPanel productApi={productApi} dispatch={dispatch} busy={disabled} snapshot={snapshot} focus={focus}
         available={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly && snapshot.availableActions?.includes('webPanels.list')}
@@ -985,7 +1032,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
       {section === 'ai' && !snapshotStale && snapshotApi.current === productApi && <AiProvidersPage productApi={productApi} onOpenTools={() => { requestWorkbenchView('tools'); openPanel('model-router-galgame') }} onOpenBindings={() => onNavigate({ section: 'bindings' })}
         onOpenQuota={snapshot.availableActions?.includes('usage.subscriptionQuota') ? () => onNavigate({ section: 'usage' }) : undefined}
         onReturnToTask={workbenchDraft().task.trim() ? () => { requestWorkbenchView('plan'); openPanel('model-router-galgame') } : undefined}/>}
-      <footer className="bp-page-footer bp-muted">上次同步 {new Date(snapshot.observedAt).toLocaleString('zh-CN')}</footer></>}
+      {section !== 'notifications' && <footer className="bp-page-footer bp-muted">上次同步 {new Date(section === 'inbox' ? inboxSnapshot?.observedAt ?? snapshot.observedAt : snapshot.observedAt).toLocaleString('zh-CN')}</footer>}</>}
     </div></div>
   </main><WorkspaceCommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} snapshot={snapshotApi.current === productApi ? snapshot : null} onNavigate={onNavigate} openSession={snapshotApi.current === productApi ? openSession : undefined}/>
   {settingsBot?.api === productApi && <BotSettingsDialog productApi={productApi} botId={settingsBot.botId} onClose={() => setSettingsBot(null)}

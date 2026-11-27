@@ -14,7 +14,7 @@ await (await import('node:fs/promises')).writeFile(file, bundle.outputFiles[0].c
 const { NotificationsPanel, formatAt } = await import(pathToFileURL(file))
 
 const item = (seq, over = {}) => ({ seq, kind: 'settled', category: 'succeeded', tone: 'ok', at: 1000, botId: 'bot-a', botName: '小助手', taskId: `task-${seq}`, attemptId: `attempt-${seq}`, outcome: 'succeeded', code: null, read: false, isNew: true, text: '小助手 的任务已完成', ...over })
-const page = (items, over = {}) => ({ schemaVersion: 1, items, nextBefore: null, maxSeq: items[0]?.seq ?? 0, unreadCount: items.filter(i => !i.read).length, cursorSeq: 0, baselineSeq: 0, ...over })
+const page = (items, over = {}) => ({ schemaVersion: 1, items, nextBefore: null, maxSeq: items[0]?.seq ?? 0, unreadCount: items.filter(i => !i.read).length, cursorSeq: 0, baselineSeq: 0, supportsMarkThrough: true, ...over })
 // A Host double that records every action the panel dispatches and lets a test swap the list result.
 const makeApi = list => {
   const dispatched = []
@@ -63,9 +63,32 @@ test('mark-all read clears every unread through one Host action', async t => {
   await f.render({ productApi: api, available: true })
   assert.equal(f.q('.bp-notifications-badge')?.textContent, '2')
   await f.settle(() => f.q('.bp-notifications-markall').click())
-  assert.ok(dispatched.some(d => d.action === 'notifications.markAll'))
+  assert.deepEqual(dispatched.find(d => d.action === 'notifications.markAll')?.payload, { throughSeq: 3 })
   assert.equal(f.q('.bp-notifications-badge'), null)
   assert.equal(f.doc.querySelectorAll('.bp-notification-read').length, 0)
+})
+
+test('mark-all uses the first displayed event and leaves newer undisplayed events unread', async t => {
+  const f = await fixture(t)
+  const marks = []
+  await f.render({ productApi: { dispatch: (action, payload) => {
+    if (action === 'notifications.list') return Promise.resolve(page([item(7), item(6)], { maxSeq: 12, unreadCount: 3 }))
+    marks.push(payload)
+    return Promise.resolve({ cursorSeq: payload.throughSeq, unreadCount: 1 })
+  } } })
+  await f.settle(() => f.q('.bp-notifications-markall').click())
+  assert.deepEqual(marks, [{ throughSeq: 7 }])
+  assert.equal(f.q('.bp-notifications-badge')?.textContent, '1')
+  assert.equal(f.doc.querySelectorAll('.bp-notification-read').length, 0)
+})
+
+test('an older Host still supports single reads without receiving an unbounded bulk action', async t => {
+  const f = await fixture(t)
+  const { api, dispatched } = makeApi(() => Promise.resolve(page([item(3)], { supportsMarkThrough: undefined })))
+  await f.render({ productApi: api })
+  assert.equal(f.q('.bp-notifications-markall').disabled, true)
+  await f.settle(() => f.q('.bp-notification-read').click())
+  assert.deepEqual(dispatched.map(row => row.action), ['notifications.list', 'notifications.read'])
 })
 
 test('replacing the Host aborts its pending read and a late result cannot change the new feed', async t => {

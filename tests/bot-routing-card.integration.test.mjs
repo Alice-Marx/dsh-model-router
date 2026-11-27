@@ -40,11 +40,11 @@ function fixture(handler) {
 }
 async function withDom(work) {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'http://routing.fixture/' })
-  const replacements = { window: dom.window, document: dom.window.document, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true }
+  const replacements = { window: dom.window, document: dom.window.document, sessionStorage: dom.window.sessionStorage, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true }
   const previous = Object.fromEntries(Object.keys(replacements).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
   for (const [key, value] of Object.entries(replacements)) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value })
   const { createRoot } = await import('react-dom/client'), container = document.getElementById('root'), root = createRoot(container)
-  const mount = async (f, busy = false) => act(async () => { root.render(React.createElement(Tasks, { snapshot, dispatch: f.dispatch, busy, submissionScope: f })); await new Promise(setImmediate) })
+  const mount = async (f, busy = false) => act(async () => { root.render(React.createElement(Tasks, { snapshot: f.snapshot ?? snapshot, dispatch: f.dispatch, busy, submissionScope: f })); await new Promise(setImmediate) })
   const remount = async f => { await act(async () => root.render(null)); await mount(f) }
   const mountPage = async api => act(async () => { root.render(React.createElement(ProductPage, { section: 'tasks', productApi: api })); await new Promise(setImmediate) })
   const button = label => [...container.querySelectorAll('button')].find(element => element.textContent.trim() === label)
@@ -259,6 +259,49 @@ test('routing card: pending submission references stay scoped to their original 
     await mount(original)
     assert.ok(button('核对原提交'))
     assert.equal(other.calls.filter(call => call.action === 'botRouting.status').length, 0)
+  })
+})
+
+test('routing card: a reload checks only the saved original submission after the Host identity arrives', async () => {
+  await withDom(async ({ container, mount, remount, button, click, type, settle, dom }) => {
+    const namespace = { schemaVersion: 1, hostId: 'host-0123456789abcdef' }
+    const withNamespace = handler => ({
+      ...fixture(handler),
+      snapshot: { ...snapshot, availableActions: [...snapshot.availableActions, 'ui.namespace'] },
+    })
+    const original = withNamespace(action => {
+      if (action === 'ui.namespace') return namespace
+      if (action === 'botRouting.dispatch') {
+        assert.match(dom.window.sessionStorage.getItem(`bot-product:routing-submission:${namespace.hostId}`), /^dsh-route-v1:main:/)
+        return Promise.reject(new Error('connection lost'))
+      }
+    })
+    await mount(original)
+    await type('只保存引用的私密任务')
+    await click('预览路由')
+    await click('按此路由创建任务')
+    const submitted = original.calls.find(call => call.action === 'botRouting.dispatch').payload
+    const storageKey = `bot-product:routing-submission:${namespace.hostId}`
+    assert.equal(dom.window.sessionStorage.getItem(storageKey), `dsh-route-v1:main:${submitted.requestKey}`)
+
+    const other = withNamespace(action => action === 'ui.namespace' ? { ...namespace, hostId: 'host-fedcba9876543210' } : undefined)
+    await mount(other)
+    assert.equal(Boolean(button('核对原提交')), false)
+    assert.equal(other.calls.some(call => call.action === 'botRouting.status'), false)
+
+    const identity = deferred()
+    const reloaded = withNamespace(action => action === 'ui.namespace' ? identity.promise : action === 'botRouting.status'
+      ? { found: true, accepted: true, originBotId: 'main', planId: 'original-after-reload', planState: 'running' } : undefined)
+    await remount(reloaded)
+    assert.equal(reloaded.calls.some(call => call.action === 'botRouting.status'), false)
+    await settle(identity, 'resolve', namespace)
+    assert.match(container.textContent, /已提交：original-after-reload/)
+    assert.deepEqual(reloaded.calls.filter(call => call.action === 'botRouting.status').map(call => call.payload), [
+      { requesterBotId: 'main', requestKey: submitted.requestKey },
+    ])
+    assert.equal(reloaded.calls.some(call => call.action === 'botRouting.dispatch'), false)
+    await click('新建另一项任务')
+    assert.equal(dom.window.sessionStorage.getItem(storageKey), null)
   })
 })
 

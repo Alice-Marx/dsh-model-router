@@ -1,6 +1,37 @@
 --- a/src/host/store.js
 +++ b/src/host/store.js
-@@ -430,6 +430,8 @@
+@@ -2,7 +2,7 @@
+ // host on the same data from writing it, and the indexes that map a Session to the Bot
+ // or group chat it belongs to.
+ import { copyFileSync, mkdirSync, readFileSync, statSync } from 'node:fs'
+-import { mkdir, unlink, writeFile } from 'node:fs/promises'
++import { mkdir, open, unlink, writeFile } from 'node:fs/promises'
+ import { join } from 'node:path'
+ import { LEGACY_THEMES, MAX_EXCHANGES, ROOM_MODES, TEXT_KEPT } from './constants.js'
+ import { replaceFile } from './files.js'
+@@ -379,10 +379,20 @@
+           }
+         }
+         ensureLock()
+-        await writeFile(temp, snapshot, 'utf8')
++        await writeFile(temp, snapshot, { encoding: 'utf8', mode: 0o600, flush: true })
+         ensureLock()
+         await replaceFile(temp, statePath, ensureLock)
+         seen = stamp()
++        if (process.platform !== 'win32') {
++          try {
++            const directory = await open(home, 'r')
++            try { await directory.sync() } finally { await directory.close() }
++          } catch (error) {
++            // Replacement already committed. A filesystem that refuses a directory
++            // sync should surface that limit without prompting a second write.
++            warn('ds-bot: could not flush the Bot team directory %s: %s', home, error)
++          }
++        }
+         rt.capabilitiesStateSaved?.()
+         rt.stateSaved?.()
+       } catch (error) {
+@@ -430,6 +440,8 @@
    const roomOwners = new Map()
    /** @type {Map<string, {botId?:string, roomId?:string}>} */
    const pastOwners = new Map()
@@ -9,7 +40,7 @@
    const chatOf = botId => botOf(botId)?.sessionId ?? botId
    const sessionOfRoom = room => (room === undefined ? undefined : room.sessionId ?? room.id)
    const indexSessions = () => {
-@@ -437,9 +439,23 @@
+@@ -437,9 +449,23 @@
      groupOwners.clear()
      roomOwners.clear()
      pastOwners.clear()
@@ -33,7 +64,7 @@
      }
      for (const room of Object.values(state.rooms)) {
        const sessionId = sessionOfRoom(room)
-@@ -461,6 +477,22 @@
+@@ -461,6 +487,22 @@
    const selfOf = id => chatOwners.get(id) ?? groupOwners.get(id)?.botId ?? pastOwners.get(id)?.botId
    // A Session where the Bot speaks now, as opposed to an archived segment.
    const isBotSession = id => chatOwners.has(id) || groupOwners.has(id)
@@ -56,7 +87,7 @@
    const groupSessionsOf = botId => Object.values(state.rooms).map(room => room.sessions?.[botId]).filter(Boolean)
    const dropGroupSession = (room, botId) => {
      if (room.memberDirs !== undefined) delete room.memberDirs[botId]
-@@ -506,7 +538,8 @@
+@@ -506,7 +548,8 @@
    Object.assign(rt, {
      state, load, save, refresh, readOnly, own,
      botOf, roomOf, isMain, chatOf, sessionOfRoom, selfOf, isBotSession,

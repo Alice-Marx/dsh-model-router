@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It manages independent AI connections and reuses Host services; each provider or CLI uses its own account and access rights.
 
-**GitHub release 0.82.5 · npm 0.82.5 · Windows Remote Agent 0.1.3**
+**GitHub release 0.82.6 · npm 0.82.6 · Windows Remote Agent 0.1.3**
 
 Use Bot contacts and chat as the main entry point for independent AI connections, multiple model routes, team delegation, private files, data analysis and your own Windows computers. Tasks, notifications and execution records stay in the workspace; Main Bot can work across saved model routes.
 
@@ -73,7 +73,7 @@ CLI chat drivers include Claude Code, Codex, Pi, Step Code, Muse Code, Antigravi
 
 Antigravity uses its matching official runtime and harness files with separate OAuth credentials. DeepSeek ACP chat uses a separate dsh **0.2.2-rc.2** Node entry and its own API key, with one model request and up to 4,096 output tokens per turn. The dsh-TUI install or repair action provides dsh **0.2.2-rc.3** for managed tool execution. See the [CLI chat connection guide](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/cli-chat-providers.md) for installation and configuration.
 
-Edit the Bot's name, role and standing instructions under **Identity & personality**, then save to apply them. Chat supports separate threads, text drafts, paged history, Markdown, code and mathematics. Notifications open the relevant Bot and task. Main Bot supports multiple saved model routes; workers use their own models, permissions and funding.
+Edit the Bot's name, role and standing instructions under **Identity & personality**, then save to apply them. Chat supports separate threads, text drafts, paged history, Markdown, code and mathematics. Open **Inbox** to see pending approvals, questions and unread activity for Bot chats, threads and groups alongside pending tasks. Each item opens the original conversation or task. In **Task notifications**, marking all as read applies through the latest loaded notification. New arrivals stay unread. Main Bot supports multiple saved model routes; workers use their own models, permissions and funding.
 
 In **Model API**, **Check** reads the connection's model catalog. Expand **Model verification** to see inference results for individual models. Local connections without an API key also have an on-demand inference test that reports time to first text.
 
@@ -84,8 +84,8 @@ Bot calls through saved loopback connections share one running inference per loc
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.82.5`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.82.5`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.82.6`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.82.6`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. In the full edition, open **Settings → AI** in the Bot workspace, add an independent model connection and select it for a Bot. The routing-only edition opens **Model Router** in the sidebar and uses routes configured in Harness.
 
@@ -93,10 +93,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.82.5
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.82.6
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.82.5
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.82.6
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -211,7 +211,7 @@ Changing a task, refreshing candidates, or switching Hosts retires the previous 
 
 **Check original submission** reads the original request's durable plan and operation IDs without resubmitting, granting access, or calling a model. A missing record is a current observation: the original request may still complete. The reminder survives page remounts for the same connected Host in this window, and stores only the submission reference in memory. Reloading the app clears it. After checking the records yourself, an explicit reminder dismissal only clears the notice; it does not stop the original task or create another one.
 
-Before reloading, expand **Save submission code** and copy the code. After reloading, connect to the original Host and paste it into **Check a saved submission** to query the original record. The code contains only the original Bot and request IDs; it contains no task text or credentials and does not authorize execution. Invalid codes are rejected locally. If clipboard access is unavailable, select and copy the code manually. Lookup failures explain whether to sign in again, update the Host, check a mismatched record, or reconnect; the reference remains available for another read.
+After reloading the same window, open **Team tasks** on the original Host. The page restores the saved reference and checks the original submission without dispatching again. Before closing or switching windows, or when browser storage is unavailable, copy the code under **Save submission code**. Paste it into **Check a saved submission** on the original Host. The code contains only the original Bot and request IDs. Lookup failures leave the reference available for another read.
 
 ```mermaid
 flowchart LR

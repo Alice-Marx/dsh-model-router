@@ -1,5 +1,7 @@
-// One unresolved submission per connected product API. Keep only its reference in window memory;
-// tasks, outputs, credentials and previews never enter this cache or browser storage.
+// One submission per connected product API. A verified Host can retain only
+// the lookup code in this tab's session storage, which survives a reload.
+import { validateNamespace } from './host-namespace.mjs'
+
 const scopes = new WeakMap()
 const same = (left, right) => left?.requestKey === right?.requestKey && left?.requesterBotId === right?.requesterBotId
 const reference = value => {
@@ -25,21 +27,49 @@ function parseCode(code) {
 export function routingSubmissions(scope) {
   if (!scope || !['object', 'function'].includes(typeof scope)) throw new TypeError('ROUTING_SUBMISSION_SCOPE_REQUIRED')
   if (scopes.has(scope)) return scopes.get(scope)
-  let value = null
+  let value = null, saved = false, storage, storageKey
   const listeners = new Set()
   const publish = next => { value = next === null ? null : Object.freeze(next); for (const listener of [...listeners]) listener() }
+  const save = identity => {
+    saved = false
+    if (!storage) return
+    try { storage.setItem(storageKey, submissionCode(identity)); saved = true } catch { /* keep manual recovery available */ }
+  }
+  const drop = () => {
+    try { if (storage?.getItem(storageKey) === submissionCode(value)) storage.removeItem(storageKey) } catch { /* storage can be blocked */ }
+    saved = false
+    publish(null)
+  }
   const store = Object.freeze({
     getSnapshot: () => value,
     subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener) },
+    savedLocally: () => saved,
+    attachStorage(namespace, browserStorage) {
+      const key = `bot-product:routing-submission:${validateNamespace(namespace)}`
+      try {
+        const target = browserStorage ?? globalThis.sessionStorage
+        const code = target?.getItem(key)
+        storage = target
+        storageKey = key
+        if (value || !code) return false
+        const identity = parseCode(code)
+        saved = true
+        publish({ ...identity, state: 'unknown', planId: null, planState: null })
+        return true
+      } catch { return false }
+    },
     start(input) {
       const identity = reference(input)
       if (value) return false
+      save(identity)
       publish({ ...identity, state: 'submitting', planId: null, planState: null })
       return true
     },
     restore(code) {
       if (value) return false
-      publish({ ...parseCode(code), state: 'unknown', planId: null, planState: null })
+      const identity = parseCode(code)
+      save(identity)
+      publish({ ...identity, state: 'unknown', planId: null, planState: null })
       return true
     },
     update(input, result) {
@@ -54,12 +84,12 @@ export function routingSubmissions(scope) {
     },
     clear(input) {
       if (!same(value, input) || value.state !== 'confirmed') return false
-      publish(null)
+      drop()
       return true
     },
     dismissUnconfirmed(input) {
       if (!same(value, input) || value.state !== 'not-found') return false
-      publish(null)
+      drop()
       return true
     },
   })

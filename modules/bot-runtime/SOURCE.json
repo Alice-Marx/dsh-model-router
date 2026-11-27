@@ -79,7 +79,7 @@
     {
       "path": "src/host/store.js",
       "kind": "patched",
-      "summary": "Indexes a Bot thread Session as another own chat of the same Bot: live threads sit in chatOwners/threadOwners, archived ones in pastOwners with no authority, and threadsOf/threadOf/threadSessionOf/sessionsOfBot are exposed for the product.",
+      "summary": "Indexes Bot thread ownership and flushes the staged team state before atomic replacement, then flushes the directory where supported.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "aae02595f97b2337e485f16a84091c9d91d40f6dbdc211350fe3fe0cddf52b19"
@@ -1674,8 +1674,8 @@
     {
       "path": "vendor/ds-bot/src/host/store.js",
       "sourcePath": "ds-bot/src/host/store.js",
-      "sha256": "a603a6d908caf8196b8d289913b1dda556c0be1c9cc13ae8120f400958adcf2b",
-      "gitBlob": "aa95a4dc3db7c0cfe9605456291c4dacf9878913",
+      "sha256": "0e90f052d6e5235e810a834824ca8e6eb2d93fed6c81f69609b63e35d99d5a89",
+      "gitBlob": "b623a0982e3c5acc923a4ba2b43a311e4108bdb9",
       "origin": "overlay"
     },
     {

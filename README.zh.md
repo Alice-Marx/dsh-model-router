@@ -14,7 +14,7 @@
 
 本项目是社区插件，独立管理 AI 连接并复用 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**GitHub 版本 0.82.5 · npm 版本 0.82.5 · Windows Remote Agent 0.1.3**
+**GitHub 版本 0.82.6 · npm 版本 0.82.6 · Windows Remote Agent 0.1.3**
 
 以 Bot 联系人和聊天为主要入口，集中使用独立 AI 连接、多模型路线、团队委派、私有资料库、数据分析与自有 Windows 电脑。任务、通知和执行记录保存在工作空间中，Main Bot 可在已保存的多条模型路线之间调度。
 
@@ -73,7 +73,7 @@ CLI 聊天驱动包括 Claude Code、Codex、Pi、Step Code、Muse Code、Antigr
 
 Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资料。DeepSeek ACP 聊天需单独配置 dsh **0.2.2-rc.2** 的 Node 入口和独立 API Key，每轮最多一次模型请求、输出最多 4,096 token。dsh-TUI 的安装与修复提供 dsh **0.2.2-rc.3**，用于托管工具执行。安装与配置步骤见 [CLI 聊天连接指南](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/cli-chat-providers.md)。
 
-在“身份与个性”中编辑 Bot 名称、职责和长期指令，保存后应用。聊天支持独立线程、文字草稿、历史分页、Markdown、代码与数学公式；通知可回到对应 Bot 和任务。Main Bot 可配置多条模型路线，执行 Bot 使用自己的模型、权限与资金。
+在“身份与个性”中编辑 Bot 名称、职责和长期指令，保存后应用。聊天支持独立线程、文字草稿、历史分页、Markdown、代码与数学公式。打开「收件箱」，可查看 Bot 会话、线程和群聊的待审批、待回答和未读状态，以及团队任务待办。点击条目可回到原会话或任务。在「任务通知」里选择「全部已读」时，以最新加载的通知为界，后到的通知保持未读。Main Bot 可配置多条模型路线，执行 Bot 使用自己的模型、权限与资金。
 
 在“模型 API”中，“检查”读取连接的模型目录。展开“模型验证”可以查看各模型的推理结果。本机免密连接还可以手动测试推理，并查看首段文字返回时间。
 
@@ -84,8 +84,8 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.82.5`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.82.5`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.82.6`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.82.6`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 完整版本进入 Bot 工作区，在 **设置 → AI** 添加独立模型连接，再为 Bot 选择模型。纯路由版本从侧栏打开 **模型路由**，使用 Harness 已配置路线。
 
@@ -93,10 +93,10 @@ Antigravity 使用配套的官方 runtime 与 harness 文件及独立 OAuth 资�
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.82.5
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.82.6
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.82.5
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.82.6
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -211,7 +211,7 @@ Main 通过 `coordinate_bots` 委派任务，普通 Bot 需要已提交的团队
 
 **核对原提交** 只读取原请求对应的持久计划和操作编号，不会重发任务、授予权限或调用模型。暂未查到只表示当前查询结果，原请求仍可能完成。同一窗口内切换页面后提醒会保留，并且只在内存保存提交引用；重新加载应用会清除。自行核对记录后，可显式清除本窗口提醒；清除不会停止原任务，也不会创建另一项任务。
 
-重载前可展开 **保存提交核对码** 并复制核对码；重载后连接原宿主，在 **核对已保存的提交** 中粘贴，即可查询原记录。核对码只包含原 Bot 与请求编号，不含任务正文或登录凭据，也不能授予执行权限。无效核对码会在本地拦截；剪贴板不可用时可选中后手动复制。核对失败会按原因提示重新登录、更新宿主、核对不一致记录或恢复连接，并保留原引用供再次查询。
+同一窗口重载后，进入原宿主的「团队任务」，页面会自动找回该窗口保留的提交引用并查询原记录。核对只读，不会再次派发任务。窗口关闭、浏览器存储不可用或换用其他窗口时，可事先从 **保存提交核对码** 复制核对码，再在原宿主的 **核对已保存的提交** 中粘贴。核对码只包含原 Bot 与请求编号。核对失败时页面会保留引用，供再次查询。
 
 ```mermaid
 flowchart LR

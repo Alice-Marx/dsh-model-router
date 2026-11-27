@@ -75,7 +75,7 @@
     {
       "path": "src/host/store.js",
       "kind": "patched",
-      "summary": "Indexes a Bot thread Session as another own chat of the same Bot: live threads sit in chatOwners/threadOwners, archived ones in pastOwners with no authority, and threadsOf/threadOf/threadSessionOf/sessionsOfBot are exposed for the product.",
+      "summary": "Indexes Bot thread ownership and flushes the staged team state before atomic replacement, then flushes the directory where supported.",
       "base": {
         "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
         "sha256": "aae02595f97b2337e485f16a84091c9d91d40f6dbdc211350fe3fe0cddf52b19"

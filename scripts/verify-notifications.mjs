@@ -30,7 +30,7 @@ const model = createProductReadModel({ runtime: { readOnly: () => readOnly }, ac
   'notifications.readModel': () => notifications.readModel(),
   'notifications.list': p => notifications.list(p ?? {}),
   'notifications.read': p => notifications.read(p?.seq),
-  'notifications.markAll': () => notifications.markAll(),
+  'notifications.markAll': p => notifications.markAll(p?.throughSeq),
 } })
 const dispatch = (request, context) => model.dispatch(request, context)
 
@@ -72,14 +72,16 @@ unknown('bot-b', 'b1', 10)
   await assert.rejects(dispatch({ action: 'notifications.read', payload: { seq: 9_999_999 } }, owner), { code: 'NOTIFICATION_NOT_FOUND' })
   results.push(['PASS', 'per-item read narrows unread and an unknown seq is refused'])
 
-  const afterAll = await dispatch({ action: 'notifications.markAll', payload: {} }, owner)
-  assert.equal(afterAll.unreadCount, 0)
-  results.push(['PASS', 'mark-all clears the unread set'])
+  succeed('bot-a', 'a2', 100)
+  const afterAll = await dispatch({ action: 'notifications.markAll', payload: { throughSeq: target } }, owner)
+  assert.equal(afterAll.unreadCount, 1)
+  assert.equal(afterAll.cursorSeq, target)
+  results.push(['PASS', 'mark-all clears through the shown event and preserves the event arriving before the click reaches the Host'])
 
   // A newer event after mark-all is unread again (the watermark only moves on an explicit action).
-  succeed('bot-a', 'a2', 100)
+  succeed('bot-a', 'a3', 200)
   const later = await dispatch({ action: 'notifications.readModel', payload: {} }, owner)
-  assert.equal(later.unreadCount, 1)
+  assert.equal(later.unreadCount, 2)
   results.push(['PASS', 'a newer event after mark-all is unread again'])
 
   notifications.close(); journal.close()

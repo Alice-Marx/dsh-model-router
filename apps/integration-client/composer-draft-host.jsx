@@ -1,6 +1,8 @@
 import { createElement as h, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { COMPOSER_DRAFT_LIMITS, createComposerDraftStore } from './composer-draft.mjs'
 import { ComposerDraftBound } from './composer-draft-bound.jsx'
+import { validateNamespace } from './host-namespace.mjs'
+export { validateNamespace } from './host-namespace.mjs'
 
 /**
  * The Host namespace, read from the Host, and the slot wrapper the wiring uses.
@@ -27,16 +29,6 @@ import { ComposerDraftBound } from './composer-draft-bound.jsx'
  *   - a failure is reported, not retried in the background; the caller re-reads
  *     explicitly by raising `attempt`.
  */
-
-const NAMESPACE_PATTERN = /^host-[0-9a-f]{16}$/
-
-/** The one shape the Host answers with; anything else is a refusal. */
-export function validateNamespace(value) {
-  if (!value || typeof value !== 'object') throw new Error('宿主没有返回界面存储标识。')
-  if (value.schemaVersion !== 1) throw new Error('宿主界面存储标识版本不被此客户端支持。')
-  if (typeof value.hostId !== 'string' || !NAMESPACE_PATTERN.test(value.hostId)) throw new Error('宿主界面存储标识格式无效。')
-  return value.hostId
-}
 
 const messageOf = error => (error?.message ? String(error.message) : String(error ?? '未知错误'))
 

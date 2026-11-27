@@ -1578,7 +1578,7 @@ export function startBotProduct(ctx, options = {}) {
             'notifications.readModel': ownerOnly(() => notifications.readModel()),
             'notifications.list': ownerOnly(payload => notifications.list(payload ?? {})),
             'notifications.read': ownerOnly(payload => notifications.read(payload?.seq)),
-            'notifications.markAll': ownerOnly(() => notifications.markAll()),
+            'notifications.markAll': ownerOnly(payload => notifications.markAll(payload?.throughSeq)),
           } : {}),
           // The adapter is constructed after createBotProduct returns. Register
           // lazy handlers now; checking readiness while building these options

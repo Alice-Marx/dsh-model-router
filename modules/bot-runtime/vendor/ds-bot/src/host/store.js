@@ -2,7 +2,7 @@
 // host on the same data from writing it, and the indexes that map a Session to the Bot
 // or group chat it belongs to.
 import { copyFileSync, mkdirSync, readFileSync, statSync } from 'node:fs'
-import { mkdir, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, open, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { LEGACY_THEMES, MAX_EXCHANGES, ROOM_MODES, TEXT_KEPT } from './constants.js'
 import { replaceFile } from './files.js'
@@ -379,10 +379,20 @@ export function install(rt) {
           }
         }
         ensureLock()
-        await writeFile(temp, snapshot, 'utf8')
+        await writeFile(temp, snapshot, { encoding: 'utf8', mode: 0o600, flush: true })
         ensureLock()
         await replaceFile(temp, statePath, ensureLock)
         seen = stamp()
+        if (process.platform !== 'win32') {
+          try {
+            const directory = await open(home, 'r')
+            try { await directory.sync() } finally { await directory.close() }
+          } catch (error) {
+            // Replacement already committed. A filesystem that refuses a directory
+            // sync should surface that limit without prompting a second write.
+            warn('ds-bot: could not flush the Bot team directory %s: %s', home, error)
+          }
+        }
         rt.capabilitiesStateSaved?.()
         rt.stateSaved?.()
       } catch (error) {

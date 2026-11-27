@@ -178,6 +178,30 @@ test('read state and the history boundary survive a cold restart of both journal
   s2.close()
 })
 
+test('mark-all through a displayed event leaves events arriving before the Host handles the click unread', async t => {
+  const { j, f, npath } = await fixture(t)
+  const s = store(npath, j, scope(['bot-a']))
+  t.after(() => s.close())
+  s.readModel()
+  succeed(j, f, 'bot-a', 'old', 1)
+  succeed(j, f, 'bot-a', 'shown', 10)
+  const displayed = s.list()
+  assert.equal(displayed.supportsMarkThrough, true)
+  const [shown, old] = displayed.items
+  succeed(j, f, 'bot-a', 'arrived', 20)
+  succeed(j, f, 'bot-b', 'foreign', 30)
+  const foreign = j.notificationEvents(['bot-b'], s.kinds).maxSeq
+  assert.throws(() => s.markAll(foreign), { code: 'NOTIFICATION_NOT_FOUND' })
+  assert.throws(() => s.markAll(foreign + 10), { code: 'NOTIFICATION_NOT_FOUND' })
+  assert.throws(() => s.markAll(null), { code: 'INVALID_NOTIFICATION_SEQ' })
+  assert.equal(s.readModel().unreadCount, 3)
+  const receipt = s.markAll(shown.seq)
+  assert.equal(receipt.cursorSeq, shown.seq)
+  assert.equal(receipt.unreadCount, 1)
+  assert.equal(s.markAll(old.seq).cursorSeq, shown.seq, 'a delayed older click cannot move the watermark backward')
+  assert.deepEqual(s.list().items.map(item => item.read), [false, true, true])
+})
+
 test('empty owners and invalid arguments degrade to an empty, available feed', async t => {
   const { j, f, npath } = await fixture(t)
   succeed(j, f, 'bot-a', 'a', 1)

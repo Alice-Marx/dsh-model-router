@@ -28,6 +28,9 @@ export function createProductSlots(slots,openPanel,productApi,TeamSidebar,client
         return target.register(options,withComposerDraft(component,{productApi,sessionBindingOf:client.sessionBindingOf}))
       }
       if(component!==TeamSidebar)return target.register(options,component)
+      // The native sidebar and ProductPage share the same local team sources.
+      // Register them before the sidebar mounts, so narrow layouts can open the inbox too.
+      if (client.inboxTeam && options.inject) client.inboxTeam.set(options.inject())
       const Sidebar=props=>{
         // Read the native session/roster sources; this address only selects the
         // settings destination. Host actions still enforce the saved grants.
@@ -40,6 +43,7 @@ export function createProductSlots(slots,openPanel,productApi,TeamSidebar,client
           return <>
             <WorkspaceShortcuts compact={!wide} onNavigate={section => {workspaceNavigation(productApi).navigate({section,botId:focusedBot.current});return go(PRODUCT_PANELS[section])}}/>
             <ContactAttentionNavigation productApi={productApi} compact={!wide}
+              inboxTeam={client.inboxTeam} useSessionStatus={props.useSessionStatus} useSessions={props.useSessions}
               onNavigate={input=>{workspaceNavigation(productApi).navigate(input);return go(PRODUCT_PANELS[input.section])}}
               onOpenAdvanced={()=>go('model-router-galgame')}/>
             <WebPanelPinsLive productApi={productApi} onSelect={panelId=>navigate({section:'webPanel',panelId})}/>

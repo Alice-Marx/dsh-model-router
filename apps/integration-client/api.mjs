@@ -20,6 +20,7 @@ export function createProductApi(fetcher = globalThis.fetch, clientLocation = gl
     return body.value
   }
   return Object.freeze({ snapshot: signal => call('snapshot', undefined, signal), attention: signal => call('task.attention', {}, signal),
+    inbox: signal => call('task.attention', { view: 'inbox' }, signal),
     async dispatch(action, payload, signal) {
       const value = await call(action, payload, signal)
       for (const listener of [...listeners]) { try { listener(action) } catch {} }

@@ -6,6 +6,7 @@ import {pathToFileURL} from 'node:url'
 import {build} from 'esbuild'
 import {JSDOM} from 'jsdom'
 import React,{act} from 'react'
+import {createProductApi} from '../apps/integration-client/api.mjs'
 
 const parent=resolve('tmp/integration/contact-attention');await mkdir(parent,{recursive:true})
 const directory=await mkdtemp(join(parent,'case-')),file=join(directory,'ui.mjs')
@@ -54,7 +55,7 @@ async function fixture(t){
 test('native contact footer displays the real lower bound and its button only opens the inbox',async t=>{
   const f=await fixture(t),reads=[],writes=[]
   await f.render({attention:async signal=>{reads.push(signal);return snapshot(2,true)},dispatch:(...args)=>writes.push(args)})
-  assert.equal(reads.length,1);assert.equal(f.badge(),'2+');assert.match(f.button().getAttribute('aria-label'),/至少 2.*仅统计已加载任务/)
+  assert.equal(reads.length,1);assert.equal(f.badge(),'2+');assert.match(f.button().getAttribute('aria-label'),/至少 2.*仅统计已加载待办/)
   await f.settle(()=>f.button().click());assert.deepEqual(f.opened,[{section:'inbox'}]);assert.equal(writes.length,0)
 })
 
@@ -84,4 +85,28 @@ test('a failed read clears the previous badge without leaking server errors into
   await f.hidden(true);await f.hidden(false)
   assert.equal(f.badge(),undefined);assert.match(f.button().title,/状态尚未更新/)
   assert.doesNotMatch(document.body.textContent,/private diagnostic/)
+})
+
+test('acknowledged notification changes refresh the visible sidebar and ignore read-only actions', async t => {
+  const f = await fixture(t)
+  const calls = []
+  let unreadCount = 2
+  const api = createProductApi(async (_url, options) => {
+    const { action } = JSON.parse(options.body)
+    calls.push(action)
+    if (action === 'notifications.markAll') unreadCount = 0
+    const notifications = { status: 'available', unreadCount }
+    return { ok: true, json: async () => ({ ok: true, value: { ...snapshot(0), notifications } }) }
+  })
+  await f.render(api)
+  const resource = document.querySelector('.bp-contact-resources summary')
+  assert.match(resource.getAttribute('aria-label'), /2 条未读通知/)
+  await f.settle(() => api.dispatch('notifications.list', {}))
+  assert.deepEqual(calls, ['task.attention', 'notifications.list'])
+  await f.settle(() => api.dispatch('notifications.markAll', { throughSeq: 8 }))
+  assert.deepEqual(calls.slice(-2), ['notifications.markAll', 'task.attention'])
+  assert.equal(resource.getAttribute('aria-label'), '资源与管理')
+  await f.hidden(true)
+  await f.settle(() => api.dispatch('notifications.read', { seq: 8 }))
+  assert.equal(calls.at(-1), 'notifications.read')
 })

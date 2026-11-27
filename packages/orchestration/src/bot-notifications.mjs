@@ -8,8 +8,7 @@
 // Read state lives in this Host's own SQLite under a single owner scope. It is
 // keyed by the journal's monotonic event `seq`, so the same event can never
 // become two notifications, and an owner's read position never trusts a client
-// clock: the browser may only confirm event ids it was actually shown, or ask
-// to mark everything read (the Host computes that watermark itself).
+// clock: the browser can confirm one event or the feed through a shown event.
 
 // State transitions a person should hear about. Transient requests (a bare
 // `cancel-requested`) are deliberately absent: a stop request is not a stop
@@ -114,6 +113,16 @@ export function createBotNotifications({ Database, file, journal, botIds, botNam
       text: line(category, botName),
     }
   }
+  const requireNotification = seq => {
+    if (!Number.isSafeInteger(seq) || seq < 1) throw Object.assign(new Error('INVALID_NOTIFICATION_SEQ'), { code: 'INVALID_NOTIFICATION_SEQ' })
+    const before = seq === Number.MAX_SAFE_INTEGER ? null : seq + 1
+    const { items } = journal.notificationEvents(ownerIds(), wanted, { after: seq - 1, before, limit: 1 })
+    if (items[0]?.seq !== seq) throw Object.assign(new Error('NOTIFICATION_NOT_FOUND'), { code: 'NOTIFICATION_NOT_FOUND' })
+  }
+  const advanceCursor = db.transaction(seq => {
+    run('UPDATE bot_notification_state SET cursor_seq=? WHERE scope=? AND cursor_seq<?').run(seq, SCOPE, seq)
+    run('DELETE FROM bot_notification_reads WHERE seq<=?').run(seq)
+  })
 
   return Object.freeze({
     kinds: wanted,
@@ -130,28 +139,24 @@ export function createBotNotifications({ Database, file, journal, botIds, botNam
       return {
         schemaVersion: 1, items: items.map(item => decorate(item, state, reads, botNames)),
         nextBefore: items.length === cap ? items[items.length - 1].seq : null,
-        maxSeq, cursorSeq: state.cursor_seq, baselineSeq: state.baseline_seq, unreadCount: unread, truncated,
+        maxSeq, cursorSeq: state.cursor_seq, baselineSeq: state.baseline_seq, unreadCount: unread, truncated, supportsMarkThrough: true,
       }
     },
     // The browser may only confirm an event id it was shown: an unknown, future
     // or foreign seq is refused instead of silently widening the read set.
     read(seq) {
-      if (!Number.isSafeInteger(seq) || seq < 1) throw Object.assign(new Error('INVALID_NOTIFICATION_SEQ'), { code: 'INVALID_NOTIFICATION_SEQ' })
+      requireNotification(seq)
       const state = ensureState()
-      const probe = journal.notificationEvents(ownerIds(), wanted, { after: seq - 1, before: seq + 1, limit: 1 })
-      if (!probe.items.some(item => item.seq === seq)) throw Object.assign(new Error('NOTIFICATION_NOT_FOUND'), { code: 'NOTIFICATION_NOT_FOUND' })
       if (seq > state.cursor_seq) run('INSERT OR IGNORE INTO bot_notification_reads(seq) VALUES(?)').run(seq)
       return this.readModel()
     },
-    // Mark everything the Host currently shows as read. The watermark is the
-    // Host's own max seq, so a later or reordered event is never swallowed.
-    markAll() {
+    // New clients send the latest event from the page they received. Older
+    // callers that omit the boundary still mark through the Host's current max.
+    markAll(throughSeq) {
+      if (throughSeq !== undefined) requireNotification(throughSeq)
       const state = ensureState()
-      const { maxSeq } = journal.notificationEvents(ownerIds(), wanted, { limit: 1 })
-      if (maxSeq > state.cursor_seq) {
-        run('UPDATE bot_notification_state SET cursor_seq=? WHERE scope=?').run(maxSeq, SCOPE)
-        run('DELETE FROM bot_notification_reads WHERE seq<=?').run(maxSeq)
-      }
+      const seq = throughSeq ?? journal.notificationEvents(ownerIds(), wanted, { limit: 1 }).maxSeq
+      if (seq > state.cursor_seq) advanceCursor(seq)
       return this.readModel()
     },
     close() { if (!closed) { closed = true; try { db.pragma(`busy_timeout=${prior}`) } catch {}; db.close() } },

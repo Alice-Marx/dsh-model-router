@@ -1,6 +1,7 @@
 import React from 'react'
 import { apply as applyDs, inject as dsInject } from '../../modules/bot-runtime/vendor/ds-bot/src/client/index.js'
 import { TeamSidebar } from '../../modules/bot-runtime/vendor/ds-bot/src/client/sidebar.js'
+import { createSource } from '../../modules/bot-runtime/vendor/ds-bot/src/client/sources.js'
 import { apply as applyMr } from '../../.dsh-plugin/client/official-harness.jsx'
 import { createProductApi, PRODUCT_PANELS } from './api.mjs'
 import { ProductNavigation, ProductPage } from './panels.jsx'
@@ -51,7 +52,8 @@ export async function apply(ctx) {
     globalThis.__dshBotAiProvidersUi = bridge
     return () => { if (globalThis.__dshBotAiProvidersUi === bridge) { if (previous) globalThis.__dshBotAiProvidersUi = previous; else delete globalThis.__dshBotAiProvidersUi } }
   }, 'bot-product: AI settings')
-  const slots = productSlots(ctx.slots, openPanel, api, { sessionBindingOf: id => ctx.sessions.binding(id), openSession: id => ctx.uiWorkspace.openSession(id) })
+  const inboxTeam = createSource(null)
+  const slots = productSlots(ctx.slots, openPanel, api, { inboxTeam, sessionBindingOf: id => ctx.sessions.binding(id), openSession: id => ctx.uiWorkspace.openSession(id) })
   const mountProductSurface = () => {
     const disposeSurface = installBotSurface(window)
     try {
@@ -71,7 +73,7 @@ export async function apply(ctx) {
   }, IndependentChatPage)), 'bot-product: independent chat')
   for (const [section, key] of Object.entries(PRODUCT_PANELS)) {
     ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key,
-      inject: () => ({ section, productApi: api, openPanel,
+      inject: () => ({ section, productApi: api, openPanel, inboxTeam,
         openSession: id => ctx.uiWorkspace.openSession(id),
       }),
     }, ProductPage)), `bot-product: ${section}`)

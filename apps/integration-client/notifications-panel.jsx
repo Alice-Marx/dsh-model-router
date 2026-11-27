@@ -99,9 +99,11 @@ function NotificationFeed({ productApi, onNavigate, available = true, botIds }) 
       try {
         const page = await abortable(() => productApi.dispatch('notifications.list', { limit: PAGE }, controller.signal), controller.signal)
         if (!valid()) return
-        setItems(previous => merge(previous, Array.isArray(page?.items) ? page.items : []))
+        const rows = Array.isArray(page?.items) ? page.items : []
+        setItems(previous => merge(previous, rows))
         setSummary(previous => ({ unreadCount: page?.unreadCount ?? 0, truncated: page?.truncated === true,
-          nextBefore: previous?.olderLoaded ? previous.nextBefore : page?.nextBefore ?? null, olderLoaded: previous?.olderLoaded ?? false, maxSeq: page?.maxSeq ?? 0 }))
+          nextBefore: previous?.olderLoaded ? previous.nextBefore : page?.nextBefore ?? null, olderLoaded: previous?.olderLoaded ?? false,
+          supportsMarkThrough: page?.supportsMarkThrough === true, throughSeq: rows[0]?.seq }))
         setStatus('ready')
       } catch {
         failed = true
@@ -126,7 +128,9 @@ function NotificationFeed({ productApi, onNavigate, available = true, botIds }) 
     setItems(previous => previous.map(row => row.seq === item.seq ? { ...row, read: true } : row))
     setSummary(previous => ({ ...previous, unreadCount: result.unreadCount, truncated: result.truncated === true }))
   })
-  const markAll = () => requestAction('notifications.markAll', {}, result => {
+  const throughSeq = summary?.throughSeq
+  const canMarkAll = summary?.supportsMarkThrough && Number.isSafeInteger(throughSeq) && throughSeq > 0
+  const markAll = () => canMarkAll && requestAction('notifications.markAll', { throughSeq }, result => {
     setItems(previous => previous.map(row => row.seq <= result.cursorSeq ? { ...row, read: true } : row))
     setSummary(previous => ({ ...previous, unreadCount: result.unreadCount, truncated: result.truncated === true }))
   })
@@ -147,7 +151,8 @@ function NotificationFeed({ productApi, onNavigate, available = true, botIds }) 
         <h2 className="bp-notifications-title">通知中心</h2>
         {(unread > 0 || summary?.truncated) && <span className="bp-notifications-badge" aria-label={unread ? `${summary?.truncated ? '至少 ' : ''}${unread} 条未读` : '较早通知的未读状态尚未完整统计'}>{unread > 99 ? '99+' : unread ? `${unread}${summary?.truncated ? '+' : ''}` : '…'}</span>}
         <div className="bp-notifications-bar-actions">
-          <button type="button" className="bp-notifications-markall" onClick={markAll} disabled={pending || (unread === 0 && !summary?.truncated)}>
+          <button type="button" className="bp-notifications-markall" onClick={markAll} disabled={pending || !canMarkAll || (unread === 0 && !summary?.truncated)}
+            title={summary && !summary.supportsMarkThrough ? '当前宿主支持逐条标为已读' : undefined}>
             <UiIcon name="check" size={16} /><span>全部已读</span>
           </button>
         </div>

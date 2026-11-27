@@ -55,6 +55,6 @@ test('native contacts remain in place and only their supporting footer is replac
   await act(async()=>{button('AI 连接').click();await new Promise(setImmediate)});assert.equal(opened.at(-1),'bot-product-ai')
   assert.equal(workspaceNavigation(api).getSnapshot().botId,'worker-b')
   opened.length=0;drawers.length=0
-  await act(async()=>{button('待办').click();await new Promise(setImmediate)});assert.deepEqual(opened,['bot-product-inbox']);assert.deepEqual(drawers,[false])
+  await act(async()=>{button('收件箱').click();await new Promise(setImmediate)});assert.deepEqual(opened,['bot-product-inbox']);assert.deepEqual(drawers,[false])
   await act(async()=>{button('高级工作台').click();await new Promise(setImmediate)});assert.equal(opened.at(-1),'model-router-galgame')
 })

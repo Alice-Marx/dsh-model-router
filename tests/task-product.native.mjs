@@ -24,7 +24,7 @@ test('contact attention is owner-only, bounded to committed Bot owners and carri
   j.submit(f,'bot-b','b','b',payload,50000,2)
   j.submit(f,'deleted-bot','c','c',payload,50000,3)
   let loads=0
-  const runtime={load:async()=>{loads++},state:{bots:{'bot-a':{id:'bot-a'},'bot-b':{id:'bot-b'}}},readOnly:()=>undefined}
+  const runtime={load:async()=>{loads++},state:{bots:{'bot-a':{id:'bot-a',name:'A'},'bot-b':{id:'bot-b',name:'B'}}},readOnly:()=>undefined,chatOf:id=>`session-${id}`}
   const model=createProductReadModel({runtime,actions:{'task.attention':body=>readProductAttention({runtime,journal:j,limit:1},body)}})
   const request={action:'task.attention',payload:{}}
   await assert.rejects(model.dispatch(request,{kind:'bot'}),{code:'REMOTE_OWNER_REQUIRED'});assert.equal(loads,0)
@@ -33,6 +33,12 @@ test('contact attention is owner-only, bounded to committed Bot owners and carri
   assert.ok(['bot-a','bot-b'].includes(view.tasks.items[0].botId))
   assert.deepEqual(Object.keys(view.tasks.items[0]).sort(),['botId','state','taskId'])
   assert.doesNotMatch(JSON.stringify(view),/input-sentinel|核对结果|funding|deleted-bot/)
+  const inbox=await model.dispatch({...request,payload:{view:'inbox'}},{kind:'owner'})
+  assert.equal(inbox.inboxView,true)
+  assert.deepEqual(inbox.bots,[{id:'bot-a',name:'A',sessionId:'session-bot-a'},{id:'bot-b',name:'B',sessionId:'session-bot-b'}])
+  assert.equal(inbox.tasks.items[0].title,'核对结果')
+  assert.doesNotMatch(JSON.stringify(inbox),/input-sentinel|funding|deleted-bot|operationId/)
+  await assert.rejects(model.dispatch({...request,payload:{view:'other'}},{kind:'owner'}),{code:'INVALID_ATTENTION_REQUEST'})
   await assert.rejects(model.dispatch({...request,payload:{botIds:['deleted-bot'],limit:99999}},{kind:'owner'}),{code:'INVALID_ATTENTION_REQUEST'})
   assert.equal(j.productList(['bot-a','bot-b','deleted-bot']).total,3)
 })

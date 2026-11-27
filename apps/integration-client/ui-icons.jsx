@@ -3,6 +3,7 @@ import React from 'react'
 const paths = {
   home: ['m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Zm6 11v-8h6v8'],
   inbox: ['M4 4h16l2 10v6H2v-6Zm-2 10h6l2 3h4l2-3h6'],
+  message: ['M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm3 5h10M7 13h7'],
   bell: ['M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4'],
   clock: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 4v5l3 2'],
   activity: ['M3 12h4l3-8 4 16 3-8h4'],

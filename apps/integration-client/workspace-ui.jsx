@@ -67,7 +67,7 @@ export function AppearanceControls() {
 }
 
 export function WorkspaceToolbar({ title, section, onHome, onSearch, onNavigate, onOpenBotSettings, botName, onRefresh, refreshing, syncing, stale }) {
-  return <header className="bp-workspace-bar bp-workspace-toolbar"><div className="bp-workspace-location"><button type="button" className="bp-workspace-home" onClick={onHome} aria-label="返回工作空间总览" title="工作空间总览"><UiIcon name="home" size={17}/></button><h1 className="bp-workspace-current">{title}</h1></div>
+  return <header className="bp-workspace-bar bp-workspace-toolbar" data-section={section}><div className="bp-workspace-location"><button type="button" className="bp-workspace-home" onClick={onHome} aria-label="返回工作空间总览" title="工作空间总览"><UiIcon name="home" size={17}/></button><h1 className="bp-workspace-current">{title}</h1></div>
     <div className="bp-workspace-bar-actions">
       {onNavigate && <nav className="bp-toolbar-destinations" aria-label="工作空间快捷入口"><button type="button" aria-current={section === 'machines' ? 'page' : undefined} onClick={() => onNavigate('machines')}><UiIcon name="computer" size={16}/><span>电脑</span></button><button type="button" aria-current={section === 'ai' ? 'page' : undefined} onClick={() => onNavigate('ai')}><UiIcon name="spark" size={16}/><span>AI 连接</span></button></nav>}
       {onOpenBotSettings && <button type="button" className="bp-toolbar-bot-settings" onClick={onOpenBotSettings} title={`${botName ?? 'Bot'} 的模型与工具`}><UiIcon name="settings" size={16}/><span>Bot 设置</span></button>}
@@ -128,13 +128,20 @@ const destinationFor = row => ({ section: 'tasks', botId: row.botId, taskId: tas
 export function WorkspaceInbox({ snapshot, onNavigate, openSession, preview = false }) {
   const { progress, tasksAvailable } = useMemo(() => workspaceOverview(snapshot), [snapshot])
   const [stage, setStage] = useState('all')
+  const stageCounts = new Map()
+  for (const row of progress.attention) stageCounts.set(row.stage, (stageCounts.get(row.stage) ?? 0) + 1)
   const rows = progress.attention.filter(row => stage === 'all' || row.stage === stage)
   const visible = preview ? rows.slice(0, 4) : rows
   return <section className={`bp-inbox${preview ? ' bp-inbox-preview' : ''}`} aria-label="任务待办">
-    <div className="bp-section-heading"><div><p className="bp-section-kicker">NEEDS YOUR ATTENTION</p><h2>需要你处理 <span className="bp-count">{tasksAvailable ? progress.attention.length : '—'}</span></h2></div>{preview && progress.attention.length > 0 && <button className="bp-text-button" type="button" onClick={() => onNavigate({ section: 'inbox' })}>查看全部<UiIcon name="chevron" size={14} /></button>}</div>
+    <div className="bp-section-heading"><div>{preview && <p className="bp-section-kicker">NEEDS YOUR ATTENTION</p>}<h2>{preview ? '需要你处理' : '任务待办'} <span className="bp-count">{tasksAvailable ? progress.attention.length : '—'}</span></h2></div>{preview && progress.attention.length > 0 && <button className="bp-text-button" type="button" onClick={() => onNavigate({ section: 'inbox' })}>查看全部<UiIcon name="chevron" size={14} /></button>}</div>
     {!tasksAvailable ? <div className="bp-empty-work"><UiIcon name="inbox" size={28} /><p>{snapshot.tasks?.reason ?? '任务状态暂不可用。'}</p>{snapshot.tasks?.nextAction && <small>{snapshot.tasks.nextAction}</small>}</div> : <>
       {snapshot.tasks.truncated && <p className="bp-muted">待办来自已加载的 {progress.items.length} / {snapshot.tasks.total ?? '未知'} 条任务。</p>}
-      {!preview && progress.attention.length > 0 && <div className="bp-inbox-filters" aria-label="按待办类型筛选"><button type="button" aria-pressed={stage === 'all'} onClick={() => setStage('all')}>全部 {progress.attention.length}</button>{Object.entries(STAGES).filter(([key]) => progress.attention.some(row => row.stage === key)).map(([key, [label]]) => <button type="button" key={key} aria-pressed={stage === key} onClick={() => setStage(key)}>{label} {progress.attention.filter(row => row.stage === key).length}</button>)}</div>}
+      {!preview && (progress.attention.length > 0 || stage !== 'all') && <div className="bp-inbox-filters" aria-label="按待办类型筛选">
+        <button type="button" aria-pressed={stage === 'all'} onClick={() => setStage('all')}>全部 {progress.attention.length}</button>
+        {Object.entries(STAGES).filter(([key]) => key === stage || stageCounts.has(key)).map(([key, [label]]) => (
+          <button type="button" key={key} aria-pressed={stage === key} onClick={() => setStage(key)}>{label} {stageCounts.get(key) ?? 0}</button>
+        ))}
+      </div>}
       {!progress.attention.length ? <div className="bp-empty-work"><span className="bp-calm-mark"><UiIcon name="check" size={26} /></span><h3>暂时没有需要你介入的任务</h3><p>团队的任务进展会在这里汇集。</p><button type="button" onClick={() => onNavigate({ section: 'tasks' })}>查看团队任务<UiIcon name="arrow" size={14} /></button></div> : <div className="bp-inbox-rows">{visible.map(row => {
         const task = progress.items.find(item => taskKey(item) === taskKey(row))
         const bot = snapshot.bots?.find(item => item.id === row.botId)

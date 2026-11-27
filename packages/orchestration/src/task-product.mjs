@@ -36,21 +36,28 @@ export function projectProductTask(task) {
   }
 }
 
-/** Bounded owner navigation data; never reads funding receipts or backend inputs. */
+/** Bounded owner navigation data. The inbox explicitly asks for the task titles it displays. */
 export async function readProductAttention({ runtime, journal, limit = 512 }, payload = {}) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length) {
+  const inbox = payload?.view === 'inbox'
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)
+    || Object.keys(payload).some(key => key !== 'view') || (Object.hasOwn(payload, 'view') && !inbox)) {
     throw Object.assign(new Error('INVALID_ATTENTION_REQUEST'), { code: 'INVALID_ATTENTION_REQUEST' })
   }
   await runtime.load()
-  const loaded = journal.productList(Object.values(runtime.state?.bots ?? {}).map(bot => bot.id), { limit })
+  const bots = Object.values(runtime.state?.bots ?? {})
+  const botIds = bots.map(bot => bot.id)
+  const loaded = journal.productList(botIds, { limit })
   const items = loaded.items.map(task => {
     const view = projectProductTask(task)
     const remote = view.result?.remote
     return { botId: view.botId, taskId: view.taskId, state: view.state,
+      ...(inbox ? { title: view.title } : {}),
       ...(remote ? { result: { remote: { stopConfirmed: remote.stopConfirmed, possiblyApplied: remote.possiblyApplied,
         ...(remote.notStarted === true ? { notStarted: true } : {}) } } } : {}) }
   })
-  return { schemaVersion: 1, tasks: { status: 'available', items, total: loaded.total, truncated: loaded.truncated } }
+  return { schemaVersion: 1, botIds, tasks: { status: 'available', items, total: loaded.total, truncated: loaded.truncated },
+    ...(inbox ? { inboxView: true, observedAt: new Date().toISOString(),
+      bots: bots.map(bot => ({ id: bot.id, name: bot.name, sessionId: runtime.chatOf(bot.id) })) } : {}) }
 }
 
 /** The service checks the Bot's committed task/read grant and the task's owner first. */

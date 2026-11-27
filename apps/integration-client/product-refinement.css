@@ -137,6 +137,7 @@ html body[data-bot-product-ui] .bb-save .bb-overview { margin-top: 12px; }
   html body[data-bot-product-ui] .bp-workspace-toolbar .bp-workspace-bar-actions { gap: 3px; }
   html body[data-bot-product-ui] .bp-workspace-toolbar button { min-width: 30px; min-height: 32px; padding: 7px; }
   .bp-toolbar-destinations { gap: 3px; }
+  .bp-workspace-toolbar[data-section=inbox] .bp-toolbar-destinations { display: none; }
   .bp-toolbar-destinations span, .bp-toolbar-bot-settings > span { display: none; }
   .bp-workspace > .bp-page { padding: 16px; }
   .bp-computer-connections { padding: 0 14px 16px; }

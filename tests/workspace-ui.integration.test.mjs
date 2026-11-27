@@ -11,9 +11,9 @@ import { chatSettingsFixture } from './fixtures/chat-settings-data.mjs'
 
 const parent = resolve('tmp/integration/workspace-upgrade'); await mkdir(parent, { recursive: true })
 const directory = await mkdtemp(join(parent, 'components-')), output = join(directory, 'workspace.mjs')
-const bundle = await build({ stdin: { contents: "export * from './apps/integration-client/panels.jsx'; export * from './apps/integration-client/workspace-ui.jsx'; export * from './apps/integration-client/workspace-navigation.mjs'", resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, platform: 'node', format: 'esm', external: ['react', 'react-dom', 'react-dom/*'], write: false , loader: { '.css': 'text' } })
+const bundle = await build({ stdin: { contents: "export * from './apps/integration-client/panels.jsx'; export * from './apps/integration-client/workspace-ui.jsx'; export * from './apps/integration-client/workspace-navigation.mjs'; export { ContactAttentionNavigation } from './apps/integration-client/contact-attention.jsx'", resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, platform: 'node', format: 'esm', external: ['react', 'react-dom', 'react-dom/*'], write: false , loader: { '.css': 'text' } })
 await writeFile(output, bundle.outputFiles[0].contents)
-const { ProductPage, Tasks, workspaceNavigation, workspaceAppearance, installWorkspaceAppearance } = await import(pathToFileURL(output))
+const { ProductPage, Tasks, WorkspaceInbox, ContactAttentionNavigation, workspaceNavigation, workspaceAppearance, installWorkspaceAppearance } = await import(pathToFileURL(output))
 
 test('the registered product page owns its compact toolbar and opens only the current Host committed Bot settings',async()=>{
   await withDom(async({render,container,click})=>{
@@ -106,6 +106,48 @@ test('a home goal reaches the preview composer once without creating work, inclu
     await render(React.createElement(ProductPage, { ...props, section: 'tasks' }))
     assert.equal(container.querySelector('.bp-task-composer textarea').value, '用户继续修改过的目标', 'same-Host navigation retains the edited draft without replaying the home transfer')
     assert.equal(calls.some(row => row.action === 'botRouting.dispatch'), false)
+  })
+})
+
+test('a selected task filter survives live updates and can return to all tasks', async () => {
+  await withDom(async ({ render, container, button, click }) => {
+    const snapshot = sample()
+    const view = tasks => React.createElement(WorkspaceInbox, { snapshot: { ...snapshot, tasks }, onNavigate() {} })
+    await render(view(snapshot.tasks))
+    await click('收据待核对 1')
+    const selected = button('收据待核对 1')
+    await render(view({ ...snapshot.tasks, items: snapshot.tasks.items.filter(row => row.state !== 'needs-reconciliation') }))
+    assert.equal(button('收据待核对 0'), selected)
+    assert.equal(selected.getAttribute('aria-pressed'), 'true')
+    assert.match(container.textContent, /该类型暂无待办/)
+    await click('全部 1')
+    assert.match(container.querySelector('.bp-inbox-item').textContent, /审批原始任务/)
+  })
+})
+
+test('the visible inbox and contact badge share a refresh and retain real task titles', async () => {
+  await withDom(async ({ render, container, dom, settle }) => {
+    Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+    const full = sample(), counts = { full: 0, summary: 0, inbox: 0 }
+    const live = { ...full, inboxView: true, tasks: { ...full.tasks, items: [...full.tasks.items] } }
+    const api = {
+      snapshot: async () => { counts.full++; return full },
+      attention: async () => { counts.summary++; return full },
+      inbox: async () => { counts.inbox++; return { ...live } },
+    }
+    await render(React.createElement(React.Fragment, null,
+      React.createElement(ContactAttentionNavigation, { productApi: api, onNavigate() {} }),
+      React.createElement(ProductPage, { section: 'inbox', productApi: api }),
+    ))
+    assert.equal(counts.full, 1)
+    assert.equal(counts.inbox, 1)
+    assert.equal(container.querySelector('.bp-contact-attention').textContent, '2+')
+    live.tasks = { ...live.tasks, items: [live.tasks.items[2]] }
+    const before = { ...counts }
+    await settle(() => document.dispatchEvent(new dom.window.Event('visibilitychange')))
+    assert.deepEqual(counts, { ...before, inbox: before.inbox + 1 })
+    assert.equal(container.querySelector('.bp-contact-attention').textContent, '1+')
+    assert.match(container.querySelector('.bp-inbox-item').textContent, /审批原始任务/)
   })
 })
 
